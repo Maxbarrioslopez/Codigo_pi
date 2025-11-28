@@ -1,0 +1,45 @@
+# Global
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.swp
+*.swo
+.vscode/
+.idea/
+.env
+.env.*
+
+# Node / Frontend
+node_modules/
+dist/
+build/
+.cache/
+coverage/
+*.tsbuildinfo
+*.map
+
+# Vite / React
+vite-dist/
+*.local
+
+# Python / Backend
+__pycache__/
+*.py[cod]
+*.pyo
+.mypy_cache/
+.pytest_cache/
+.venv/
+venv/
+env/
+Pipfile.lock
+poetry.lock
+
+# Django
+*.sqlite3
+media/
+staticfiles/
+
+# Tests & reports
+coverage.xml
+coverage_html/

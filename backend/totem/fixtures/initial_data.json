@@ -1,0 +1,89 @@
+[
+    {
+        "model": "totem.parametrooperativo",
+        "pk": 1,
+        "fields": {
+            "clave": "qr_ttl_min",
+            "valor": "30",
+            "descripcion": "Tiempo de vida del QR en minutos antes de expirar"
+        }
+    },
+    {
+        "model": "totem.parametrooperativo",
+        "pk": 2,
+        "fields": {
+            "clave": "ciclo_duracion_dias",
+            "valor": "60",
+            "descripcion": "Duración por defecto de un ciclo bimensual en días"
+        }
+    },
+    {
+        "model": "totem.parametrooperativo",
+        "pk": 3,
+        "fields": {
+            "clave": "stock_umbral_bajo",
+            "valor": "10",
+            "descripcion": "Umbral de stock bajo para alertas"
+        }
+    },
+    {
+        "model": "totem.parametrooperativo",
+        "pk": 4,
+        "fields": {
+            "clave": "max_agendamientos_dia",
+            "valor": "50",
+            "descripcion": "Máximo de agendamientos permitidos por día"
+        }
+    },
+    {
+        "model": "totem.sucursal",
+        "pk": 1,
+        "fields": {
+            "nombre": "Casa Central",
+            "codigo": "CENTRAL"
+        }
+    },
+    {
+        "model": "totem.sucursal",
+        "pk": 2,
+        "fields": {
+            "nombre": "Sucursal Norte",
+            "codigo": "NORTE"
+        }
+    },
+    {
+        "model": "totem.sucursal",
+        "pk": 3,
+        "fields": {
+            "nombre": "Sucursal Sur",
+            "codigo": "SUR"
+        }
+    },
+    {
+        "model": "totem.stocksucursal",
+        "pk": 1,
+        "fields": {
+            "sucursal": "Central",
+            "producto": "Caja Premium",
+            "cantidad": 50
+        }
+    },
+    {
+        "model": "totem.stocksucursal",
+        "pk": 2,
+        "fields": {
+            "sucursal": "Central",
+            "producto": "Caja Estándar",
+            "cantidad": 100
+        }
+    },
+    {
+        "model": "totem.ciclo",
+        "pk": 1,
+        "fields": {
+            "fecha_inicio": "2025-11-01",
+            "fecha_fin": "2025-12-31",
+            "activo": true
+        }
+    }
+]

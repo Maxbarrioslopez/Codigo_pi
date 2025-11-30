@@ -1,31 +1,27 @@
 import { useState, useEffect } from 'react';
 import { BarChart3, Users, FileText, AlertCircle, Upload, UserPlus, User, Eye, EyeOff, Download, Filter, CheckCircle2, Info } from 'lucide-react';
-import { listarIncidencias, listarAgendamientosPorRut, listarTickets, reportesRetirosPorDia, TicketDTO, IncidenciaDTO, AgendamientoDTO, CicloDTO, RetirosDiaDTO } from '../services/api';
+import { listarIncidencias, listarAgendamientosPorRut, listarTickets, reportesRetirosPorDia, resolverIncidencia, cambiarEstadoIncidencia, TicketDTO, IncidenciaDTO, AgendamientoDTO, CicloDTO, RetirosDiaDTO } from '../services/api';
 import { useCicloActivo } from '../hooks/useCicloActivo';
 
-type RRHHScreen = 'login' | 'dashboard';
 type DashboardTab = 'dashboard' | 'nomina' | 'retiros' | 'incidencias';
 
 export function RRHHModule() {
-  const [currentScreen, setCurrentScreen] = useState<RRHHScreen>('login');
   const [currentTab, setCurrentTab] = useState<DashboardTab>('dashboard');
-  const [showPassword, setShowPassword] = useState(false);
   const { ciclo } = useCicloActivo();
   const [incidencias, setIncidencias] = useState<IncidenciaDTO[]>([]);
   const [agendamientos, setAgendamientos] = useState<AgendamientoDTO[]>([]);
   const [tickets, setTickets] = useState<TicketDTO[]>([]);
   const [retirosDia, setRetirosDia] = useState<RetirosDiaDTO[]>([]);
-  const rutDemo = '12345678-5'; // TODO: reemplazar por selección dinámica
+  const [rutFilter, setRutFilter] = useState<string>('12345678-5');
 
   useEffect(() => {
-    if (currentScreen !== 'dashboard') return;
     let active = true;
     (async () => {
       try {
         const [inc, ag, tks, rep] = await Promise.all([
           listarIncidencias().catch(() => [] as IncidenciaDTO[]),
-          listarAgendamientosPorRut(rutDemo).catch(() => [] as AgendamientoDTO[]),
-          listarTickets(rutDemo).catch(() => [] as TicketDTO[]),
+          listarAgendamientosPorRut(rutFilter).catch(() => [] as AgendamientoDTO[]),
+          listarTickets(rutFilter).catch(() => [] as TicketDTO[]),
           reportesRetirosPorDia(7).catch(() => [] as RetirosDiaDTO[])
         ]);
         if (!active) return;
@@ -36,111 +32,20 @@ export function RRHHModule() {
       } catch {/* silencioso */ }
     })();
     return () => { active = false; };
-  }, [currentScreen, rutDemo]);
-
-  const handleLogin = () => {
-    setCurrentScreen('dashboard');
-  };
-
-  if (currentScreen === 'login') {
-    return <RRHHLogin onLogin={handleLogin} showPassword={showPassword} setShowPassword={setShowPassword} />;
-  }
+  }, [rutFilter]);
 
   return (
     <RRHHDashboard
       currentTab={currentTab}
       setCurrentTab={setCurrentTab}
-      onLogout={() => setCurrentScreen('login')}
+      onLogout={() => { /* cierre de sesión gestionado por App/Auth */ }}
       ciclo={ciclo}
       tickets={tickets}
       incidencias={incidencias}
       retirosDia={retirosDia}
+      rutFilter={rutFilter}
+      setRutFilter={setRutFilter}
     />
-  );
-}
-
-function RRHHLogin({
-  onLogin,
-  showPassword,
-  setShowPassword
-}: {
-  onLogin: () => void;
-  showPassword: boolean;
-  setShowPassword: (show: boolean) => void;
-}) {
-  return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-[#333333] mb-2">Dashboard RRHH - Login</h2>
-        <p className="text-[#6B6B6B]">
-          Vista de inicio de sesión para el personal de Recursos Humanos (1440×900)
-        </p>
-      </div>
-
-      {/* Login Screen */}
-      <div className="bg-[#F8F8F8] rounded-xl p-12 min-h-[600px] flex items-center justify-center">
-        <div className="bg-white rounded-xl border-2 border-[#E0E0E0] p-12 w-full max-w-md shadow-lg">
-          {/* Logo */}
-          <div className="w-20 h-20 bg-gradient-to-br from-[#E12019] to-[#B51810] rounded-xl flex items-center justify-center mx-auto mb-8">
-            <span className="text-white" style={{ fontSize: '24px', fontWeight: 700 }}>TML</span>
-          </div>
-
-          <h2 className="text-[#333333] text-center mb-8" style={{ fontSize: '30px', fontWeight: 700 }}>
-            Ingreso RRHH / Administración
-          </h2>
-
-          {/* Form */}
-          <div className="space-y-6">
-            <div>
-              <label className="block text-[#333333] mb-2" style={{ fontSize: '16px', fontWeight: 500 }}>
-                Usuario
-              </label>
-              <input
-                type="text"
-                placeholder="Ingrese su usuario"
-                className="w-full px-4 py-3 bg-white border-2 border-[#E0E0E0] rounded-xl text-[#333333] placeholder:text-[#6B6B6B] focus:border-[#E12019] focus:outline-none"
-                style={{ fontSize: '16px' }}
-              />
-            </div>
-
-            <div>
-              <label className="block text-[#333333] mb-2" style={{ fontSize: '16px', fontWeight: 500 }}>
-                Contraseña
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Ingrese su contraseña"
-                  className="w-full px-4 py-3 bg-white border-2 border-[#E0E0E0] rounded-xl text-[#333333] placeholder:text-[#6B6B6B] focus:border-[#E12019] focus:outline-none pr-12"
-                  style={{ fontSize: '16px' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6B6B6B] hover:text-[#333333]"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            <button
-              onClick={onLogin}
-              className="w-full px-8 py-4 bg-[#E12019] text-white rounded-xl hover:bg-[#B51810] transition-colors"
-              style={{ fontSize: '18px', fontWeight: 700, minHeight: '56px' }}
-            >
-              Iniciar sesión
-            </button>
-
-            <div className="text-center">
-              <a href="#" className="text-[#E12019] hover:text-[#B51810]" style={{ fontSize: '14px' }}>
-                ¿Olvidaste tu contraseña?
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -151,7 +56,9 @@ function RRHHDashboard({
   ciclo,
   tickets,
   incidencias,
-  retirosDia
+  retirosDia,
+  rutFilter,
+  setRutFilter,
 }: {
   currentTab: DashboardTab;
   setCurrentTab: (tab: DashboardTab) => void;
@@ -160,6 +67,8 @@ function RRHHDashboard({
   tickets: TicketDTO[];
   incidencias: IncidenciaDTO[];
   retirosDia: RetirosDiaDTO[];
+  rutFilter: string;
+  setRutFilter: (rut: string) => void;
 }) {
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
@@ -191,6 +100,17 @@ function RRHHDashboard({
               </h3>
             </div>
             <div className="flex items-center gap-4">
+              {/* Filtro por RUT para datos */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={rutFilter}
+                  onChange={(e) => setRutFilter(e.target.value)}
+                  placeholder="RUT trabajador (ej: 12345678-5)"
+                  className="px-3 py-2 bg-white border-2 border-[#E0E0E0] rounded-lg text-[#333333] placeholder:text-[#6B6B6B] focus:border-[#E12019] focus:outline-none"
+                  style={{ fontSize: '14px', minWidth: '220px' }}
+                />
+              </div>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-[#E0E0E0] rounded-full flex items-center justify-center">
                   <User className="w-5 h-5 text-[#6B6B6B]" />
@@ -1333,14 +1253,44 @@ function IncidenciasView() {
   const [selectedIncident, setSelectedIncident] = useState<any>(null);
   const [showResolveModal, setShowResolveModal] = useState(false);
   const [resolution, setResolution] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [incidencias, setIncidencias] = useState<IncidenciaDTO[]>([]);
 
-  const incidencias = [
-    { id: 'INC-0001', tipo: 'Ticket ilegible o dañado', trabajador: 'Carlos Muñoz', rut: '98.765.432-1', estado: 'Abierta', fecha: '09/11/2025', hora: '14:15', guardia: 'Juan Pérez', descripcion: 'El código QR del ticket no se puede escanear, está manchado', comentarios: '' },
-    { id: 'INC-0002', tipo: 'Trabajador sin ticket', trabajador: 'Ana Vargas', rut: '11.222.333-4', estado: 'En proceso', fecha: '09/11/2025', hora: '13:58', guardia: 'Juan Pérez', descripcion: 'Trabajadora indica que nunca recibió el ticket en su correo', comentarios: 'Verificando correo en sistema' },
-    { id: 'INC-0003', tipo: 'Beneficio incorrecto', trabajador: 'Pedro Soto', rut: '55.666.777-8', estado: 'Abierta', fecha: '08/11/2025', hora: '16:30', guardia: 'María Torres', descripcion: 'Se le asignó caja estándar pero debería tener premium', comentarios: '' },
-    { id: 'INC-0004', tipo: 'Sistema caído', trabajador: 'N/A', rut: 'N/A', estado: 'Resuelta', fecha: '08/11/2025', hora: '10:15', guardia: 'María Torres', descripcion: 'Tótem no responde, pantalla negra', comentarios: 'Reinicio del sistema solucionó el problema' },
-    { id: 'INC-0005', tipo: 'Otro problema', trabajador: 'Roberto Morales', rut: '44.555.666-7', estado: 'Resuelta', fecha: '07/11/2025', hora: '15:20', guardia: 'Juan Pérez', descripcion: 'Trabajador recibió beneficio de otro trabajador por error', comentarios: 'Beneficio corregido y entregado correctamente' },
-  ];
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const data = await listarIncidencias();
+        if (active) setIncidencias(data);
+      } catch { /* silencioso */ }
+    })();
+    return () => { active = false; };
+  }, []);
+
+  const handleResolve = async (codigo: string, nuevoEstado: 'en_proceso' | 'resuelta') => {
+    setLoading(true);
+    try {
+      if (nuevoEstado === 'resuelta' && !resolution.trim()) {
+        alert('Por favor ingresa una resolución antes de marcar como resuelta.');
+        return;
+      }
+      if (nuevoEstado === 'resuelta') {
+        await resolverIncidencia(codigo, resolution);
+      } else {
+        await cambiarEstadoIncidencia(codigo, nuevoEstado);
+      }
+      // Actualizar lista
+      const updated = await listarIncidencias();
+      setIncidencias(updated);
+      setShowResolveModal(false);
+      setSelectedIncident(null);
+      setResolution('');
+    } catch (err: any) {
+      alert(`Error: ${err.detail || 'No se pudo actualizar la incidencia'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -1358,15 +1308,15 @@ function IncidenciasView() {
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-white border-2 border-[#E0E0E0] rounded-xl p-4">
           <p className="text-[#6B6B6B] mb-1" style={{ fontSize: '14px' }}>Abiertas</p>
-          <p className="text-[#E12019]" style={{ fontSize: '28px', fontWeight: 700 }}>2</p>
+          <p className="text-[#E12019]" style={{ fontSize: '28px', fontWeight: 700 }}>{incidencias.filter(i => i.estado === 'abierta' || i.estado === 'pendiente').length}</p>
         </div>
         <div className="bg-white border-2 border-[#E0E0E0] rounded-xl p-4">
           <p className="text-[#6B6B6B] mb-1" style={{ fontSize: '14px' }}>En proceso</p>
-          <p className="text-[#FF9F55]" style={{ fontSize: '28px', fontWeight: 700 }}>1</p>
+          <p className="text-[#FF9F55]" style={{ fontSize: '28px', fontWeight: 700 }}>{incidencias.filter(i => i.estado === 'en_proceso').length}</p>
         </div>
         <div className="bg-white border-2 border-[#E0E0E0] rounded-xl p-4">
           <p className="text-[#6B6B6B] mb-1" style={{ fontSize: '14px' }}>Resueltas hoy</p>
-          <p className="text-[#017E49]" style={{ fontSize: '28px', fontWeight: 700 }}>2</p>
+          <p className="text-[#017E49]" style={{ fontSize: '28px', fontWeight: 700 }}>{incidencias.filter(i => i.estado === 'resuelta' && i.resolved_at && new Date(i.resolved_at).toDateString() === new Date().toDateString()).length}</p>
         </div>
       </div>
 
@@ -1375,41 +1325,38 @@ function IncidenciasView() {
           <table className="w-full">
             <thead className="bg-[#F8F8F8]">
               <tr>
-                <th className="px-6 py-3 text-left text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>ID</th>
+                <th className="px-6 py-3 text-left text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>Código</th>
                 <th className="px-6 py-3 text-left text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>Tipo</th>
-                <th className="px-6 py-3 text-left text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>Trabajador</th>
+                <th className="px-6 py-3 text-left text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>Descripción</th>
                 <th className="px-6 py-3 text-left text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>Estado</th>
                 <th className="px-6 py-3 text-left text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>Fecha</th>
-                <th className="px-6 py-3 text-left text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>Guardia</th>
+                <th className="px-6 py-3 text-left text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>Creada por</th>
                 <th className="px-6 py-3 text-left text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>Acciones</th>
               </tr>
             </thead>
             <tbody>
               {incidencias.map((inc, index) => (
                 <tr key={index} className="border-t border-[#E0E0E0] hover:bg-[#F8F8F8]">
-                  <td className="px-6 py-4 text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>{inc.id}</td>
+                  <td className="px-6 py-4 text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>{inc.codigo}</td>
                   <td className="px-6 py-4 text-[#333333]" style={{ fontSize: '14px' }}>{inc.tipo}</td>
-                  <td className="px-6 py-4">
-                    <p className="text-[#333333]" style={{ fontSize: '14px' }}>{inc.trabajador}</p>
-                    {inc.rut !== 'N/A' && (
-                      <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>{inc.rut}</p>
-                    )}
+                  <td className="px-6 py-4 text-[#333333]" style={{ fontSize: '14px', maxWidth: '300px' }} title={inc.descripcion}>
+                    {inc.descripcion?.slice(0, 60)}{inc.descripcion && inc.descripcion.length > 60 ? '...' : ''}
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full uppercase ${inc.estado === 'Resuelta' ? 'bg-[#017E49]' :
-                      inc.estado === 'En proceso' ? 'bg-[#FF9F55]' :
+                    <span className={`px-3 py-1 rounded-full uppercase ${inc.estado === 'resuelta' ? 'bg-[#017E49]' :
+                      inc.estado === 'en_proceso' ? 'bg-[#FF9F55]' :
                         'bg-[#E12019]'
                       } text-white`} style={{ fontSize: '12px', fontWeight: 700 }}>
                       {inc.estado}
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <p className="text-[#333333]" style={{ fontSize: '14px' }}>{inc.fecha}</p>
-                    <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>{inc.hora}</p>
+                    <p className="text-[#333333]" style={{ fontSize: '14px' }}>{new Date(inc.created_at).toLocaleDateString('es-CL')}</p>
+                    <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>{new Date(inc.created_at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</p>
                   </td>
-                  <td className="px-6 py-4 text-[#333333]" style={{ fontSize: '14px' }}>{inc.guardia}</td>
+                  <td className="px-6 py-4 text-[#333333]" style={{ fontSize: '14px' }}>{inc.creada_por}</td>
                   <td className="px-6 py-4">
-                    {inc.estado !== 'Resuelta' && (
+                    {inc.estado !== 'resuelta' && (
                       <button
                         onClick={() => {
                           setSelectedIncident(inc);
@@ -1425,143 +1372,150 @@ function IncidenciasView() {
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
+          </tbody>
+        </table>
+      </div>
 
-        <div className="px-6 py-4 border-t-2 border-[#E0E0E0] flex items-center justify-between">
-          <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>
-            Mostrando 5 de 47 incidencias
-          </p>
-          <div className="flex gap-2">
-            <button className="px-4 py-2 bg-white border-2 border-[#E0E0E0] rounded-lg text-[#333333] hover:bg-[#F8F8F8]" style={{ fontSize: '14px' }}>
-              Anterior
+      <div className="px-6 py-4 border-t-2 border-[#E0E0E0] flex items-center justify-between">
+        <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>
+          Mostrando 5 de 47 incidencias
+        </p>
+        <div className="flex gap-2">
+          <button className="px-4 py-2 bg-white border-2 border-[#E0E0E0] rounded-lg text-[#333333] hover:bg-[#F8F8F8]" style={{ fontSize: '14px' }}>
+            Anterior
+          </button>
+          <button className="px-4 py-2 bg-[#E12019] text-white rounded-lg" style={{ fontSize: '14px', fontWeight: 500 }}>
+            1
+          </button>
+          <button className="px-4 py-2 bg-white border-2 border-[#E0E0E0] rounded-lg text-[#333333] hover:bg-[#F8F8F8]" style={{ fontSize: '14px' }}>
+            2
+          </button>
+          <button className="px-4 py-2 bg-white border-2 border-[#E0E0E0] rounded-lg text-[#333333] hover:bg-[#F8F8F8]" style={{ fontSize: '14px' }}>
+            Siguiente
+          </button>
+        </div>
+      </div>
+    </div>
+
+      {/* Resolve Incident Modal */ }
+  {
+    showResolveModal && selectedIncident && (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl p-8 max-w-2xl w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+          <h3 className="text-[#333333] mb-6" style={{ fontSize: '24px', fontWeight: 700 }}>
+            Resolver Incidencia {selectedIncident.id}
+          </h3>
+
+          <div className="space-y-6 mb-6">
+            {/* Incident Details */}
+            <div className="bg-[#F8F8F8] rounded-xl p-6 border-2 border-[#E0E0E0]">
+              <h4 className="text-[#333333] mb-4" style={{ fontSize: '18px', fontWeight: 500 }}>
+                Detalles de la incidencia
+              </h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[#6B6B6B] mb-1" style={{ fontSize: '14px' }}>Tipo</p>
+                  <p className="text-[#333333]" style={{ fontSize: '16px', fontWeight: 500 }}>{selectedIncident.tipo}</p>
+                </div>
+                <div>
+                  <p className="text-[#6B6B6B] mb-1" style={{ fontSize: '14px' }}>Estado actual</p>
+                  <span className={`inline-block px-3 py-1 rounded-full uppercase ${selectedIncident.estado === 'En proceso' ? 'bg-[#FF9F55]' : 'bg-[#E12019]'
+                    } text-white`} style={{ fontSize: '12px', fontWeight: 700 }}>
+                    {selectedIncident.estado}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-[#6B6B6B] mb-1" style={{ fontSize: '14px' }}>Trabajador afectado</p>
+                  <p className="text-[#333333]" style={{ fontSize: '16px', fontWeight: 500 }}>{selectedIncident.trabajador}</p>
+                  {selectedIncident.rut !== 'N/A' && (
+                    <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>{selectedIncident.rut}</p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-[#6B6B6B] mb-1" style={{ fontSize: '14px' }}>Reportado por</p>
+                  <p className="text-[#333333]" style={{ fontSize: '16px', fontWeight: 500 }}>{selectedIncident.guardia}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-[#6B6B6B] mb-1" style={{ fontSize: '14px' }}>Descripción</p>
+                  <p className="text-[#333333]" style={{ fontSize: '16px' }}>{selectedIncident.descripcion}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Resolution Section */}
+            <div>
+              <label className="block text-[#333333] mb-3" style={{ fontSize: '18px', fontWeight: 500 }}>
+                Resolución de la incidencia
+              </label>
+              <textarea
+                value={resolution}
+                onChange={(e) => setResolution(e.target.value)}
+                placeholder="Describe la solución aplicada y las acciones tomadas..."
+                className="w-full h-32 px-4 py-3 bg-white border-2 border-[#E0E0E0] rounded-xl text-[#333333] placeholder:text-[#6B6B6B] focus:border-[#017E49] focus:outline-none resize-none"
+                style={{ fontSize: '16px' }}
+              />
+            </div>
+
+            {/* Quick Actions for Common Issues */}
+            <div>
+              <p className="text-[#333333] mb-3" style={{ fontSize: '16px', fontWeight: 500 }}>
+                Acciones rápidas
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <button className="p-3 bg-white border-2 border-[#E0E0E0] rounded-xl hover:border-[#017E49] transition-colors text-left">
+                  <p className="text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>Reenviar ticket</p>
+                  <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>Enviar nuevo ticket al trabajador</p>
+                </button>
+                <button className="p-3 bg-white border-2 border-[#E0E0E0] rounded-xl hover:border-[#017E49] transition-colors text-left">
+                  <p className="text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>Cambiar beneficio</p>
+                  <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>Modificar asignación de beneficio</p>
+                </button>
+                <button className="p-3 bg-white border-2 border-[#E0E0E0] rounded-xl hover:border-[#017E49] transition-colors text-left">
+                  <p className="text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>Autorizar retiro manual</p>
+                  <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>Aprobar entrega sin ticket</p>
+                </button>
+                <button className="p-3 bg-white border-2 border-[#E0E0E0] rounded-xl hover:border-[#017E49] transition-colors text-left">
+                  <p className="text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>Escalar a TI</p>
+                  <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>Problema técnico del sistema</p>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => handleResolve(selectedIncident.codigo, 'resuelta')}
+              disabled={loading || !resolution.trim()}
+              className="flex-1 px-6 py-4 bg-[#017E49] text-white rounded-xl hover:bg-[#015A34] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ fontSize: '18px', fontWeight: 700 }}
+            >
+              {loading ? 'Guardando...' : 'Marcar como Resuelta'}
             </button>
-            <button className="px-4 py-2 bg-[#E12019] text-white rounded-lg" style={{ fontSize: '14px', fontWeight: 500 }}>
-              1
+            <button
+              onClick={() => handleResolve(selectedIncident.codigo, 'en_proceso')}
+              disabled={loading}
+              className="px-6 py-4 bg-[#FF9F55] text-white rounded-xl hover:bg-[#E88D44] transition-colors disabled:opacity-50"
+              style={{ fontSize: '18px', fontWeight: 700 }}
+            >
+              {loading ? 'Guardando...' : 'En Proceso'}
             </button>
-            <button className="px-4 py-2 bg-white border-2 border-[#E0E0E0] rounded-lg text-[#333333] hover:bg-[#F8F8F8]" style={{ fontSize: '14px' }}>
-              2
-            </button>
-            <button className="px-4 py-2 bg-white border-2 border-[#E0E0E0] rounded-lg text-[#333333] hover:bg-[#F8F8F8]" style={{ fontSize: '14px' }}>
-              Siguiente
+            <button
+              onClick={() => {
+                setShowResolveModal(false);
+                setSelectedIncident(null);
+                setResolution('');
+              }}
+              disabled={loading}
+              className="px-6 py-4 bg-white text-[#333333] border-2 border-[#E0E0E0] rounded-xl hover:bg-[#F8F8F8] transition-colors disabled:opacity-50"
+              style={{ fontSize: '18px', fontWeight: 700 }}
+            >
+              Cancelar
             </button>
           </div>
         </div>
       </div>
-
-      {/* Resolve Incident Modal */}
-      {showResolveModal && selectedIncident && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-8 max-w-2xl w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-[#333333] mb-6" style={{ fontSize: '24px', fontWeight: 700 }}>
-              Resolver Incidencia {selectedIncident.id}
-            </h3>
-
-            <div className="space-y-6 mb-6">
-              {/* Incident Details */}
-              <div className="bg-[#F8F8F8] rounded-xl p-6 border-2 border-[#E0E0E0]">
-                <h4 className="text-[#333333] mb-4" style={{ fontSize: '18px', fontWeight: 500 }}>
-                  Detalles de la incidencia
-                </h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-[#6B6B6B] mb-1" style={{ fontSize: '14px' }}>Tipo</p>
-                    <p className="text-[#333333]" style={{ fontSize: '16px', fontWeight: 500 }}>{selectedIncident.tipo}</p>
-                  </div>
-                  <div>
-                    <p className="text-[#6B6B6B] mb-1" style={{ fontSize: '14px' }}>Estado actual</p>
-                    <span className={`inline-block px-3 py-1 rounded-full uppercase ${selectedIncident.estado === 'En proceso' ? 'bg-[#FF9F55]' : 'bg-[#E12019]'
-                      } text-white`} style={{ fontSize: '12px', fontWeight: 700 }}>
-                      {selectedIncident.estado}
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-[#6B6B6B] mb-1" style={{ fontSize: '14px' }}>Trabajador afectado</p>
-                    <p className="text-[#333333]" style={{ fontSize: '16px', fontWeight: 500 }}>{selectedIncident.trabajador}</p>
-                    {selectedIncident.rut !== 'N/A' && (
-                      <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>{selectedIncident.rut}</p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-[#6B6B6B] mb-1" style={{ fontSize: '14px' }}>Reportado por</p>
-                    <p className="text-[#333333]" style={{ fontSize: '16px', fontWeight: 500 }}>{selectedIncident.guardia}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <p className="text-[#6B6B6B] mb-1" style={{ fontSize: '14px' }}>Descripción</p>
-                    <p className="text-[#333333]" style={{ fontSize: '16px' }}>{selectedIncident.descripcion}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Resolution Section */}
-              <div>
-                <label className="block text-[#333333] mb-3" style={{ fontSize: '18px', fontWeight: 500 }}>
-                  Resolución de la incidencia
-                </label>
-                <textarea
-                  value={resolution}
-                  onChange={(e) => setResolution(e.target.value)}
-                  placeholder="Describe la solución aplicada y las acciones tomadas..."
-                  className="w-full h-32 px-4 py-3 bg-white border-2 border-[#E0E0E0] rounded-xl text-[#333333] placeholder:text-[#6B6B6B] focus:border-[#017E49] focus:outline-none resize-none"
-                  style={{ fontSize: '16px' }}
-                />
-              </div>
-
-              {/* Quick Actions for Common Issues */}
-              <div>
-                <p className="text-[#333333] mb-3" style={{ fontSize: '16px', fontWeight: 500 }}>
-                  Acciones rápidas
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <button className="p-3 bg-white border-2 border-[#E0E0E0] rounded-xl hover:border-[#017E49] transition-colors text-left">
-                    <p className="text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>Reenviar ticket</p>
-                    <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>Enviar nuevo ticket al trabajador</p>
-                  </button>
-                  <button className="p-3 bg-white border-2 border-[#E0E0E0] rounded-xl hover:border-[#017E49] transition-colors text-left">
-                    <p className="text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>Cambiar beneficio</p>
-                    <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>Modificar asignación de beneficio</p>
-                  </button>
-                  <button className="p-3 bg-white border-2 border-[#E0E0E0] rounded-xl hover:border-[#017E49] transition-colors text-left">
-                    <p className="text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>Autorizar retiro manual</p>
-                    <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>Aprobar entrega sin ticket</p>
-                  </button>
-                  <button className="p-3 bg-white border-2 border-[#E0E0E0] rounded-xl hover:border-[#017E49] transition-colors text-left">
-                    <p className="text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>Escalar a TI</p>
-                    <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>Problema técnico del sistema</p>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                disabled={!resolution}
-                className="flex-1 px-6 py-4 bg-[#017E49] text-white rounded-xl hover:bg-[#015A34] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ fontSize: '18px', fontWeight: 700 }}
-              >
-                Marcar como Resuelta
-              </button>
-              <button
-                className="px-6 py-4 bg-[#FF9F55] text-white rounded-xl hover:bg-[#E88D44] transition-colors"
-                style={{ fontSize: '18px', fontWeight: 700 }}
-              >
-                En Proceso
-              </button>
-              <button
-                onClick={() => {
-                  setShowResolveModal(false);
-                  setSelectedIncident(null);
-                  setResolution('');
-                }}
-                className="px-6 py-4 bg-white text-[#333333] border-2 border-[#E0E0E0] rounded-xl hover:bg-[#F8F8F8] transition-colors"
-                style={{ fontSize: '18px', fontWeight: 700 }}
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    )
+  }
+    </div >
   );
 }

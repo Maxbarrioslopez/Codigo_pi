@@ -48,6 +48,24 @@ function getStoredToken(): string | null {
     try { return localStorage.getItem('authToken'); } catch { return null; }
 }
 
+async function refreshAccessToken(): Promise<string | null> {
+    try {
+        const refreshToken = localStorage.getItem('refresh_token');
+        if (!refreshToken) return null;
+        const resp = await fetch(`${API_BASE}/auth/refresh/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh: refreshToken })
+        });
+        if (!resp.ok) return null;
+        const data = await resp.json();
+        setAuthToken(data.access);
+        return data.access;
+    } catch {
+        return null;
+    }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     // Normalizar path para evitar duplicar "/api" si viene incluido por error.
     const normalizedPath = path.startsWith('/api/') ? path.slice(4) : path;
@@ -61,6 +79,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
         ...options,
     });
     if (!resp.ok) {
+        // Auto-refresh en caso de 401 Unauthorized
+        if (resp.status === 401 && !path.includes('/auth/')) {
+            const newToken = await refreshAccessToken();
+            if (newToken) {
+                // Reintentar request con nuevo token
+                return request<T>(path, options);
+            }
+        }
         let detail = 'Error desconocido';
         try { const js = await resp.json(); detail = js.detail || JSON.stringify(js); } catch { }
         throw { status: resp.status, detail } as ApiError;
@@ -114,6 +140,12 @@ export async function listarIncidencias(estado?: string) {
     const q = estado ? `?estado=${encodeURIComponent(estado)}` : '';
     return request<IncidenciaDTO[]>(`/incidencias/listar/${q}`);
 }
+export async function resolverIncidencia(codigo: string, resolucion: string) {
+    return request<IncidenciaDTO>(`/incidencias/${codigo}/resolver/`, { method: 'POST', body: JSON.stringify({ resolucion }) });
+}
+export async function cambiarEstadoIncidencia(codigo: string, estado: 'pendiente' | 'en_proceso' | 'resuelta') {
+    return request<IncidenciaDTO>(`/incidencias/${codigo}/estado/`, { method: 'PATCH', body: JSON.stringify({ estado }) });
+}
 
 // Ciclo y métricas
 export async function cicloActivo() { return request<CicloDTO>('/ciclo/activo/'); }
@@ -150,6 +182,8 @@ export const api = {
     crearIncidencia,
     obtenerIncidencia,
     listarIncidencias,
+    resolverIncidencia,
+    cambiarEstadoIncidencia,
     cicloActivo,
     metricasGuardia,
     listarParametros,

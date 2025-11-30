@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { api } from '../services/api';
 
 /**
  * Sistema de Autenticación con JWT
@@ -53,10 +54,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setLoading(false);
     }, []);
 
+    // Sincroniza el token de acceso con la capa API centralizada
+    useEffect(() => {
+        api.setAuthToken(accessToken ?? null);
+    }, [accessToken]);
+
+    // Base de la API para endpoints de auth (coincide con api.ts)
+    const API_BASE =
+        (import.meta as any)?.env?.VITE_API_URL?.replace(/\/$/, '') ||
+        (import.meta as any)?.env?.VITE_API_PREFIX?.replace(/\/$/, '') ||
+        '/api';
+
     const login = async (username: string, password: string) => {
         setLoading(true);
         try {
-            const response = await fetch('http://localhost:8000/api/auth/login/', {
+            const response = await fetch(`${API_BASE}/auth/login/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -88,6 +100,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             localStorage.setItem('user', JSON.stringify(userData));
             localStorage.setItem('access_token', data.access);
             localStorage.setItem('refresh_token', data.refresh);
+            // Inyectar token en la capa API
+            api.setAuthToken(data.access);
         } catch (error) {
             console.error('Error de login:', error);
             throw error;
@@ -103,6 +117,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         localStorage.removeItem('user');
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
+        api.setAuthToken(null);
     };
 
     const hasRole = (roles: string | string[]): boolean => {
@@ -137,7 +152,11 @@ export const useAuth = (): AuthContextType => {
 // Helper para refrescar el token de acceso
 export const refreshAccessToken = async (refreshToken: string): Promise<string | null> => {
     try {
-        const response = await fetch('http://localhost:8000/api/auth/refresh/', {
+        const API_BASE =
+            (import.meta as any)?.env?.VITE_API_URL?.replace(/\/$/, '') ||
+            (import.meta as any)?.env?.VITE_API_PREFIX?.replace(/\/$/, '') ||
+            '/api';
+        const response = await fetch(`${API_BASE}/auth/refresh/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -151,6 +170,8 @@ export const refreshAccessToken = async (refreshToken: string): Promise<string |
 
         const data = await response.json();
         localStorage.setItem('access_token', data.access);
+        // Actualiza token en la capa API
+        api.setAuthToken(data.access);
         return data.access;
     } catch (error) {
         console.error('Error al refrescar token:', error);

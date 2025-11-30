@@ -1372,150 +1372,149 @@ function IncidenciasView() {
                 </tr>
               ))}
             </tbody>
-          </tbody>
-        </table>
-      </div>
-
-      <div className="px-6 py-4 border-t-2 border-[#E0E0E0] flex items-center justify-between">
-        <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>
-          Mostrando 5 de 47 incidencias
-        </p>
-        <div className="flex gap-2">
-          <button className="px-4 py-2 bg-white border-2 border-[#E0E0E0] rounded-lg text-[#333333] hover:bg-[#F8F8F8]" style={{ fontSize: '14px' }}>
-            Anterior
-          </button>
-          <button className="px-4 py-2 bg-[#E12019] text-white rounded-lg" style={{ fontSize: '14px', fontWeight: 500 }}>
-            1
-          </button>
-          <button className="px-4 py-2 bg-white border-2 border-[#E0E0E0] rounded-lg text-[#333333] hover:bg-[#F8F8F8]" style={{ fontSize: '14px' }}>
-            2
-          </button>
-          <button className="px-4 py-2 bg-white border-2 border-[#E0E0E0] rounded-lg text-[#333333] hover:bg-[#F8F8F8]" style={{ fontSize: '14px' }}>
-            Siguiente
-          </button>
+          </table>
         </div>
-      </div>
-    </div>
 
-      {/* Resolve Incident Modal */ }
-  {
-    showResolveModal && selectedIncident && (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-xl p-8 max-w-2xl w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-          <h3 className="text-[#333333] mb-6" style={{ fontSize: '24px', fontWeight: 700 }}>
-            Resolver Incidencia {selectedIncident.id}
-          </h3>
-
-          <div className="space-y-6 mb-6">
-            {/* Incident Details */}
-            <div className="bg-[#F8F8F8] rounded-xl p-6 border-2 border-[#E0E0E0]">
-              <h4 className="text-[#333333] mb-4" style={{ fontSize: '18px', fontWeight: 500 }}>
-                Detalles de la incidencia
-              </h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-[#6B6B6B] mb-1" style={{ fontSize: '14px' }}>Tipo</p>
-                  <p className="text-[#333333]" style={{ fontSize: '16px', fontWeight: 500 }}>{selectedIncident.tipo}</p>
-                </div>
-                <div>
-                  <p className="text-[#6B6B6B] mb-1" style={{ fontSize: '14px' }}>Estado actual</p>
-                  <span className={`inline-block px-3 py-1 rounded-full uppercase ${selectedIncident.estado === 'En proceso' ? 'bg-[#FF9F55]' : 'bg-[#E12019]'
-                    } text-white`} style={{ fontSize: '12px', fontWeight: 700 }}>
-                    {selectedIncident.estado}
-                  </span>
-                </div>
-                <div>
-                  <p className="text-[#6B6B6B] mb-1" style={{ fontSize: '14px' }}>Trabajador afectado</p>
-                  <p className="text-[#333333]" style={{ fontSize: '16px', fontWeight: 500 }}>{selectedIncident.trabajador}</p>
-                  {selectedIncident.rut !== 'N/A' && (
-                    <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>{selectedIncident.rut}</p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-[#6B6B6B] mb-1" style={{ fontSize: '14px' }}>Reportado por</p>
-                  <p className="text-[#333333]" style={{ fontSize: '16px', fontWeight: 500 }}>{selectedIncident.guardia}</p>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-[#6B6B6B] mb-1" style={{ fontSize: '14px' }}>Descripción</p>
-                  <p className="text-[#333333]" style={{ fontSize: '16px' }}>{selectedIncident.descripcion}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Resolution Section */}
-            <div>
-              <label className="block text-[#333333] mb-3" style={{ fontSize: '18px', fontWeight: 500 }}>
-                Resolución de la incidencia
-              </label>
-              <textarea
-                value={resolution}
-                onChange={(e) => setResolution(e.target.value)}
-                placeholder="Describe la solución aplicada y las acciones tomadas..."
-                className="w-full h-32 px-4 py-3 bg-white border-2 border-[#E0E0E0] rounded-xl text-[#333333] placeholder:text-[#6B6B6B] focus:border-[#017E49] focus:outline-none resize-none"
-                style={{ fontSize: '16px' }}
-              />
-            </div>
-
-            {/* Quick Actions for Common Issues */}
-            <div>
-              <p className="text-[#333333] mb-3" style={{ fontSize: '16px', fontWeight: 500 }}>
-                Acciones rápidas
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                <button className="p-3 bg-white border-2 border-[#E0E0E0] rounded-xl hover:border-[#017E49] transition-colors text-left">
-                  <p className="text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>Reenviar ticket</p>
-                  <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>Enviar nuevo ticket al trabajador</p>
-                </button>
-                <button className="p-3 bg-white border-2 border-[#E0E0E0] rounded-xl hover:border-[#017E49] transition-colors text-left">
-                  <p className="text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>Cambiar beneficio</p>
-                  <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>Modificar asignación de beneficio</p>
-                </button>
-                <button className="p-3 bg-white border-2 border-[#E0E0E0] rounded-xl hover:border-[#017E49] transition-colors text-left">
-                  <p className="text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>Autorizar retiro manual</p>
-                  <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>Aprobar entrega sin ticket</p>
-                </button>
-                <button className="p-3 bg-white border-2 border-[#E0E0E0] rounded-xl hover:border-[#017E49] transition-colors text-left">
-                  <p className="text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>Escalar a TI</p>
-                  <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>Problema técnico del sistema</p>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex gap-3">
-            <button
-              onClick={() => handleResolve(selectedIncident.codigo, 'resuelta')}
-              disabled={loading || !resolution.trim()}
-              className="flex-1 px-6 py-4 bg-[#017E49] text-white rounded-xl hover:bg-[#015A34] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ fontSize: '18px', fontWeight: 700 }}
-            >
-              {loading ? 'Guardando...' : 'Marcar como Resuelta'}
+        <div className="px-6 py-4 border-t-2 border-[#E0E0E0] flex items-center justify-between">
+          <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>
+            Mostrando 5 de 47 incidencias
+          </p>
+          <div className="flex gap-2">
+            <button className="px-4 py-2 bg-white border-2 border-[#E0E0E0] rounded-lg text-[#333333] hover:bg-[#F8F8F8]" style={{ fontSize: '14px' }}>
+              Anterior
             </button>
-            <button
-              onClick={() => handleResolve(selectedIncident.codigo, 'en_proceso')}
-              disabled={loading}
-              className="px-6 py-4 bg-[#FF9F55] text-white rounded-xl hover:bg-[#E88D44] transition-colors disabled:opacity-50"
-              style={{ fontSize: '18px', fontWeight: 700 }}
-            >
-              {loading ? 'Guardando...' : 'En Proceso'}
+            <button className="px-4 py-2 bg-[#E12019] text-white rounded-lg" style={{ fontSize: '14px', fontWeight: 500 }}>
+              1
             </button>
-            <button
-              onClick={() => {
-                setShowResolveModal(false);
-                setSelectedIncident(null);
-                setResolution('');
-              }}
-              disabled={loading}
-              className="px-6 py-4 bg-white text-[#333333] border-2 border-[#E0E0E0] rounded-xl hover:bg-[#F8F8F8] transition-colors disabled:opacity-50"
-              style={{ fontSize: '18px', fontWeight: 700 }}
-            >
-              Cancelar
+            <button className="px-4 py-2 bg-white border-2 border-[#E0E0E0] rounded-lg text-[#333333] hover:bg-[#F8F8F8]" style={{ fontSize: '14px' }}>
+              2
+            </button>
+            <button className="px-4 py-2 bg-white border-2 border-[#E0E0E0] rounded-lg text-[#333333] hover:bg-[#F8F8F8]" style={{ fontSize: '14px' }}>
+              Siguiente
             </button>
           </div>
         </div>
       </div>
-    )
-  }
+
+      {/* Resolve Incident Modal */}
+      {
+        showResolveModal && selectedIncident && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl p-8 max-w-2xl w-full mx-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+              <h3 className="text-[#333333] mb-6" style={{ fontSize: '24px', fontWeight: 700 }}>
+                Resolver Incidencia {selectedIncident.id}
+              </h3>
+
+              <div className="space-y-6 mb-6">
+                {/* Incident Details */}
+                <div className="bg-[#F8F8F8] rounded-xl p-6 border-2 border-[#E0E0E0]">
+                  <h4 className="text-[#333333] mb-4" style={{ fontSize: '18px', fontWeight: 500 }}>
+                    Detalles de la incidencia
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-[#6B6B6B] mb-1" style={{ fontSize: '14px' }}>Tipo</p>
+                      <p className="text-[#333333]" style={{ fontSize: '16px', fontWeight: 500 }}>{selectedIncident.tipo}</p>
+                    </div>
+                    <div>
+                      <p className="text-[#6B6B6B] mb-1" style={{ fontSize: '14px' }}>Estado actual</p>
+                      <span className={`inline-block px-3 py-1 rounded-full uppercase ${selectedIncident.estado === 'En proceso' ? 'bg-[#FF9F55]' : 'bg-[#E12019]'
+                        } text-white`} style={{ fontSize: '12px', fontWeight: 700 }}>
+                        {selectedIncident.estado}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-[#6B6B6B] mb-1" style={{ fontSize: '14px' }}>Trabajador afectado</p>
+                      <p className="text-[#333333]" style={{ fontSize: '16px', fontWeight: 500 }}>{selectedIncident.trabajador}</p>
+                      {selectedIncident.rut !== 'N/A' && (
+                        <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>{selectedIncident.rut}</p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-[#6B6B6B] mb-1" style={{ fontSize: '14px' }}>Reportado por</p>
+                      <p className="text-[#333333]" style={{ fontSize: '16px', fontWeight: 500 }}>{selectedIncident.guardia}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-[#6B6B6B] mb-1" style={{ fontSize: '14px' }}>Descripción</p>
+                      <p className="text-[#333333]" style={{ fontSize: '16px' }}>{selectedIncident.descripcion}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Resolution Section */}
+                <div>
+                  <label className="block text-[#333333] mb-3" style={{ fontSize: '18px', fontWeight: 500 }}>
+                    Resolución de la incidencia
+                  </label>
+                  <textarea
+                    value={resolution}
+                    onChange={(e) => setResolution(e.target.value)}
+                    placeholder="Describe la solución aplicada y las acciones tomadas..."
+                    className="w-full h-32 px-4 py-3 bg-white border-2 border-[#E0E0E0] rounded-xl text-[#333333] placeholder:text-[#6B6B6B] focus:border-[#017E49] focus:outline-none resize-none"
+                    style={{ fontSize: '16px' }}
+                  />
+                </div>
+
+                {/* Quick Actions for Common Issues */}
+                <div>
+                  <p className="text-[#333333] mb-3" style={{ fontSize: '16px', fontWeight: 500 }}>
+                    Acciones rápidas
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button className="p-3 bg-white border-2 border-[#E0E0E0] rounded-xl hover:border-[#017E49] transition-colors text-left">
+                      <p className="text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>Reenviar ticket</p>
+                      <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>Enviar nuevo ticket al trabajador</p>
+                    </button>
+                    <button className="p-3 bg-white border-2 border-[#E0E0E0] rounded-xl hover:border-[#017E49] transition-colors text-left">
+                      <p className="text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>Cambiar beneficio</p>
+                      <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>Modificar asignación de beneficio</p>
+                    </button>
+                    <button className="p-3 bg-white border-2 border-[#E0E0E0] rounded-xl hover:border-[#017E49] transition-colors text-left">
+                      <p className="text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>Autorizar retiro manual</p>
+                      <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>Aprobar entrega sin ticket</p>
+                    </button>
+                    <button className="p-3 bg-white border-2 border-[#E0E0E0] rounded-xl hover:border-[#017E49] transition-colors text-left">
+                      <p className="text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>Escalar a TI</p>
+                      <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>Problema técnico del sistema</p>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleResolve(selectedIncident.codigo, 'resuelta')}
+                  disabled={loading || !resolution.trim()}
+                  className="flex-1 px-6 py-4 bg-[#017E49] text-white rounded-xl hover:bg-[#015A34] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ fontSize: '18px', fontWeight: 700 }}
+                >
+                  {loading ? 'Guardando...' : 'Marcar como Resuelta'}
+                </button>
+                <button
+                  onClick={() => handleResolve(selectedIncident.codigo, 'en_proceso')}
+                  disabled={loading}
+                  className="px-6 py-4 bg-[#FF9F55] text-white rounded-xl hover:bg-[#E88D44] transition-colors disabled:opacity-50"
+                  style={{ fontSize: '18px', fontWeight: 700 }}
+                >
+                  {loading ? 'Guardando...' : 'En Proceso'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowResolveModal(false);
+                    setSelectedIncident(null);
+                    setResolution('');
+                  }}
+                  disabled={loading}
+                  className="px-6 py-4 bg-white text-[#333333] border-2 border-[#E0E0E0] rounded-xl hover:bg-[#F8F8F8] transition-colors disabled:opacity-50"
+                  style={{ fontSize: '18px', fontWeight: 700 }}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
     </div >
   );
 }

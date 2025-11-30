@@ -68,40 +68,79 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const login = async (username: string, password: string) => {
         setLoading(true);
         try {
-            const response = await fetch(`${API_BASE}/auth/login/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
+            // Usuarios mock para desarrollo independiente
+            const mockUsers: Record<string, { password: string; user: User }> = {
+                admin: {
+                    password: 'admin123',
+                    user: { id: 1, username: 'admin', rol: 'admin', email: 'admin@tmluc.cl' }
                 },
-                body: JSON.stringify({ username, password }),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Error de autenticación');
-            }
-
-            const data = await response.json();
-
-            // Decodificar el token para obtener información del usuario
-            const tokenPayload = JSON.parse(atob(data.access.split('.')[1]));
-
-            const userData: User = {
-                id: tokenPayload.user_id,
-                username: tokenPayload.username || username,
-                rol: tokenPayload.rol || 'guardia',
+                guardia: {
+                    password: 'guardia123',
+                    user: { id: 2, username: 'guardia', rol: 'guardia', email: 'guardia@tmluc.cl' }
+                },
+                rrhh: {
+                    password: 'rrhh123',
+                    user: { id: 3, username: 'rrhh', rol: 'rrhh', email: 'rrhh@tmluc.cl' }
+                }
             };
 
-            // Guardar en estado y localStorage
-            setUser(userData);
-            setAccessToken(data.access);
-            setRefreshToken(data.refresh);
+            // Intentar login con backend real primero
+            try {
+                const response = await fetch(`${API_BASE}/auth/login/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password }),
+                });
 
-            localStorage.setItem('user', JSON.stringify(userData));
-            localStorage.setItem('access_token', data.access);
-            localStorage.setItem('refresh_token', data.refresh);
-            // Inyectar token en la capa API
-            api.setAuthToken(data.access);
+                if (response.ok) {
+                    const data = await response.json();
+
+                    // Decodificar el token para obtener información del usuario
+                    const tokenPayload = JSON.parse(atob(data.access.split('.')[1]));
+
+                    const userData: User = {
+                        id: tokenPayload.user_id,
+                        username: tokenPayload.username || username,
+                        rol: tokenPayload.rol || 'guardia',
+                    };
+
+                    // Guardar en estado y localStorage
+                    setUser(userData);
+                    setAccessToken(data.access);
+                    setRefreshToken(data.refresh);
+
+                    localStorage.setItem('user', JSON.stringify(userData));
+                    localStorage.setItem('access_token', data.access);
+                    localStorage.setItem('refresh_token', data.refresh);
+                    localStorage.setItem('mock_mode', 'false');
+                    // Inyectar token en la capa API
+                    api.setAuthToken(data.access);
+                    return;
+                }
+            } catch (backendError) {
+                console.warn('Backend no disponible, usando modo mock:', backendError);
+            }
+
+            // Fallback a usuarios mock si backend no está disponible
+            const mockUser = mockUsers[username.toLowerCase()];
+            if (mockUser && mockUser.password === password) {
+                const mockToken = `mock.${btoa(JSON.stringify({ user_id: mockUser.user.id, username: mockUser.user.username, rol: mockUser.user.rol }))}.mock`;
+
+                setUser(mockUser.user);
+                setAccessToken(mockToken);
+                setRefreshToken(mockToken);
+
+                localStorage.setItem('user', JSON.stringify(mockUser.user));
+                localStorage.setItem('access_token', mockToken);
+                localStorage.setItem('refresh_token', mockToken);
+                localStorage.setItem('mock_mode', 'true');
+                api.setAuthToken(mockToken);
+                return;
+            }
+
+            throw new Error('Credenciales inválidas');
         } catch (error) {
             console.error('Error de login:', error);
             throw error;

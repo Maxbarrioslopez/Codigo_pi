@@ -22,8 +22,10 @@ urlpatterns = [
 
     # Incidencias
     path('incidencias/', views.crear_incidencia, name='crear_incidencia'),
-    path('incidencias/<str:codigo>/', views.obtener_incidencia, name='obtener_incidencia'),
     path('incidencias/listar/', views.listar_incidencias, name='listar_incidencias'),
+    path('incidencias/<str:codigo>/', views.obtener_incidencia, name='obtener_incidencia'),
+    path('incidencias/<str:codigo>/resolver/', views.resolver_incidencia, name='resolver_incidencia'),
+    path('incidencias/<str:codigo>/estado/', views.cambiar_estado_incidencia, name='cambiar_estado_incidencia'),
 
     # Ciclo y métricas
     path('ciclo/activo/', views.ciclo_activo, name='ciclo_activo'),

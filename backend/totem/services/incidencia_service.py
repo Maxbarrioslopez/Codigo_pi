@@ -118,6 +118,63 @@ class IncidenciaService:
         return list(queryset.order_by('-created_at')[:limit])
     
     @transaction.atomic
+    def resolver_incidencia(
+        self,
+        codigo: str,
+        resolucion: str
+    ) -> Incidencia:
+        """
+        Resuelve una incidencia.
+        
+        Args:
+            codigo: Código de la incidencia
+            resolucion: Descripción de la resolución
+            
+        Returns:
+            Incidencia resuelta
+        """
+        incidencia = self.obtener_incidencia(codigo)
+        
+        incidencia.estado = 'resuelta'
+        incidencia.resolved_at = timezone.now()
+        
+        # Guardar resolución en metadata
+        if 'resolucion' not in incidencia.metadata:
+            incidencia.metadata['resolucion'] = resolucion
+        if 'historial' not in incidencia.metadata:
+            incidencia.metadata['historial'] = []
+        incidencia.metadata['historial'].append({
+            'timestamp': timezone.now().isoformat(),
+            'accion': 'resuelta',
+            'resolucion': resolucion
+        })
+        
+        incidencia.save()
+        
+        logger.info(f"Incidencia {codigo} resuelta: {resolucion}")
+        return incidencia
+    
+    @transaction.atomic
+    def cambiar_estado(
+        self,
+        codigo: str,
+        nuevo_estado: str,
+        notas: str = ''
+    ) -> Incidencia:
+        """
+        Cambia el estado de una incidencia.
+        
+        Args:
+            codigo: Código de la incidencia
+            nuevo_estado: Nuevo estado (pendiente, en_proceso, resuelta)
+            notas: Notas adicionales
+            
+        Returns:
+            Incidencia actualizada
+        """
+        return self.actualizar_estado(codigo, nuevo_estado, notas)
+    
+    @transaction.atomic
     def actualizar_estado(
         self,
         codigo: str,

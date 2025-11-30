@@ -270,6 +270,48 @@ def listar_incidencias(request):
         return Response({'detail': 'Error interno del servidor'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@api_view(['POST'])
+@permission_classes([AllowTotem])
+def resolver_incidencia(request, codigo):
+    """
+    POST /api/incidencias/{codigo}/resolver/ - resuelve una incidencia.
+    Body: {"resolucion": "..."}
+    """
+    try:
+        resolucion = request.data.get('resolucion', '')
+        
+        service = IncidenciaService()
+        incidencia = service.resolver_incidencia(codigo, resolucion)
+        return Response(IncidenciaSerializer(incidencia).data)
+    except TotemBaseException:
+        raise
+    except Exception as e:
+        logger.error(f"Error inesperado en resolver_incidencia: {e}")
+        return Response({'detail': 'Error interno del servidor'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['PATCH'])
+@permission_classes([AllowTotem])
+def cambiar_estado_incidencia(request, codigo):
+    """
+    PATCH /api/incidencias/{codigo}/estado/ - cambia el estado de una incidencia.
+    Body: {"estado": "pendiente|en_proceso|resuelta"}
+    """
+    try:
+        nuevo_estado = request.data.get('estado')
+        if not nuevo_estado:
+            return Response({'detail': 'Falta campo estado'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        service = IncidenciaService()
+        incidencia = service.cambiar_estado(codigo, nuevo_estado)
+        return Response(IncidenciaSerializer(incidencia).data)
+    except TotemBaseException:
+        raise
+    except Exception as e:
+        logger.error(f"Error inesperado en cambiar_estado_incidencia: {e}")
+        return Response({'detail': 'Error interno del servidor'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 @api_view(['GET'])
 def ciclo_activo(request):
     ciclo = Ciclo.objects.filter(activo=True).order_by('-id').first()

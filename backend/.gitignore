@@ -11,10 +11,10 @@ venv/
 env/
 
 # Django
-*.sqlite3
+# *.sqlite3  # Comentado para subir db de desarrollo
 media/
 staticfiles/
 
 # Env
-.env
-.env.*
+# .env  # Comentado para subir config de desarrollo
+# .env.*

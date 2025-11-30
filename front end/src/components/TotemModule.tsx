@@ -9,12 +9,19 @@ export function TotemModule() {
   const [selectedIncidentType, setSelectedIncidentType] = useState<string>('');
   const [incidentDescription, setIncidentDescription] = useState('');
   const [selectedDay, setSelectedDay] = useState<string>('');
-  const [isWeekend, setIsWeekend] = useState(false); // Simulates if current day is weekend
-  const [rutEscaneado, setRutEscaneado] = useState<string>('12345678-5'); // Placeholder del RUT detectado en escáner
+  const [rutInput, setRutInput] = useState<string>('');
+  const [rutEscaneado, setRutEscaneado] = useState<string>('');
   const [beneficio, setBeneficio] = useState<any>(null);
   const [ticket, setTicket] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
+  const [validationSteps, setValidationSteps] = useState<Array<{ label: string; status: 'pending' | 'active' | 'complete' | 'error'; }>>([
+    { label: 'Verificando identidad', status: 'pending' },
+    { label: 'Verificando beneficio', status: 'pending' },
+    { label: 'Verificando stock', status: 'pending' },
+  ]);
+  const DEV_MODE = typeof window !== 'undefined' && window.location.search.includes('dev');
+  const isWeekend = (() => { const d = new Date().getDay(); return d === 0 || d === 6; })();
 
   function calcularFechaDesdeNombre(nombre: string): string {
     const mapping: Record<string, number> = {
@@ -36,30 +43,50 @@ export function TotemModule() {
     return target.toISOString();
   }
 
-  // Cuando entramos a pantalla 'validating' hacemos la llamada al backend
+  // Flujo de validación secuencial real
   useEffect(() => {
-    if (currentScreen === 'validating') {
+    let cancelled = false;
+    async function runValidation() {
+      if (currentScreen !== 'validating') return;
       setLoading(true);
       setErrorMsg('');
-      api.getBeneficio(rutEscaneado)
-        .then(res => {
-          setBeneficio(res.beneficio);
-          // Decidir ruta siguiente según beneficio y stock simulado
-          const stock = res.beneficio?.beneficio_disponible?.stock ?? 10; // default
-          if (!res.beneficio) {
-            setCurrentScreen('no-benefit');
-          } else if (stock <= 0) {
-            setCurrentScreen('no-stock');
-          } else {
-            setCurrentScreen('success-choice');
-          }
-        })
-        .catch(err => {
-          setErrorMsg(err.detail || 'Error validando beneficio');
-          setCurrentScreen('error');
-        })
-        .finally(() => setLoading(false));
+      setValidationSteps(prev => prev.map((s, i) => ({ ...s, status: i === 0 ? 'active' : 'pending' })));
+      try {
+        // Paso 1: identidad (en este contexto asumimos que el RUT es el ID, podríamos tener endpoint futuro)
+        await new Promise(r => setTimeout(r, 350)); // pequeña pausa visual
+        if (cancelled) return;
+        setValidationSteps(prev => prev.map((s, i) => i === 0 ? { ...s, status: 'complete' } : i === 1 ? { ...s, status: 'active' } : s));
+
+        // Paso 2: beneficio
+        const res = await api.getBeneficio(rutEscaneado);
+        if (cancelled) return;
+        setBeneficio(res.beneficio);
+        setValidationSteps(prev => prev.map((s, i) => i === 1 ? { ...s, status: 'complete' } : i === 2 ? { ...s, status: 'active' } : s));
+
+        // Paso 3: stock
+        const stock = res.beneficio?.beneficio_disponible?.stock ?? 0;
+        await new Promise(r => setTimeout(r, 250));
+        if (cancelled) return;
+        setValidationSteps(prev => prev.map((s, i) => i === 2 ? { ...s, status: 'complete' } : s));
+
+        if (!res.beneficio) {
+          setCurrentScreen('no-benefit');
+        } else if (stock <= 0) {
+          setCurrentScreen('no-stock');
+        } else {
+          setCurrentScreen('success-choice');
+        }
+      } catch (e: any) {
+        if (cancelled) return;
+        setValidationSteps(prev => prev.map((s, i) => i === 0 || i === 1 || i === 2 ? { ...s, status: s.status === 'active' ? 'error' : s.status } : s));
+        setErrorMsg(e?.detail || 'Error validando beneficio');
+        setCurrentScreen('error');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
+    runValidation();
+    return () => { cancelled = true; };
   }, [currentScreen, rutEscaneado]);
 
   const generarTicket = async () => {
@@ -103,173 +130,35 @@ export function TotemModule() {
       <div>
         <h2 className="text-[#333333] mb-2">Tótem de Autoservicio</h2>
         <p className="text-[#6B6B6B]">
-          Pantallas del kiosko de autoservicio (1080×1920, vertical, sin login). Navegue entre las pantallas para ver el flujo completo.
+          Flujo integrado del kiosko (1080×1920, vertical, sin login).
         </p>
       </div>
-
-      {/* Screen Selector */}
-      <div className="flex flex-wrap gap-3">
-        <button
-          onClick={() => setCurrentScreen('initial')}
-          className={`px-6 py-3 rounded-xl transition-colors ${currentScreen === 'initial'
-            ? 'bg-[#E12019] text-white'
-            : 'bg-white text-[#333333] border-2 border-[#E0E0E0] hover:bg-[#F8F8F8]'
-            }`}
-          style={{ fontSize: '16px', fontWeight: 500 }}
-        >
-          Pantalla Inicial
-        </button>
-        <button
-          onClick={() => setCurrentScreen('validating')}
-          className={`px-6 py-3 rounded-xl transition-colors ${currentScreen === 'validating'
-            ? 'bg-[#E12019] text-white'
-            : 'bg-white text-[#333333] border-2 border-[#E0E0E0] hover:bg-[#F8F8F8]'
-            }`}
-          style={{ fontSize: '16px', fontWeight: 500 }}
-        >
-          Validando
-        </button>
-        <button
-          onClick={() => {
-            setCurrentScreen('success-choice');
-            setIsWeekend(false);
-          }}
-          className={`px-6 py-3 rounded-xl transition-colors ${currentScreen === 'success-choice'
-            ? 'bg-[#E12019] text-white'
-            : 'bg-white text-[#333333] border-2 border-[#E0E0E0] hover:bg-[#F8F8F8]'
-            }`}
-          style={{ fontSize: '16px', fontWeight: 500 }}
-        >
-          Éxito - Elegir Retiro
-        </button>
-        <button
-          onClick={() => {
-            setCurrentScreen('success-choice');
-            setIsWeekend(true);
-          }}
-          className={`px-6 py-3 rounded-xl transition-colors ${currentScreen === 'success-choice' && isWeekend
-            ? 'bg-[#E12019] text-white'
-            : 'bg-white text-[#333333] border-2 border-[#E0E0E0] hover:bg-[#F8F8F8]'
-            }`}
-          style={{ fontSize: '16px', fontWeight: 500 }}
-        >
-          Éxito (Fin de Semana)
-        </button>
-        <button
-          onClick={() => setCurrentScreen('success')}
-          className={`px-6 py-3 rounded-xl transition-colors ${currentScreen === 'success'
-            ? 'bg-[#E12019] text-white'
-            : 'bg-white text-[#333333] border-2 border-[#E0E0E0] hover:bg-[#F8F8F8]'
-            }`}
-          style={{ fontSize: '16px', fontWeight: 500 }}
-        >
-          Ticket Generado
-        </button>
-        <button
-          onClick={() => setCurrentScreen('no-stock')}
-          className={`px-6 py-3 rounded-xl transition-colors ${currentScreen === 'no-stock'
-            ? 'bg-[#E12019] text-white'
-            : 'bg-white text-[#333333] border-2 border-[#E0E0E0] hover:bg-[#F8F8F8]'
-            }`}
-          style={{ fontSize: '16px', fontWeight: 500 }}
-        >
-          Sin Stock
-        </button>
-        <button
-          onClick={() => setCurrentScreen('error')}
-          className={`px-6 py-3 rounded-xl transition-colors ${currentScreen === 'error'
-            ? 'bg-[#E12019] text-white'
-            : 'bg-white text-[#333333] border-2 border-[#E0E0E0] hover:bg-[#F8F8F8]'
-            }`}
-          style={{ fontSize: '16px', fontWeight: 500 }}
-        >
-          Error
-        </button>
-        <button
-          onClick={() => setCurrentScreen('incident-scan')}
-          className={`px-6 py-3 rounded-xl transition-colors ${currentScreen === 'incident-scan'
-            ? 'bg-[#E12019] text-white'
-            : 'bg-white text-[#333333] border-2 border-[#E0E0E0] hover:bg-[#F8F8F8]'
-            }`}
-          style={{ fontSize: '16px', fontWeight: 500 }}
-        >
-          Consultar Incidencia
-        </button>
-        <button
-          onClick={() => setCurrentScreen('incident-status')}
-          className={`px-6 py-3 rounded-xl transition-colors ${currentScreen === 'incident-status'
-            ? 'bg-[#E12019] text-white'
-            : 'bg-white text-[#333333] border-2 border-[#E0E0E0] hover:bg-[#F8F8F8]'
-            }`}
-          style={{ fontSize: '16px', fontWeight: 500 }}
-        >
-          Estado Incidencia
-        </button>
-        <button
-          onClick={() => setCurrentScreen('incident-form')}
-          className={`px-6 py-3 rounded-xl transition-colors ${currentScreen === 'incident-form'
-            ? 'bg-[#E12019] text-white'
-            : 'bg-white text-[#333333] border-2 border-[#E0E0E0] hover:bg-[#F8F8F8]'
-            }`}
-          style={{ fontSize: '16px', fontWeight: 500 }}
-        >
-          Reportar Incidencia
-        </button>
-        <button
-          onClick={() => {
-            setCurrentScreen('schedule-select');
-            setSelectedDay('');
-          }}
-          className={`px-6 py-3 rounded-xl transition-colors ${currentScreen === 'schedule-select'
-            ? 'bg-[#E12019] text-white'
-            : 'bg-white text-[#333333] border-2 border-[#E0E0E0] hover:bg-[#F8F8F8]'
-            }`}
-          style={{ fontSize: '16px', fontWeight: 500 }}
-        >
-          Agendar Retiro
-        </button>
-        <button
-          onClick={() => {
-            setSelectedDay('jueves');
-            setCurrentScreen('schedule-confirm');
-          }}
-          className={`px-6 py-3 rounded-xl transition-colors ${currentScreen === 'schedule-confirm'
-            ? 'bg-[#E12019] text-white'
-            : 'bg-white text-[#333333] border-2 border-[#E0E0E0] hover:bg-[#F8F8F8]'
-            }`}
-          style={{ fontSize: '16px', fontWeight: 500 }}
-        >
-          Confirmar Agendamiento
-        </button>
-        <button
-          onClick={() => setCurrentScreen('no-benefit')}
-          className={`px-6 py-3 rounded-xl transition-colors ${currentScreen === 'no-benefit'
-            ? 'bg-[#E12019] text-white'
-            : 'bg-white text-[#333333] border-2 border-[#E0E0E0] hover:bg-[#F8F8F8]'
-            }`}
-          style={{ fontSize: '16px', fontWeight: 500 }}
-        >
-          Sin Beneficio
-        </button>
-      </div>
-
-      {/* Totem Screen Display */}
+      {DEV_MODE && (
+        <div className="flex flex-wrap gap-2 p-4 bg-[#F8F8F8] border rounded-xl">
+          <p className="text-xs text-[#6B6B6B] w-full">Modo desarrollador: navegación manual</p>
+          {['initial', 'validating', 'success-choice', 'success', 'no-stock', 'schedule-select', 'schedule-confirm', 'no-benefit', 'error', 'incident-scan', 'incident-status', 'incident-form', 'incident-sent'].map(s => (
+            <button key={s} onClick={() => setCurrentScreen(s as TotemScreen)} className={`text-xs px-2 py-1 rounded border ${currentScreen === s ? 'bg-[#E12019] text-white border-[#E12019]' : 'bg-white text-[#333333] hover:bg-[#F0F0F0]'}`}>{s}</button>
+          ))}
+        </div>
+      )}
       <div className="bg-[#333333] p-8 rounded-xl">
         <div className="max-w-2xl mx-auto bg-[#F8F8F8] rounded-xl shadow-2xl overflow-hidden" style={{ aspectRatio: '9/16' }}>
           {currentScreen === 'initial' && (
             <TotemInitialScreen
-              onScan={() => setCurrentScreen('validating')}
+              rutInput={rutInput}
+              onRutChange={setRutInput}
+              onScan={() => { if (rutInput.trim()) { setRutEscaneado(rutInput.trim()); setCurrentScreen('validating'); } }}
               onConsultIncident={() => setCurrentScreen('incident-scan')}
               onReportIncident={() => setCurrentScreen('incident-form')}
             />
           )}
-          {currentScreen === 'validating' && <TotemValidatingScreen loading={loading} errorMsg={errorMsg} />}
+          {currentScreen === 'validating' && <TotemValidatingScreen loading={loading} errorMsg={errorMsg} steps={validationSteps} />}
           {currentScreen === 'success-choice' && (
             <TotemSuccessChoice
               isWeekend={isWeekend}
               beneficio={beneficio}
               onSameDay={generarTicket}
-              onSchedule={() => setCurrentScreen('schedule-select')}
+              onSchedule={() => { setSelectedDay(''); setCurrentScreen('schedule-select'); }}
             />
           )}
           {currentScreen === 'success' && (
@@ -278,11 +167,13 @@ export function TotemModule() {
               onFinish={() => {
                 setTicket(null);
                 setBeneficio(null);
+                setSelectedIncidentType('');
+                setIncidentDescription('');
                 setCurrentScreen('initial');
               }}
             />
           )}
-          {currentScreen === 'no-stock' && <TotemNoStockScreen onSchedule={() => setCurrentScreen('schedule-select')} onBack={() => setCurrentScreen('initial')} />}
+          {currentScreen === 'no-stock' && <TotemNoStockScreen onSchedule={() => { setSelectedDay(''); setCurrentScreen('schedule-select'); }} onBack={() => setCurrentScreen('initial')} />}
           {currentScreen === 'schedule-select' && (
             <TotemScheduleSelect
               selectedDay={selectedDay}
@@ -328,10 +219,12 @@ export function TotemModule() {
   );
 }
 
-function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident }: {
+function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutInput, onRutChange }: {
   onScan: () => void;
   onConsultIncident: () => void;
   onReportIncident: () => void;
+  rutInput: string;
+  onRutChange: (v: string) => void;
 }) {
   return (
     <div className="h-full flex flex-col p-12">
@@ -354,15 +247,22 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident }: {
           Acerca tu documento al lector para verificar tu beneficio
         </p>
 
-        {/* Scan Area */}
-        <div className="bg-white border-4 border-dashed border-[#E12019] rounded-xl p-10 mb-8 w-full max-w-md relative">
-          <div className="flex flex-col items-center">
-            <Scan className="w-28 h-28 text-[#E12019] mb-3 animate-pulse" />
-            <p className="text-[#333333]" style={{ fontSize: '18px', fontWeight: 500 }}>
-              Modo escáner activo
+        {/* Scan Area + Input */}
+        <div className="bg-white border-4 border-dashed border-[#E12019] rounded-xl p-8 mb-8 w-full max-w-md relative">
+          <div className="flex flex-col items-center w-full">
+            <Scan className="w-24 h-24 text-[#E12019] mb-4 animate-pulse" />
+            <p className="text-[#333333] mb-2" style={{ fontSize: '18px', fontWeight: 600 }}>
+              Escáner listo
             </p>
-            <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>
-              Listo para escanear
+            <input
+              value={rutInput}
+              onChange={(e) => onRutChange(e.target.value)}
+              placeholder="Ingresa o escanea RUT (ej: 12345678-5)"
+              className="w-full px-4 py-3 rounded-lg border-2 border-[#E0E0E0] focus:border-[#E12019] outline-none text-[#333333] placeholder:text-[#6B6B6B]"
+              style={{ fontSize: '16px' }}
+            />
+            <p className="text-[#6B6B6B] mt-2" style={{ fontSize: '12px' }}>
+              Presiona el botón para validar
             </p>
           </div>
         </div>
@@ -372,10 +272,11 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident }: {
       <div className="space-y-3 mb-6">
         <button
           onClick={onScan}
-          className="w-full px-8 py-5 bg-[#E12019] text-white rounded-xl hover:bg-[#B51810] transition-colors"
+          disabled={!rutInput.trim()}
+          className={`w-full px-8 py-5 rounded-xl transition-colors ${rutInput.trim() ? 'bg-[#E12019] text-white hover:bg-[#B51810]' : 'bg-[#E0E0E0] text-[#6B6B6B] cursor-not-allowed'}`}
           style={{ fontSize: '18px', fontWeight: 700, minHeight: '64px' }}
         >
-          Escanear Beneficio
+          Validar Beneficio
         </button>
         <div className="grid grid-cols-2 gap-3">
           <button
@@ -407,12 +308,10 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident }: {
   );
 }
 
-function TotemValidatingScreen({ loading, errorMsg }: { loading?: boolean; errorMsg?: string }) {
-  const steps = [
-    { label: 'Verificando nómina', status: 'complete' as const },
-    { label: 'Revisando turno', status: 'active' as const },
-    { label: 'Aplicando seguridad', status: 'pending' as const },
-  ];
+function TotemValidatingScreen({ loading, errorMsg, steps }: { loading?: boolean; errorMsg?: string; steps: { label: string; status: 'pending' | 'active' | 'complete' | 'error'; }[] }) {
+  const total = steps.length;
+  const completed = steps.filter(s => s.status === 'complete').length;
+  const progressPct = Math.min(100, Math.round((completed / total) * 100));
 
   return (
     <div className="h-full flex flex-col items-center justify-center p-12">
@@ -428,19 +327,18 @@ function TotemValidatingScreen({ loading, errorMsg }: { loading?: boolean; error
       <div className="w-full max-w-md space-y-6">
         {steps.map((step, index) => (
           <div key={index} className="flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${step.status === 'complete' ? 'bg-[#017E49]' :
-              step.status === 'active' ? 'bg-[#FF9F55]' :
-                'bg-[#E0E0E0]'
-              }`}>
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${step.status === 'complete' ? 'bg-[#017E49]' : step.status === 'active' ? 'bg-[#FF9F55]' : step.status === 'error' ? 'bg-[#E12019]' : 'bg-[#E0E0E0]'} }`}>
               {step.status === 'complete' ? (
                 <CheckCircle2 className="w-6 h-6 text-white" />
+              ) : step.status === 'error' ? (
+                <XCircle className="w-6 h-6 text-white" />
               ) : (
                 <span className="text-white" style={{ fontSize: '18px', fontWeight: 700 }}>
                   {index + 1}
                 </span>
               )}
             </div>
-            <p className="text-[#333333]" style={{ fontSize: '18px', fontWeight: step.status === 'active' ? 500 : 400 }}>
+            <p className="text-[#333333]" style={{ fontSize: '18px', fontWeight: step.status === 'active' ? 600 : 400 }}>
               {step.label}
             </p>
           </div>
@@ -450,8 +348,9 @@ function TotemValidatingScreen({ loading, errorMsg }: { loading?: boolean; error
       {/* Progress Bar */}
       <div className="w-full max-w-md mt-12">
         <div className="h-3 bg-[#E0E0E0] rounded-full overflow-hidden">
-          <div className="h-full bg-[#E12019] rounded-full animate-pulse" style={{ width: '66%' }} />
+          <div className="h-full bg-[#E12019] rounded-full transition-all" style={{ width: `${progressPct}%` }} />
         </div>
+        <p className="text-center text-[#6B6B6B] mt-2" style={{ fontSize: '12px' }}>{progressPct}%</p>
       </div>
       {errorMsg && (
         <div className="bg-white border-2 border-[#E12019] rounded-xl p-4 w-full max-w-md mt-6">

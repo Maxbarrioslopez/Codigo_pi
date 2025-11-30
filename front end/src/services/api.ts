@@ -17,6 +17,9 @@ export interface IncidenciaDTO { id: number; codigo: string; trabajador: number 
 export interface ParametroOperativoDTO { id: number; clave: string; valor: string; descripcion: string; updated_at: string; }
 export interface BeneficioResponse { beneficio: TrabajadorDTO; }
 export interface MetricasGuardiaDTO { entregados: number; pendientes: number; incidencias_pendientes: number; }
+// Stock
+export interface StockResumenDTO { disponible: number; entregadas_hoy: number; reservadas: number; total_mes: number; por_tipo: { estandar: number; premium: number }; }
+export interface StockMovimientoDTO { fecha: string; hora: string; tipo_caja: string; accion: 'Agregado' | 'Retirado'; cantidad: number; motivo: string; usuario: string; }
 
 export interface ApiError {
     status: number;
@@ -126,6 +129,13 @@ export async function reportesRetirosPorDia(dias: number = 7) {
     return request<RetirosDiaDTO[]>(`/reportes/retiros_por_dia/?dias=${dias}`);
 }
 
+// Stock endpoints (si backend los soporta)
+export async function stockResumen() { return request<StockResumenDTO>('/stock/resumen/'); }
+export async function stockMovimientos() { return request<StockMovimientoDTO[]>('/stock/movimientos/'); }
+export async function registrarMovimientoStock(accion: 'agregar' | 'retirar', tipo_caja: 'Estándar' | 'Premium', cantidad: number, motivo: string) {
+    return request<any>('/stock/movimiento/', { method: 'POST', body: JSON.stringify({ accion, tipo_caja, cantidad, motivo }) });
+}
+
 export const api = {
     getBeneficio,
     crearTicket,
@@ -145,5 +155,8 @@ export const api = {
     listarParametros,
     upsertParametro,
     reportesRetirosPorDia,
+    stockResumen,
+    stockMovimientos,
+    registrarMovimientoStock,
     setAuthToken,
 };

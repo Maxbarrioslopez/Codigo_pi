@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Scan, Package, Clock, AlertOctagon, History, User, Eye, EyeOff, AlertCircle, BarChart3, CheckCircle2 } from 'lucide-react';
-import { estadoTicket, validarTicketGuardia, TicketDTO, MetricasGuardiaDTO } from '../services/api';
+import { estadoTicket, validarTicketGuardia, TicketDTO, MetricasGuardiaDTO, crearIncidencia, stockResumen, stockMovimientos, registrarMovimientoStock, listarTickets } from '../services/api';
 import { useMetricasGuardia } from '../hooks/useMetricasGuardia';
 
 type GuardiaScreen = 'login' | 'dashboard';
@@ -15,6 +15,17 @@ export function GuardiaModule() {
   const [ticketUUID, setTicketUUID] = useState('');
   const [ticketData, setTicketData] = useState<TicketDTO | null>(null);
   const [validating, setValidating] = useState(false);
+  const [deliveryHistory, setDeliveryHistory] = useState<DeliveryHistoryItem[]>([]);
+  // Persistencia local de historial entregas
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('deliveryHistory');
+      if (raw) setDeliveryHistory(JSON.parse(raw));
+    } catch { /* noop */ }
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem('deliveryHistory', JSON.stringify(deliveryHistory.slice(0, 500))); } catch { /* noop */ }
+  }, [deliveryHistory]);
   // Poll métricas cada 15s solo si estamos en dashboard (hook maneja ciclo interno)
   const { metricas } = useMetricasGuardia(15000);
 
@@ -41,10 +52,22 @@ export function GuardiaModule() {
       validating={validating}
       setValidating={setValidating}
       metrics={metricas}
+      deliveryHistory={deliveryHistory}
+      appendHistory={(item) => setDeliveryHistory(prev => [item, ...prev])}
       onLogout={() => setCurrentScreen('login')}
     />
   );
 }
+
+type DeliveryHistoryItem = {
+  timestamp: string;
+  rut: string;
+  nombre: string;
+  beneficio: string;
+  caja: string;
+  estado: 'Entregado' | 'Incidencia';
+  ticket: string;
+};
 
 function GuardiaLogin({
   onLogin,
@@ -145,6 +168,8 @@ function GuardiaDashboard({
   validating,
   setValidating,
   metrics,
+  deliveryHistory,
+  appendHistory,
   onLogout
 }: {
   currentTab: DashboardTab;
@@ -160,6 +185,8 @@ function GuardiaDashboard({
   validating: boolean;
   setValidating: (b: boolean) => void;
   metrics: MetricasGuardiaDTO | null;
+  deliveryHistory: DeliveryHistoryItem[];
+  appendHistory: (item: DeliveryHistoryItem) => void;
   onLogout: () => void;
 }) {
   const tabs = [
@@ -277,10 +304,44 @@ function GuardiaDashboard({
                 setTicketUUID('');
                 setTicketData(null);
               }}
+              onRegisterDelivery={(cajaCodigo) => {
+                if (!ticketData) return;
+                appendHistory({
+                  timestamp: new Date().toISOString(),
+                  rut: ticketData.trabajador?.rut || '—',
+                  nombre: ticketData.trabajador?.nombre || '—',
+                  beneficio: ticketData.data?.beneficio || '—',
+                  caja: cajaCodigo,
+                  estado: 'Entregado',
+                  ticket: ticketUUID
+                });
+              }}
+              onRegisterIncidencia={async (cajaCodigo, descripcionExtra) => {
+                if (!ticketData) return;
+                appendHistory({
+                  timestamp: new Date().toISOString(),
+                  rut: ticketData.trabajador?.rut || '—',
+                  nombre: ticketData.trabajador?.nombre || '—',
+                  beneficio: ticketData.data?.beneficio || '—',
+                  caja: cajaCodigo,
+                  estado: 'Incidencia',
+                  ticket: ticketUUID
+                });
+                try {
+                  await crearIncidencia({
+                    tipo: 'Caja incorrecta',
+                    descripcion: descripcionExtra || `Caja escaneada (${cajaCodigo}) no coincide con beneficio asignado (${ticketData.data?.beneficio || 'N/A'})`,
+                    trabajador_rut: ticketData.trabajador?.rut || '',
+                    metadata: { ticket: ticketUUID, caja_codigo: cajaCodigo }
+                  } as any);
+                } catch {
+                  // Silenciar error de incidencia para no bloquear flujo
+                }
+              }}
             />
           )}
           {currentTab === 'incidents' && <IncidentReportView />}
-          {currentTab === 'metrics' && <MetricsPanel />}
+          {currentTab === 'metrics' && <MetricsPanel history={deliveryHistory} />}
         </main>
       </div>
     </div>
@@ -296,7 +357,9 @@ function ScannerView({
   validating,
   onValidate,
   onFetchEstado,
-  onReset
+  onReset,
+  onRegisterDelivery,
+  onRegisterIncidencia
 }: {
   hasScannedTicket: boolean;
   isExpiredTicket: boolean;
@@ -307,9 +370,44 @@ function ScannerView({
   onValidate: () => void;
   onFetchEstado: () => void;
   onReset: () => void;
+  onRegisterDelivery: (cajaCodigo: string) => void;
+  onRegisterIncidencia: (cajaCodigo: string, descripcionExtra?: string) => void;
 }) {
-  const [ticketCode, setTicketCode] = useState('');
   const [timeLeftSec, setTimeLeftSec] = useState<number | null>(null);
+  const [stage, setStage] = useState<'ticket' | 'box' | 'success' | 'error'>('ticket');
+  const [boxScanning, setBoxScanning] = useState(false);
+  const [manualBoxInput, setManualBoxInput] = useState('');
+  const playTone = (type: 'success' | 'error') => {
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = type === 'success' ? 880 : 220;
+      osc.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.25);
+    } catch { /* noop */ }
+  };
+  const validateCaja = async (codigo: string, simulateIncorrect?: boolean) => {
+    if (!ticketUUID || boxScanning) return;
+    setBoxScanning(true);
+    try {
+      if (!simulateIncorrect) {
+        await validarTicketGuardia(ticketUUID, codigo);
+        setStage('success');
+        onRegisterDelivery(codigo);
+        playTone('success');
+      } else {
+        throw new Error('Caja incorrecta (simulada)');
+      }
+    } catch (err: any) {
+      setStage('error');
+      onRegisterIncidencia(codigo, err?.message);
+      playTone('error');
+    } finally {
+      setBoxScanning(false);
+    }
+  };
 
   // Countdown dinámico basado en ttl_expira_at del ticket.
   useEffect(() => {
@@ -425,7 +523,7 @@ function ScannerView({
     );
   }
 
-  if (!hasScannedTicket) {
+  if (stage === 'ticket' && !hasScannedTicket) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[500px]">
         <div className="w-full max-w-2xl">
@@ -494,7 +592,10 @@ function ScannerView({
                     <p className="text-[#333333]" style={{ fontSize: '14px', fontWeight: 600 }}>Datos Ticket:</p>
                     <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>Estado: {ticketData.estado}</p>
                     <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>Trabajador: {ticketData.trabajador?.nombre} ({ticketData.trabajador?.rut})</p>
-                    <button onClick={onReset} className="mt-2 text-[#E12019] text-sm underline">Limpiar</button>
+                    <div className="flex gap-3 mt-3">
+                      <button onClick={() => setStage('box')} className="px-4 py-2 bg-[#017E49] text-white rounded-lg text-xs font-semibold hover:bg-[#015A34]">Continuar Caja ➜</button>
+                      <button onClick={onReset} className="px-4 py-2 bg-white border border-[#E0E0E0] rounded-lg text-[#E12019] text-xs font-semibold hover:bg-[#F8F8F8]">Reset</button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -513,7 +614,131 @@ function ScannerView({
     );
   }
 
-  // Ticket scanned - show validation result
+  // Caja física (stage box)
+  if (stage === 'box' && hasScannedTicket && !isExpiredTicket) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[500px]">
+        <div className="w-full max-w-2xl">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-[#333333]" style={{ fontSize: '24px', fontWeight: 500 }}>Validar Caja Física</h3>
+            <button onClick={() => setStage('ticket')} className="text-[#E12019] text-sm underline">Volver</button>
+          </div>
+          <div className="bg-white border-2 border-[#017E49] rounded-xl p-6 mb-6">
+            <p className="text-[#6B6B6B] mb-1" style={{ fontSize: '12px' }}>Trabajador</p>
+            <p className="text-[#333333]" style={{ fontSize: '16px', fontWeight: 600 }}>{ticketData?.trabajador?.nombre} ({ticketData?.trabajador?.rut})</p>
+            <p className="text-[#6B6B6B] mt-2" style={{ fontSize: '12px' }}>Beneficio: <span className="text-[#017E49] font-semibold">{ticketData?.data?.beneficio || '—'}</span></p>
+          </div>
+          <div className="bg-white border-4 border-dashed border-[#FF9F55] rounded-xl p-12 mb-6">
+            <div className="flex flex-col items-center">
+              <Scan className={`w-32 h-32 ${boxScanning ? 'text-[#FF9F55] animate-pulse' : 'text-[#FF9F55]'}`} />
+              <p className="text-[#333333] mt-4" style={{ fontSize: '18px', fontWeight: 600 }}>Escanear Código de Caja</p>
+              <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>Coloque el código frente al lector</p>
+            </div>
+          </div>
+          <div className="flex gap-3 mb-6">
+            <button
+              onClick={() => validateCaja('SIM-CORRECTA')}
+              disabled={boxScanning}
+              className={`flex-1 px-6 py-4 rounded-xl transition-colors ${boxScanning ? 'bg-[#6B6B6B]' : 'bg-[#017E49] hover:bg-[#015A34]'} text-white`}
+              style={{ fontSize: '16px', fontWeight: 700 }}
+            >{boxScanning ? 'Leyendo...' : 'Caja Correcta'}</button>
+            <button
+              onClick={() => validateCaja('SIM-INCORRECTA', true)}
+              disabled={boxScanning}
+              className={`flex-1 px-6 py-4 rounded-xl transition-colors ${boxScanning ? 'bg-[#6B6B6B]' : 'bg-[#E12019] hover:bg-[#B51810]'} text-white`}
+              style={{ fontSize: '16px', fontWeight: 700 }}
+            >{boxScanning ? 'Leyendo...' : 'Caja Incorrecta'}</button>
+          </div>
+          <div className="bg-[#F8F8F8] rounded-xl p-6 border-2 border-[#E0E0E0] mb-6">
+            <p className="text-[#333333] mb-3" style={{ fontSize: '14px', fontWeight: 600 }}>Ingreso Manual</p>
+            <div className="flex gap-3">
+              <input
+                value={manualBoxInput}
+                onChange={e => setManualBoxInput(e.target.value.toUpperCase())}
+                placeholder="BOX-XXXX"
+                className="flex-1 px-4 py-3 bg-white border-2 border-[#E0E0E0] rounded-xl text-[#333333] placeholder:text-[#6B6B6B] focus:border-[#FF9F55] focus:outline-none text-sm tracking-wider"
+              />
+              <button
+                disabled={!manualBoxInput || boxScanning}
+                onClick={() => validateCaja(manualBoxInput)}
+                className={`px-6 py-3 rounded-xl text-sm font-semibold ${manualBoxInput && !boxScanning ? 'bg-[#FF9F55] text-white hover:bg-[#E68843]' : 'bg-[#E0E0E0] text-[#6B6B6B]'}`}
+              >{boxScanning ? '...' : 'Validar'}</button>
+            </div>
+            <p className="text-[#6B6B6B] mt-3" style={{ fontSize: '12px' }}>Debe coincidir con la caja asignada al ticket.</p>
+          </div>
+          <div className="bg-[#FFF4E6] border-2 border-[#FF9F55] rounded-xl p-4">
+            <p className="text-[#333333] mb-2" style={{ fontSize: '14px', fontWeight: 600 }}>Notas</p>
+            <p className="text-[#6B6B6B]" style={{ fontSize: '13px', lineHeight: '1.5' }}>Si la caja no coincide, reportar incidencia y retener el ticket hasta aclarar la situación.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (stage === 'success' && hasScannedTicket) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[500px]">
+        <div className="w-full max-w-2xl bg-gradient-to-br from-[#017E49] to-[#015A34] rounded-xl p-10 mb-6 text-center shadow-lg">
+          <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle2 className="w-14 h-14 text-[#017E49]" />
+          </div>
+          <h3 className="text-white mb-2" style={{ fontSize: '32px', fontWeight: 700 }}>Entrega Autorizada</h3>
+          <p className="text-white/90" style={{ fontSize: '16px' }}>Proceda a entregar la caja al trabajador.</p>
+        </div>
+        <div className="bg-white border-2 border-[#017E49] rounded-xl p-6 w-full max-w-2xl mb-6">
+          <p className="text-[#333333] mb-2" style={{ fontSize: '14px', fontWeight: 600 }}>Resumen Ticket</p>
+          <p className="text-[#6B6B6B] text-sm">Trabajador: {ticketData?.trabajador?.nombre} ({ticketData?.trabajador?.rut})</p>
+          <p className="text-[#6B6B6B] text-sm">Beneficio: {ticketData?.data?.beneficio || '—'}</p>
+        </div>
+        <div className="flex flex-col gap-3 w-full max-w-2xl">
+          <button
+            onClick={() => { onReset(); setStage('ticket'); }}
+            className="w-full px-8 py-4 bg-[#E12019] text-white rounded-xl hover:bg-[#B51810] transition-colors"
+            style={{ fontSize: '16px', fontWeight: 700 }}
+          >Finalizar y Nuevo Ticket</button>
+          <button
+            onClick={() => setStage('ticket')}
+            className="w-full px-8 py-4 bg-white text-[#333333] border-2 border-[#E0E0E0] rounded-xl hover:bg-[#F8F8F8] transition-colors"
+            style={{ fontSize: '16px', fontWeight: 700 }}
+          >Volver sin Reset</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (stage === 'error' && hasScannedTicket) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[500px]">
+        <div className="w-full max-w-2xl bg-gradient-to-br from-[#E12019] to-[#B51810] rounded-xl p-10 mb-6 text-center shadow-lg">
+          <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertOctagon className="w-14 h-14 text-[#E12019]" />
+          </div>
+          <h3 className="text-white mb-2" style={{ fontSize: '32px', fontWeight: 700 }}>Caja Incorrecta</h3>
+          <p className="text-white/90" style={{ fontSize: '16px' }}>La caja escaneada no coincide con la asignada.</p>
+        </div>
+        <div className="bg-white border-2 border-[#E12019] rounded-xl p-6 w-full max-w-2xl mb-6">
+          <p className="text-[#333333] mb-2" style={{ fontSize: '14px', fontWeight: 600 }}>Acciones sugeridas</p>
+          <ul className="text-[#6B6B6B] text-sm space-y-1">
+            <li>• Confirmar código impreso en ticket</li>
+            <li>• Revisar stock y ubicación de cajas</li>
+            <li>• Registrar incidencia si persiste</li>
+          </ul>
+        </div>
+        <div className="flex flex-col gap-3 w-full max-w-2xl">
+          <button
+            onClick={() => setStage('box')}
+            className="w-full px-8 py-4 bg-[#FF9F55] text-white rounded-xl hover:bg-[#E68843] transition-colors"
+            style={{ fontSize: '16px', fontWeight: 700 }}
+          >Reintentar Escaneo Caja</button>
+          <button
+            onClick={() => { onReset(); setStage('ticket'); }}
+            className="w-full px-8 py-4 bg-white text-[#333333] border-2 border-[#E0E0E0] rounded-xl hover:bg-[#F8F8F8] transition-colors"
+            style={{ fontSize: '16px', fontWeight: 700 }}
+          >Cancelar y Volver</button>
+        </div>
+      </div>
+    );
+  }
   function MetricsView({ metrics }: { metrics: MetricasGuardiaDTO | null }) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[500px]">
@@ -662,7 +887,7 @@ function IncidentReportView() {
   );
 }
 
-function MetricsPanel() {
+function MetricsPanel({ history }: { history: DeliveryHistoryItem[] }) {
   const [selectedView, setSelectedView] = useState<'stock' | 'shift' | 'history' | 'sos'>('stock');
 
   return (
@@ -714,7 +939,7 @@ function MetricsPanel() {
       {/* Content */}
       {selectedView === 'stock' && <StockView />}
       {selectedView === 'shift' && <ShiftView />}
-      {selectedView === 'history' && <HistoryView />}
+      {selectedView === 'history' && <HistoryView history={history} />}
       {selectedView === 'sos' && <SOSView />}
     </div>
   );
@@ -726,27 +951,55 @@ function StockView() {
   const [selectedBoxType, setSelectedBoxType] = useState<'Estándar' | 'Premium'>('Estándar');
   const [quantity, setQuantity] = useState('');
   const [observation, setObservation] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [resumen, setResumen] = useState<{ disponible: number; entregadas_hoy: number; reservadas: number; total_mes: number; por_tipo: { estandar: number; premium: number } } | null>(null);
+  const [movimientos, setMovimientos] = useState<Array<{ fecha: string; hora: string; tipo_caja: string; accion: string; cantidad: number; motivo: string; usuario: string }>>([]);
 
-  const stockData = [
-    { label: 'Disponible', value: '142', color: '#017E49' },
-    { label: 'Entregadas hoy', value: '58', color: '#E12019' },
-    { label: 'Reservadas', value: '23', color: '#FF9F55' },
-    { label: 'Total mes', value: '1,247', color: '#333333' },
-  ];
+  const fetchStock = async () => {
+    setLoading(true); setError(null);
+    try {
+      const r = await stockResumen();
+      setResumen(r);
+      const m = await stockMovimientos();
+      setMovimientos(m);
+    } catch (e: any) {
+      setError('No se pudo cargar stock desde servidor, usando datos locales.');
+      if (!resumen) {
+        setResumen({ disponible: 142, entregadas_hoy: 58, reservadas: 23, total_mes: 1247, por_tipo: { estandar: 87, premium: 55 } });
+      }
+      if (movimientos.length === 0) {
+        setMovimientos([
+          { fecha: '09/11/2025', hora: '14:30', tipo_caja: 'Premium', accion: 'Agregado', cantidad: 20, motivo: 'Reabastecimiento semanal programado', usuario: 'Juan Pérez' },
+          { fecha: '09/11/2025', hora: '11:15', tipo_caja: 'Estándar', accion: 'Retirado', cantidad: 5, motivo: 'Cajas dañadas durante transporte', usuario: 'Juan Pérez' }
+        ]);
+      }
+    } finally { setLoading(false); }
+  };
+  useEffect(() => { fetchStock(); }, []);
 
-  const stockLog = [
-    { fecha: '09/11/2025', hora: '14:30', tipo: 'Premium', accion: 'Agregado', cantidad: '+20', motivo: 'Reabastecimiento semanal programado', usuario: 'Juan Pérez' },
-    { fecha: '09/11/2025', hora: '11:15', tipo: 'Estándar', accion: 'Retirado', cantidad: '-5', motivo: 'Cajas dañadas durante transporte', usuario: 'Juan Pérez' },
-    { fecha: '08/11/2025', hora: '16:45', tipo: 'Premium', accion: 'Agregado', cantidad: '+15', motivo: 'Ajuste por inventario físico', usuario: 'María Silva' },
-    { fecha: '08/11/2025', hora: '09:00', tipo: 'Estándar', accion: 'Agregado', cantidad: '+50', motivo: 'Ingreso de nueva carga', usuario: 'María Silva' },
-  ];
-
-  const handleSubmit = (action: 'add' | 'remove') => {
-    // Here would be the logic to submit
-    setShowAddModal(false);
-    setShowRemoveModal(false);
-    setQuantity('');
-    setObservation('');
+  const handleSubmit = async (action: 'add' | 'remove') => {
+    if (!quantity || !observation) return;
+    try {
+      await registrarMovimientoStock(action === 'add' ? 'agregar' : 'retirar', selectedBoxType, Number(quantity), observation);
+      await fetchStock();
+    } catch {
+      // En caso de fallo, actualizar localmente movimientos
+      setMovimientos(prev => [{
+        fecha: new Date().toLocaleDateString('es-CL'),
+        hora: new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }),
+        tipo_caja: selectedBoxType,
+        accion: action === 'add' ? 'Agregado' : 'Retirado',
+        cantidad: Number(quantity) * (action === 'add' ? 1 : 1),
+        motivo: observation,
+        usuario: 'LocalUser'
+      }, ...prev]);
+    } finally {
+      setShowAddModal(false);
+      setShowRemoveModal(false);
+      setQuantity('');
+      setObservation('');
+    }
   };
 
   return (
@@ -774,16 +1027,17 @@ function StockView() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stockData.map((item, index) => (
-          <div key={index} className="bg-white border-2 border-[#E0E0E0] rounded-xl p-6">
-            <p className="text-[#6B6B6B] mb-2" style={{ fontSize: '14px' }}>
-              {item.label}
-            </p>
-            <p className="text-[#333333]" style={{ fontSize: '36px', fontWeight: 700, color: item.color }}>
-              {item.value}
-            </p>
-          </div>
-        ))}
+        {['Disponible', 'Entregadas hoy', 'Reservadas', 'Total mes'].map((label, i) => {
+          const map: any = resumen || { disponible: 0, entregadas_hoy: 0, reservadas: 0, total_mes: 0 };
+          const val = label === 'Disponible' ? map.disponible : label === 'Entregadas hoy' ? map.entregadas_hoy : label === 'Reservadas' ? map.reservadas : map.total_mes;
+          const color = label === 'Disponible' ? '#017E49' : label === 'Entregadas hoy' ? '#E12019' : label === 'Reservadas' ? '#FF9F55' : '#333333';
+          return (
+            <div key={i} className="bg-white border-2 border-[#E0E0E0] rounded-xl p-6">
+              <p className="text-[#6B6B6B] mb-2" style={{ fontSize: '14px' }}>{label}</p>
+              <p className="text-[#333333]" style={{ fontSize: '36px', fontWeight: 700, color }}>{loading ? '—' : val}</p>
+            </div>
+          );
+        })}
       </div>
 
       <div className="bg-white border-2 border-[#E0E0E0] rounded-xl p-6">
@@ -793,11 +1047,11 @@ function StockView() {
         <div className="space-y-4">
           <div className="flex items-center justify-between p-4 bg-[#F8F8F8] rounded-xl">
             <span className="text-[#333333]" style={{ fontSize: '16px' }}>Caja Estándar</span>
-            <span className="text-[#333333]" style={{ fontSize: '20px', fontWeight: 700 }}>87</span>
+            <span className="text-[#333333]" style={{ fontSize: '20px', fontWeight: 700 }}>{resumen?.por_tipo.estandar ?? '—'}</span>
           </div>
           <div className="flex items-center justify-between p-4 bg-[#F8F8F8] rounded-xl">
             <span className="text-[#333333]" style={{ fontSize: '16px' }}>Caja Premium</span>
-            <span className="text-[#333333]" style={{ fontSize: '20px', fontWeight: 700 }}>55</span>
+            <span className="text-[#333333]" style={{ fontSize: '20px', fontWeight: 700 }}>{resumen?.por_tipo.premium ?? '—'}</span>
           </div>
         </div>
       </div>
@@ -826,11 +1080,11 @@ function StockView() {
               </tr>
             </thead>
             <tbody>
-              {stockLog.map((item, index) => (
+              {movimientos.map((item, index) => (
                 <tr key={index} className="border-t border-[#E0E0E0]">
                   <td className="px-6 py-4 text-[#333333]" style={{ fontSize: '14px' }}>{item.fecha}</td>
                   <td className="px-6 py-4 text-[#333333]" style={{ fontSize: '14px' }}>{item.hora}</td>
-                  <td className="px-6 py-4 text-[#333333]" style={{ fontSize: '14px' }}>{item.tipo}</td>
+                  <td className="px-6 py-4 text-[#333333]" style={{ fontSize: '14px' }}>{item.tipo_caja}</td>
                   <td className="px-6 py-4">
                     <span className={`px-3 py-1 rounded-full uppercase ${item.accion === 'Agregado' ? 'bg-[#017E49]' : 'bg-[#E12019]'
                       } text-white`} style={{ fontSize: '12px', fontWeight: 700 }}>
@@ -838,8 +1092,8 @@ function StockView() {
                     </span>
                   </td>
                   <td className="px-6 py-4" style={{ fontSize: '14px' }}>
-                    <span className={item.cantidad.startsWith('+') ? 'text-[#017E49]' : 'text-[#E12019]'} style={{ fontWeight: 700 }}>
-                      {item.cantidad}
+                    <span className={item.accion === 'Agregado' ? 'text-[#017E49]' : 'text-[#E12019]'} style={{ fontWeight: 700 }}>
+                      {item.accion === 'Agregado' ? `+${item.cantidad}` : `-${item.cantidad}`}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-[#333333]" style={{ fontSize: '14px' }}>{item.motivo}</td>
@@ -1106,15 +1360,32 @@ function SOSView() {
   );
 }
 
-function HistoryView() {
-  const history = [
-    { fecha: '09/11/2025', hora: '14:32', rut: '12.345.678-9', nombre: 'María González', tipo: 'Premium', estado: 'Entregado' },
-    { fecha: '09/11/2025', hora: '14:15', rut: '98.765.432-1', nombre: 'Carlos Muñoz', tipo: 'Estándar', estado: 'Entregado' },
-    { fecha: '09/11/2025', hora: '13:58', rut: '11.222.333-4', nombre: 'Ana Vargas', tipo: 'Premium', estado: 'Rechazado' },
-    { fecha: '09/11/2025', hora: '13:45', rut: '55.666.777-8', nombre: 'Pedro Soto', tipo: 'Estándar', estado: 'Entregado' },
-    { fecha: '09/11/2025', hora: '13:20', rut: '99.888.777-6', nombre: 'Laura Díaz', tipo: 'Premium', estado: 'Entregado' },
-    { fecha: '09/11/2025', hora: '12:55', rut: '44.555.666-7', nombre: 'Roberto Morales', tipo: 'Estándar', estado: 'Entregado' },
-  ];
+function HistoryView({ history }: { history: DeliveryHistoryItem[] }) {
+  const mapItem = (item: DeliveryHistoryItem) => {
+    const dt = new Date(item.timestamp);
+    const fecha = dt.toLocaleDateString('es-CL');
+    const hora = dt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+    return {
+      fecha,
+      hora,
+      rut: item.rut,
+      nombre: item.nombre,
+      tipo: item.beneficio,
+      estado: item.estado
+    };
+  };
+  const rows = history.map(mapItem);
+  const [serverTickets, setServerTickets] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fetchServer = async () => {
+    setLoading(true); setError(null);
+    try {
+      const data = await listarTickets();
+      setServerTickets(data);
+    } catch (e: any) { setError('No se pudo cargar tickets del servidor'); }
+    finally { setLoading(false); }
+  };
 
   return (
     <div className="space-y-6">
@@ -1122,9 +1393,14 @@ function HistoryView() {
         <h3 className="text-[#333333]" style={{ fontSize: '24px', fontWeight: 500 }}>
           Historial de retiros
         </h3>
-        <button className="px-6 py-3 bg-white text-[#333333] border-2 border-[#E12019] rounded-xl hover:bg-[#F8F8F8] transition-colors" style={{ fontSize: '14px', fontWeight: 700 }}>
-          Exportar
-        </button>
+        <div className="flex gap-3">
+          <button onClick={fetchServer} className="px-6 py-3 bg-white text-[#333333] border-2 border-[#017E49] rounded-xl hover:bg-[#F8F8F8] transition-colors" style={{ fontSize: '14px', fontWeight: 700 }}>
+            {loading ? 'Cargando...' : 'Refrescar Servidor'}
+          </button>
+          <button className="px-6 py-3 bg-white text-[#333333] border-2 border-[#E12019] rounded-xl hover:bg-[#F8F8F8] transition-colors" style={{ fontSize: '14px', fontWeight: 700 }}>
+            Exportar
+          </button>
+        </div>
       </div>
 
       <div className="bg-white border-2 border-[#E0E0E0] rounded-xl overflow-hidden">
@@ -1141,7 +1417,7 @@ function HistoryView() {
               </tr>
             </thead>
             <tbody>
-              {history.map((item, index) => (
+              {rows.map((item, index) => (
                 <tr key={index} className="border-t border-[#E0E0E0]">
                   <td className="px-6 py-4 text-[#333333]" style={{ fontSize: '14px' }}>{item.fecha}</td>
                   <td className="px-6 py-4 text-[#333333]" style={{ fontSize: '14px' }}>{item.hora}</td>
@@ -1162,7 +1438,9 @@ function HistoryView() {
 
         <div className="px-6 py-4 border-t-2 border-[#E0E0E0] flex items-center justify-between">
           <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>
-            Mostrando 6 de 58 registros
+            <span>{rows.length === 0 ? 'Sin entregas registradas' : `Mostrando ${rows.length} entrega(s)`}</span>
+            {serverTickets.length > 0 && <span className="ml-4 text-[#017E49]">Tickets servidor: {serverTickets.length}</span>}
+            {error && <span className="ml-4 text-[#E12019]">{error}</span>}
           </p>
           <div className="flex gap-2">
             <button className="px-4 py-2 bg-white border-2 border-[#E0E0E0] rounded-lg text-[#333333] hover:bg-[#F8F8F8]" style={{ fontSize: '14px' }}>

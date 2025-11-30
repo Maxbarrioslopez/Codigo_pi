@@ -13,19 +13,17 @@ import { TrazabilidadModule } from './components/TrazabilidadModule';
 import { NominaModule } from './components/NominaModule';
 import { ReportesModule } from './components/ReportesModule';
 import { AdministradorModule } from './components/AdministradorModule';
-import { GuardiaFlowScreens } from './components/GuardiaFlowScreens';
 import { Menu, X } from 'lucide-react';
 
 // Layout principal con sidebar para usuarios autenticados
 function DashboardLayout() {
-  const [currentSection, setCurrentSection] = useState<'design-system' | 'totem' | 'guardia' | 'rrhh' | 'trabajadores' | 'ciclo' | 'trazabilidad' | 'nomina' | 'reportes' | 'admin' | 'guardia-flow'>('design-system');
+  const [currentSection, setCurrentSection] = useState<'design-system' | 'totem' | 'guardia' | 'rrhh' | 'trabajadores' | 'ciclo' | 'trazabilidad' | 'nomina' | 'reportes' | 'admin'>('design-system');
   const [menuOpen, setMenuOpen] = useState(false);
 
   const sections = [
     { id: 'design-system', label: 'Design System', icon: '🎨' },
     { id: 'totem', label: 'Tótem Autoservicio', icon: '🖥️' },
     { id: 'guardia', label: 'Panel Guardia', icon: '👮' },
-    { id: 'guardia-flow', label: 'Guardia - Flujo Escaneo', icon: '📷' },
     { id: 'rrhh', label: 'Dashboard RRHH', icon: '📊' },
     { id: 'trabajadores', label: 'Gestión Trabajadores', icon: '👥' },
     { id: 'ciclo', label: 'Ciclo Bimensual', icon: '📅' },
@@ -91,7 +89,6 @@ function DashboardLayout() {
           {currentSection === 'design-system' && <DesignSystem />}
           {currentSection === 'totem' && <TotemModule />}
           {currentSection === 'guardia' && <GuardiaModule />}
-          {currentSection === 'guardia-flow' && <GuardiaFlowScreens />}
           {currentSection === 'rrhh' && <RRHHModule />}
           {currentSection === 'trabajadores' && <TrabajadoresModule />}
           {currentSection === 'ciclo' && <CicloBimensualModule />}

@@ -999,9 +999,9 @@ function StockView() {
   const fetchStock = async () => {
     setLoading(true); setError(null);
     try {
-      const r = await stockResumen();
+      const r = await stockService.stockResumen();
       setResumen(r);
-      const m = await stockMovimientos();
+      const m = await stockService.stockMovimientos();
       setMovimientos(m);
     } catch (e: any) {
       setError('No se pudo cargar stock desde servidor, usando datos locales.');
@@ -1021,7 +1021,7 @@ function StockView() {
   const handleSubmit = async (action: 'add' | 'remove') => {
     if (!quantity || !observation) return;
     try {
-      await registrarMovimientoStock(action === 'add' ? 'agregar' : 'retirar', selectedBoxType, Number(quantity), observation);
+      await stockService.registrarMovimiento(action === 'add' ? 'entrada' : 'salida', Number(quantity), `${selectedBoxType}: ${observation}`);
       await fetchStock();
     } catch {
       // En caso de fallo, actualizar localmente movimientos
@@ -1421,7 +1421,7 @@ function HistoryView({ history }: { history: DeliveryHistoryItem[] }) {
   const fetchServer = async () => {
     setLoading(true); setError(null);
     try {
-      const data = await listarTickets();
+      const data = await ticketsQueryService.listar();
       setServerTickets(data);
     } catch (e: any) { setError('No se pudo cargar tickets del servidor'); }
     finally { setLoading(false); }

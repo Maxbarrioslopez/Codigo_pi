@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Scan, CheckCircle2, XCircle, FileText, AlertCircle, ArrowLeft, Printer, AlertTriangle, Calendar, ChevronLeft, ChevronRight, Info, Search } from 'lucide-react';
 import { trabajadorService } from '@/services/trabajador.service';
 import { ticketService } from '@/services/ticket.service';
+import { incidentService } from '@/services/incident.service';
+import { scheduleService } from '@/services/schedule.service';
 import { RUTInput } from './form/RUTInput';
 
 type TotemScreen = 'initial' | 'validating' | 'success' | 'success-choice' | 'no-stock' | 'schedule-select' | 'schedule-confirm' | 'no-benefit' | 'error' | 'incident-form' | 'incident-sent' | 'incident-scan' | 'incident-status';
@@ -107,7 +109,7 @@ export function TotemModule() {
   const agendarRetiro = async (fechaISO: string) => {
     setLoading(true); setErrorMsg('');
     try {
-      await api.crearAgendamiento(rutEscaneado, fechaISO);
+      await scheduleService.crearAgendamiento(rutEscaneado, fechaISO);
       setCurrentScreen('schedule-confirm');
     } catch (e: any) {
       setErrorMsg(e.detail || 'Error agendando');
@@ -119,7 +121,7 @@ export function TotemModule() {
     if (!selectedIncidentType) return;
     setLoading(true); setErrorMsg('');
     try {
-      await api.crearIncidencia({ trabajador_rut: rutEscaneado, tipo: selectedIncidentType, descripcion: incidentDescription, origen: 'totem' });
+      await incidentService.crearIncidencia({ trabajador_rut: rutEscaneado, tipo: selectedIncidentType, descripcion: incidentDescription, origen: 'totem' } as any);
       setCurrentScreen('incident-sent');
     } catch (e: any) {
       setErrorMsg(e.detail || 'Error reportando incidencia');

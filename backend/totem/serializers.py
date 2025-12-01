@@ -1,8 +1,8 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import (
-    Trabajador, Ticket, StockSucursal, Usuario,
-    Ciclo, Sucursal, CajaFisica, Agendamiento, Incidencia, TicketEvent, ParametroOperativo
+    Trabajador, Ticket, StockSucursal, StockMovimiento, Usuario,
+    Ciclo, Sucursal, CajaFisica, Agendamiento, Incidencia, TicketEvent, ParametroOperativo, NominaCarga
 )
 
 
@@ -31,6 +31,12 @@ class StockSucursalSerializer(serializers.ModelSerializer):
     class Meta:
         model = StockSucursal
         fields = ['id', 'sucursal', 'producto', 'cantidad']
+
+
+class StockMovimientoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StockMovimiento
+        fields = ['id', 'fecha', 'hora', 'tipo_caja', 'accion', 'cantidad', 'motivo', 'usuario', 'sucursal']
 
 
 class TicketSerializer(serializers.ModelSerializer):
@@ -112,3 +118,13 @@ class ParametroOperativoSerializer(serializers.ModelSerializer):
         model = ParametroOperativo
         fields = ['id', 'clave', 'valor', 'descripcion', 'updated_at']
         read_only_fields = ['updated_at']
+
+
+class NominaCargaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NominaCarga
+        fields = [
+            'id', 'ciclo', 'usuario', 'archivo_nombre', 'total_registros',
+            'creados', 'actualizados', 'sin_beneficio', 'observaciones', 'fecha_carga'
+        ]
+        read_only_fields = ['fecha_carga']

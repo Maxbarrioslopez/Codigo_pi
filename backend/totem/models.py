@@ -98,6 +98,40 @@ class StockSucursal(models.Model):
         return f"{self.sucursal} - {self.producto}: {self.cantidad}"
 
 
+class StockMovimiento(models.Model):
+    """Registro de movimientos de stock por sucursal y tipo de caja.
+    Usado por GuardiaModule para auditoría y reportes.
+    """
+    ACCIONES = (
+        ('agregar', 'Agregado'),
+        ('retirar', 'Retirado'),
+    )
+    TIPO_CAJA = (
+        ('Estándar', 'Estándar'),
+        ('Premium', 'Premium'),
+    )
+
+    fecha = models.DateField(auto_now_add=True)
+    hora = models.TimeField(auto_now_add=True)
+    tipo_caja = models.CharField(max_length=20, choices=TIPO_CAJA)
+    accion = models.CharField(max_length=10, choices=ACCIONES)
+    cantidad = models.PositiveIntegerField()
+    motivo = models.CharField(max_length=200, blank=True)
+    usuario = models.CharField(max_length=80, blank=True)
+    sucursal = models.ForeignKey('Sucursal', on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        ordering = ['-fecha', '-hora']
+        indexes = [
+            models.Index(fields=['fecha'], name='stockmov_fecha_idx'),
+            models.Index(fields=['tipo_caja'], name='stockmov_tipo_idx'),
+            models.Index(fields=['accion'], name='stockmov_accion_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.fecha} {self.hora} - {self.accion} {self.cantidad} {self.tipo_caja}"
+
+
 class Ticket(models.Model):
     """
     Ticket generado cuando un trabajador utiliza el tótem.
@@ -128,9 +162,10 @@ class Ticket(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=['uuid'], name='ticket_uuid_idx'),
-            models.Index(fields=['estado', 'created_at'], name='ticket_estado_fecha_idx'),
-            models.Index(fields=['trabajador', 'ciclo'], name='ticket_trabajador_ciclo_idx'),
+            models.Index(fields=['estado', 'created_at'], name='ticket_est_fecha_idx'),
+            models.Index(fields=['trabajador', 'ciclo', 'estado'], name='ticket_trab_ciclo_idx'),
             models.Index(fields=['ttl_expira_at'], name='ticket_ttl_idx'),
+            models.Index(fields=['created_at'], name='ticket_created_idx'),
         ]
         verbose_name = 'Ticket'
         verbose_name_plural = 'Tickets'
@@ -192,9 +227,9 @@ class Agendamiento(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=['trabajador', 'estado'], name='agendamiento_trabajador_estado_idx'),
-            models.Index(fields=['fecha_retiro', 'estado'], name='agendamiento_fecha_estado_idx'),
-            models.Index(fields=['ciclo', 'estado'], name='agendamiento_ciclo_estado_idx'),
+            models.Index(fields=['trabajador', 'estado', 'ciclo'], name='agend_trab_est_idx'),
+            models.Index(fields=['fecha_retiro', 'estado'], name='agend_fecha_est_idx'),
+            models.Index(fields=['estado', 'fecha_retiro'], name='agend_est_fecha_idx'),
         ]
         verbose_name = 'Agendamiento'
         verbose_name_plural = 'Agendamientos'
@@ -223,8 +258,10 @@ class Incidencia(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=['estado', 'created_at'], name='incidencia_estado_fecha_idx'),
-            models.Index(fields=['tipo', 'estado'], name='incidencia_tipo_estado_idx'),
+            models.Index(fields=['estado', 'created_at'], name='incid_est_fecha_idx'),
+            models.Index(fields=['tipo', 'estado'], name='incid_tipo_est_idx'),
+            models.Index(fields=['codigo'], name='incid_codigo_idx'),
+            models.Index(fields=['trabajador', 'estado'], name='incid_trab_est_idx'),
         ]
         verbose_name = 'Incidencia'
         verbose_name_plural = 'Incidencias'
@@ -264,3 +301,38 @@ class ParametroOperativo(models.Model):
 
     def __str__(self):
         return f"Parametro {self.clave}={self.valor}"
+
+
+class NominaCarga(models.Model):
+    """Auditoría de cada carga de nómina, para métricas históricas por ciclo."""
+    ciclo = models.ForeignKey(
+        "Ciclo",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="nomina_cargas",
+    )
+    usuario = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="nomina_cargas",
+    )
+    archivo_nombre = models.CharField(max_length=255, blank=True)
+    total_registros = models.PositiveIntegerField(default=0)
+    creados = models.PositiveIntegerField(default=0)
+    actualizados = models.PositiveIntegerField(default=0)
+    sin_beneficio = models.PositiveIntegerField(default=0)
+    observaciones = models.TextField(blank=True)
+    fecha_carga = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-fecha_carga", "-id"]
+        indexes = [
+            models.Index(fields=["fecha_carga"]),
+            models.Index(fields=["ciclo"]),
+        ]
+
+    def __str__(self):
+        return f"Carga nomina {self.id} ({self.archivo_nombre})"

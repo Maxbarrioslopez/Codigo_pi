@@ -7,17 +7,17 @@ from .base import *
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS')
+ALLOWED_HOSTS = get_env_list('ALLOWED_HOSTS')
 
 # Database - PostgreSQL required for production
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': env('POSTGRES_DB'),
-        'USER': env('POSTGRES_USER'),
-        'PASSWORD': env('POSTGRES_PASSWORD'),
-        'HOST': env('POSTGRES_HOST'),
-        'PORT': env('POSTGRES_PORT', default='5432'),
+        'NAME': get_env('POSTGRES_DB'),
+        'USER': get_env('POSTGRES_USER'),
+        'PASSWORD': get_env('POSTGRES_PASSWORD'),
+        'HOST': get_env('POSTGRES_HOST'),
+        'PORT': get_env('POSTGRES_PORT', '5432'),
         'CONN_MAX_AGE': 600,  # Persistent connections
         'OPTIONS': {
             'connect_timeout': 10,
@@ -42,46 +42,57 @@ CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SAMESITE = 'Strict'
 
 # CORS - Strict origins only
-CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS')
+CORS_ALLOWED_ORIGINS = get_env_list('CORS_ALLOWED_ORIGINS')
 CORS_ALLOW_CREDENTIALS = True
 
 # Email Configuration
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = env('EMAIL_HOST')
-EMAIL_PORT = env.int('EMAIL_PORT', default=587)
-EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS', default=True)
-EMAIL_HOST_USER = env('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
-DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL')
+EMAIL_HOST = get_env('EMAIL_HOST')
+EMAIL_PORT = get_env_int('EMAIL_PORT', 587)
+EMAIL_USE_TLS = get_env_bool('EMAIL_USE_TLS', True)
+EMAIL_HOST_USER = get_env('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = get_env('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = get_env('DEFAULT_FROM_EMAIL')
 
 # Static files - Use WhiteNoise for serving
-MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+try:
+    import whitenoise
+    MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+except ImportError:
+    pass
 
 # Cache - Redis required
-CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': env('REDIS_URL'),
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-            'PARSER_CLASS': 'redis.connection.HiredisParser',
-            'SOCKET_CONNECT_TIMEOUT': 5,
-            'SOCKET_TIMEOUT': 5,
-            'CONNECTION_POOL_CLASS_KWARGS': {
-                'max_connections': 100,
+try:
+    import django_redis
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': get_env('REDIS_URL'),
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+                'SOCKET_CONNECT_TIMEOUT': 5,
+                'SOCKET_TIMEOUT': 5,
+                'CONNECTION_POOL_CLASS_KWARGS': {
+                    'max_connections': 100,
+                },
+                'PASSWORD': get_env('REDIS_PASSWORD', None),
             },
-            'PASSWORD': env('REDIS_PASSWORD', default=None),
-        },
-        'KEY_PREFIX': 'totem_prod',
-        'TIMEOUT': 300,
+            'KEY_PREFIX': 'totem_prod',
+            'TIMEOUT': 300,
+        }
     }
-}
+except ImportError:
+    pass
 
 # Celery - Production configuration
-CELERY_BROKER_URL = env('CELERY_BROKER_URL')
-CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND')
-CELERY_TASK_ALWAYS_EAGER = False
+try:
+    import celery
+    CELERY_BROKER_URL = get_env('CELERY_BROKER_URL')
+    CELERY_RESULT_BACKEND = get_env('CELERY_RESULT_BACKEND')
+    CELERY_TASK_ALWAYS_EAGER = False
+except ImportError:
+    pass
 
 # Logging - Production logging
 LOGGING['handlers']['file']['filename'] = '/var/log/totem/django.log'
@@ -89,24 +100,28 @@ LOGGING['handlers']['audit_file']['filename'] = '/var/log/totem/audit.log'
 LOGGING['handlers']['security_file']['filename'] = '/var/log/totem/security.log'
 
 # Error tracking with Sentry (optional)
-if env('SENTRY_DSN', default=None):
-    import sentry_sdk
-    from sentry_sdk.integrations.django import DjangoIntegration
-    from sentry_sdk.integrations.celery import CeleryIntegration
-    
-    sentry_sdk.init(
-        dsn=env('SENTRY_DSN'),
-        integrations=[
-            DjangoIntegration(),
-            CeleryIntegration(),
-        ],
-        traces_sample_rate=0.1,
-        send_default_pii=False,
-        environment='production',
-    )
+sentry_dsn = get_env('SENTRY_DSN', None)
+if sentry_dsn:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.django import DjangoIntegration
+        from sentry_sdk.integrations.celery import CeleryIntegration
+        
+        sentry_sdk.init(
+            dsn=sentry_dsn,
+            integrations=[
+                DjangoIntegration(),
+                CeleryIntegration(),
+            ],
+            traces_sample_rate=0.1,
+            send_default_pii=False,
+            environment='production',
+        )
+    except ImportError:
+        pass
 
 # Admin Security
-ADMIN_URL = env('ADMIN_URL', default='admin/')
+ADMIN_URL = get_env('ADMIN_URL', 'admin/')
 
 # Performance
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB

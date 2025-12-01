@@ -8,7 +8,6 @@ from datetime import date, datetime
 from django.conf import settings
 from django.utils import timezone
 from typing import Tuple, Any
-import bleach
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +32,13 @@ class InputSanitizer:
         if not value:
             return ""
         
-        # Eliminar HTML tags completamente
-        clean_value = bleach.clean(value, tags=[], strip=True)
+        # Try to use bleach if available, otherwise use basic sanitization
+        try:
+            import bleach
+            clean_value = bleach.clean(value, tags=[], strip=True)
+        except ImportError:
+            # Fallback: remove HTML tags manually
+            clean_value = re.sub(r'<[^>]+>', '', value)
         
         # Eliminar caracteres de control excepto newline/tab
         clean_value = ''.join(char for char in clean_value if ord(char) >= 32 or char in '\n\t')
@@ -303,10 +307,10 @@ class RUTValidator:
             Tupla (es_valido, mensaje_error)
         """
         # Importar la utilidad existente
-        from totem.utils_rut import validar_rut
+        from totem.utils_rut import valid_rut
         
         try:
-            es_valido = validar_rut(rut)
+            es_valido = valid_rut(rut)
             if not es_valido:
                 return False, "RUT inválido"
             return True, ""
@@ -320,16 +324,204 @@ class RUTValidator:
         Limpia el RUT eliminando puntos y convirtiendo a formato estándar.
         
         Args:
-            rut: RUT con o sin formato
+            rut: String con RUT (ej: "12.345.678-9" o "123456789")
             
         Returns:
-            RUT limpio en formato XXXXXXXX-X
+            RUT limpio en formato sin puntos con guión (ej: "12345678-9")
         """
-        # Eliminar puntos y espacios
-        rut = rut.replace('.', '').replace(' ', '').upper()
+        from totem.utils_rut import clean_rut
+        return clean_rut(rut)
+
+
+class CicloValidator:
+    """
+    Validador de reglas para ciclos bimensuales.
+    """
+    
+    @staticmethod
+    def validar_fechas(fecha_inicio: date, fecha_fin: date) -> Tuple[bool, str]:
+        """
+        Valida que las fechas del ciclo sean coherentes.
         
-        # Si no tiene guión, agregarlo antes del último dígito
-        if '-' not in rut:
-            rut = f"{rut[:-1]}-{rut[-1]}"
+        Args:
+            fecha_inicio: Fecha de inicio del ciclo
+            fecha_fin: Fecha de fin del ciclo
+            
+        Returns:
+            Tupla (es_valido, mensaje_error)
+        """
+        if not fecha_inicio or not fecha_fin:
+            return False, "Fechas inicio y fin son requeridas"
         
-        return rut
+        if fecha_fin <= fecha_inicio:
+            return False, "Fecha fin debe ser posterior a fecha inicio"
+        
+        # Advertir si el ciclo es muy corto
+        duracion = (fecha_fin - fecha_inicio).days
+        if duracion < 7:
+            logger.warning(f"Ciclo muy corto: {duracion} días")
+        
+        # Advertir si el ciclo es muy largo (más de 90 días)
+        if duracion > 90:
+            logger.warning(f"Ciclo muy largo: {duracion} días")
+        
+        return True, ""
+    
+    @staticmethod
+    def validar_solapamiento(fecha_inicio: date, fecha_fin: date, excluir_id: int = None) -> Tuple[bool, str]:
+        """
+        Valida que no haya solapamiento con otros ciclos activos.
+        
+        Args:
+            fecha_inicio: Fecha inicio del nuevo ciclo
+            fecha_fin: Fecha fin del nuevo ciclo
+            excluir_id: ID de ciclo a excluir (para updates)
+            
+        Returns:
+            Tupla (es_valido, mensaje_error)
+        """
+        from totem.models import Ciclo
+        from django.db.models import Q
+        
+        # Buscar ciclos que se solapen
+        query = Q(
+            Q(fecha_inicio__lte=fecha_fin, fecha_fin__gte=fecha_inicio) |
+            Q(fecha_inicio__gte=fecha_inicio, fecha_fin__lte=fecha_fin)
+        )
+        
+        if excluir_id:
+            query &= ~Q(id=excluir_id)
+        
+        ciclos_solapados = Ciclo.objects.filter(query, activo=True)
+        
+        if ciclos_solapados.exists():
+            return False, "Ya existe un ciclo activo que se solapa con estas fechas"
+        
+        return True, ""
+
+
+class StockValidator:
+    """
+    Validador de reglas para movimientos de stock.
+    """
+    
+    @staticmethod
+    def validar_cantidad(cantidad: Any) -> Tuple[bool, str]:
+        """
+        Valida que la cantidad sea un entero positivo.
+        
+        Args:
+            cantidad: Valor a validar
+            
+        Returns:
+            Tupla (es_valido, mensaje_error)
+        """
+        try:
+            cantidad_int = int(cantidad)
+            if cantidad_int <= 0:
+                return False, "Cantidad debe ser un número positivo"
+            if cantidad_int > 10000:
+                return False, "Cantidad excede el límite permitido (10000)"
+            return True, ""
+        except (ValueError, TypeError):
+            return False, "Cantidad debe ser un número entero"
+    
+    @staticmethod
+    def validar_accion(accion: str) -> Tuple[bool, str]:
+        """
+        Valida que la acción sea válida.
+        
+        Args:
+            accion: Acción a validar
+            
+        Returns:
+            Tupla (es_valido, mensaje_error)
+        """
+        acciones_validas = ['agregar', 'retirar']
+        if accion not in acciones_validas:
+            return False, f"Acción inválida. Debe ser: {', '.join(acciones_validas)}"
+        return True, ""
+    
+    @staticmethod
+    def validar_tipo_caja(tipo: str) -> Tuple[bool, str]:
+        """
+        Valida que el tipo de caja sea válido.
+        
+        Args:
+            tipo: Tipo de caja a validar
+            
+        Returns:
+            Tupla (es_valido, mensaje_error)
+        """
+        tipos_validos = ['Estándar', 'Premium', 'estandar', 'premium']
+        if not tipo or tipo.strip() == '':
+            return False, "Tipo de caja es requerido"
+        # Normalizar y validar
+        if tipo.lower() not in [t.lower() for t in tipos_validos]:
+            return False, f"Tipo de caja inválido. Debe ser: Estándar o Premium"
+        return True, ""
+    
+    @staticmethod
+    def validar_stock_disponible(sucursal_id: int, tipo_caja: str, cantidad_requerida: int) -> Tuple[bool, str]:
+        """
+        Valida que haya stock suficiente para un retiro.
+        
+        Args:
+            sucursal_id: ID de sucursal
+            tipo_caja: Tipo de caja
+            cantidad_requerida: Cantidad a retirar
+            
+        Returns:
+            Tupla (es_valido, mensaje_error)
+        """
+        from totem.models import StockSucursal
+        
+        try:
+            stock = StockSucursal.objects.get(sucursal_id=sucursal_id, producto__iexact=tipo_caja)
+            stock_disponible = stock.cantidad
+        except StockSucursal.DoesNotExist:
+            stock_disponible = 0
+        
+        if stock_disponible < cantidad_requerida:
+            return False, f"Stock insuficiente. Disponible: {stock_disponible}, solicitado: {cantidad_requerida}"
+        
+        return True, ""
+
+
+class IncidenciaValidator:
+    """
+    Validador de reglas para incidencias.
+    """
+    
+    @staticmethod
+    def validar_tipo(tipo: str) -> Tuple[bool, str]:
+        """
+        Valida que el tipo de incidencia sea válido.
+        
+        Args:
+            tipo: Tipo de incidencia
+            
+        Returns:
+            Tupla (es_valido, mensaje_error)
+        """
+        tipos_validos = ['Falla', 'Queja', 'Sugerencia', 'Consulta', 'Otro']
+        if tipo not in tipos_validos:
+            return False, f"Tipo inválido. Debe ser: {', '.join(tipos_validos)}"
+        return True, ""
+    
+    @staticmethod
+    def validar_descripcion(descripcion: str) -> Tuple[bool, str]:
+        """
+        Valida que la descripción tenga contenido adecuado.
+        
+        Args:
+            descripcion: Texto de la descripción
+            
+        Returns:
+            Tupla (es_valido, mensaje_error)
+        """
+        if not descripcion or len(descripcion.strip()) < 10:
+            return False, "Descripción debe tener al menos 10 caracteres"
+        if len(descripcion) > 2000:
+            return False, "Descripción excede el límite de 2000 caracteres"
+        return True, ""

@@ -42,10 +42,34 @@ logger = logging.getLogger(__name__)
 @ratelimit(key='ip', rate='30/m', method='GET')
 def obtener_beneficio(request, rut):
     """
-    GET /api/beneficios/{rut}
-    - Valida formato RUT
-    - Busca trabajador por rut
-    - Retorna información de beneficio y stock aproximado
+    Obtiene información del beneficio disponible para un trabajador.
+    
+    ENDPOINT: GET /api/beneficios/{rut}/
+    PERMISOS: Público (tótem sin autenticación)
+    RATE LIMIT: 30 peticiones por minuto por IP
+    
+    PARÁMETROS URL:
+        rut (str): RUT del trabajador en formato 12345678-9 o 12345678-K
+    
+    RESPUESTA EXITOSA (200):
+        {
+            "beneficio": {
+                "id": int,
+                "rut": "12345678-9",
+                "nombre": "Juan Pérez",
+                "beneficio_disponible": {
+                    "tipo": "Caja",
+                    "categoria": "Estándar",
+                    "descripcion": "Caja de mercadería estándar"
+                }
+            }
+        }
+    
+    ERRORES:
+        400: RUT con formato inválido
+        404: Trabajador no encontrado
+        429: Límite de peticiones excedido
+        500: Error interno del servidor
     """
     try:
         rut_c = clean_rut(rut)
@@ -71,13 +95,35 @@ def obtener_beneficio(request, rut):
 @ratelimit(key='ip', rate='10/m', method='POST')
 def crear_ticket(request):
     """
-    POST /api/tickets
-    Body esperado JSON:
-    {
-        "trabajador_rut": "12345678-5",
-        "sucursal": "Central"
-    }
-    Usa TicketService para crear ticket con QR firmado y validaciones.
+    Crea un ticket de retiro para un trabajador.
+    
+    ENDPOINT: POST /api/tickets/
+    PERMISOS: Público (tótem sin autenticación)
+    RATE LIMIT: 10 peticiones por minuto por IP
+    
+    BODY (JSON):
+        {
+            "trabajador_rut": "12345678-9",  # REQUERIDO: RUT del trabajador
+            "sucursal": "Central"            # OPCIONAL: Nombre de sucursal (default: "Central")
+        }
+    
+    RESPUESTA EXITOSA (201):
+        {
+            "id": int,
+            "uuid": "ABC123",
+            "trabajador": {"id": int, "rut": str, "nombre": str},
+            "estado": "pendiente",
+            "qr_image": "/media/qr/ABC123.png",
+            "created_at": "2025-11-30T10:30:00Z",
+            "ttl_minutos": 30
+        }
+    
+    ERRORES:
+        400: RUT inválido o datos faltantes
+        404: Trabajador no encontrado o sin beneficio
+        409: Ticket duplicado (ya existe pendiente para este trabajador)
+        429: Límite de peticiones excedido
+        500: Error interno del servidor
     """
     try:
         payload = request.data
@@ -104,7 +150,40 @@ def crear_ticket(request):
 @permission_classes([AllowTotem])
 def estado_ticket(request, uuid):
     """
-    GET /api/tickets/{uuid}/estado - retorna estado y eventos del ticket.
+    GET /api/tickets/{uuid}/estado/
+    
+    Consulta el estado actual de un ticket por su UUID único.
+    Retorna información sobre validez, tiempos de expiración y estado de entrega.
+    
+    ENDPOINT: GET /api/tickets/{uuid}/estado/
+    MÉTODO: GET
+    PERMISOS: Público (tótem sin autenticación)
+    RATE LIMIT: 30 peticiones por minuto por IP
+    
+    PARÁMETROS URL:
+        uuid (str): UUID único del ticket generado (ej: "ABC123DEF456")
+    
+    RESPUESTA EXITOSA (200):
+        {
+            "id": int,
+            "uuid": "ABC123DEF456",
+            "estado": "pendiente",           # pendiente | entregado | expirado | anulado
+            "trabajador": {
+                "id": int,
+                "rut": "12345678-9",
+                "nombre": "Juan Pérez López"
+            },
+            "created_at": "2025-11-30T10:30:00Z",
+            "expires_at": "2025-11-30T11:00:00Z",
+            "tiempo_restante_minutos": 25,
+            "puede_retirar": true,
+            "sucursal": {"id": int, "nombre": "Central"},
+            "qr_image": "/media/qr/ABC123.png"
+        }
+    
+    ERRORES:
+        404: Ticket no encontrado
+        500: Error interno del servidor
     """
     try:
         service = TicketService()
@@ -121,7 +200,38 @@ def estado_ticket(request, uuid):
 @permission_classes([AllowTotem])
 def anular_ticket(request, uuid):
     """
-    POST /api/tickets/{uuid}/anular - anula un ticket pendiente.
+    POST /api/tickets/{uuid}/anular/
+    
+    Anula un ticket pendiente, invalidando su uso para retiro.
+    Tickets anulados no pueden ser validados en portería.
+    
+    ENDPOINT: POST /api/tickets/{uuid}/anular/
+    MÉTODO: POST
+    PERMISOS: Público (tótem sin autenticación)
+    RATE LIMIT: 10 peticiones por minuto por IP
+    
+    PARÁMETROS URL:
+        uuid (str): UUID único del ticket a anular
+    
+    BODY (JSON) - OPCIONAL:
+        {
+            "motivo": "Trabajador cambió de opinión"  # OPCIONAL: Razón de anulación
+        }
+    
+    RESPUESTA EXITOSA (200):
+        {
+            "id": int,
+            "uuid": "ABC123DEF456",
+            "estado": "anulado",
+            "trabajador": {...},
+            "motivo_anulacion": "Trabajador cambió de opinión",
+            "anulado_at": "2025-11-30T10:35:00Z"
+        }
+    
+    ERRORES:
+        404: Ticket no encontrado
+        409: Ticket ya fue entregado o anulado anteriormente
+        500: Error interno del servidor
     """
     try:
         razon = request.data.get('motivo', 'No especificado')
@@ -139,7 +249,38 @@ def anular_ticket(request, uuid):
 @permission_classes([AllowTotem])
 def reimprimir_ticket(request, uuid):
     """
-    POST /api/tickets/{uuid}/reimprimir - reimprime un ticket pendiente (renueva TTL).
+    POST /api/tickets/{uuid}/reimprimir/
+    
+    Reimprime un ticket pendiente, renovando su tiempo de vida (TTL).
+    Útil cuando el trabajador perdió o dañó su ticket físico.
+    
+    ENDPOINT: POST /api/tickets/{uuid}/reimprimir/
+    MÉTODO: POST
+    PERMISOS: Público (tótem sin autenticación)
+    RATE LIMIT: 10 peticiones por minuto por IP
+    
+    PARÁMETROS URL:
+        uuid (str): UUID único del ticket a reimprimir
+    
+    BODY: Vacío (no requiere datos)
+    
+    RESPUESTA EXITOSA (200):
+        {
+            "id": int,
+            "uuid": "ABC123DEF456",
+            "estado": "pendiente",
+            "trabajador": {...},
+            "qr_image": "/media/qr/ABC123_reprint.png",
+            "created_at": "2025-11-30T10:30:00Z",  # Fecha original
+            "expires_at": "2025-11-30T11:30:00Z",  # TTL renovado
+            "reimpreso_at": "2025-11-30T10:50:00Z",
+            "ttl_minutos": 30
+        }
+    
+    ERRORES:
+        404: Ticket no encontrado
+        409: Ticket ya fue entregado, expirado o anulado (no se puede reimprimir)
+        500: Error interno del servidor
     """
     try:
         service = TicketService()
@@ -157,9 +298,46 @@ def reimprimir_ticket(request, uuid):
 @ratelimit(key='ip', rate='10/m', method='POST')
 def crear_agendamiento(request):
     """
-    POST /api/agendamientos
-    Body: {"trabajador_rut": "...", "fecha_retiro": "YYYY-MM-DD"}
-    Crea agendamiento asociado al ciclo activo.
+    POST /api/agendamientos/
+    
+    Crea un agendamiento para retiro futuro de beneficio.
+    El trabajador reserva una fecha específica para retirar su beneficio.
+    
+    ENDPOINT: POST /api/agendamientos/
+    MÉTODO: POST
+    PERMISOS: Público (tótem sin autenticación)
+    RATE LIMIT: 10 peticiones por minuto por IP
+    
+    BODY (JSON):
+        {
+            "trabajador_rut": "12345678-9",  # REQUERIDO: RUT del trabajador
+            "fecha_retiro": "2025-12-15"     # REQUERIDO: Fecha agendada (YYYY-MM-DD)
+        }
+    
+    RESPUESTA EXITOSA (201):
+        {
+            "id": int,
+            "codigo": "AGN-20251130-001",
+            "trabajador": {
+                "id": int,
+                "rut": "12345678-9",
+                "nombre": "Juan Pérez López"
+            },
+            "fecha_retiro": "2025-12-15",
+            "ciclo": {
+                "id": int,
+                "fecha_inicio": "2025-11-01",
+                "fecha_fin": "2025-12-31"
+            },
+            "created_at": "2025-11-30T10:30:00Z"
+        }
+    
+    ERRORES:
+        400: Datos inválidos o fecha fuera del ciclo activo
+        404: Trabajador no encontrado o sin beneficio
+        409: Ya existe agendamiento para esta fecha
+        429: Límite de peticiones excedido
+        500: Error interno del servidor
     """
     try:
         rut = request.data.get('trabajador_rut')
@@ -182,7 +360,35 @@ def crear_agendamiento(request):
 @permission_classes([AllowTotem])
 def listar_agendamientos_trabajador(request, rut):
     """
-    GET /api/agendamientos/{rut} - lista agendamientos de un trabajador.
+    GET /api/agendamientos/{rut}/
+    
+    Lista todos los agendamientos de un trabajador específico.
+    Incluye agendamientos pasados y futuros.
+    
+    ENDPOINT: GET /api/agendamientos/{rut}/
+    MÉTODO: GET
+    PERMISOS: Público (tótem sin autenticación)
+    RATE LIMIT: 30 peticiones por minuto por IP
+    
+    PARÁMETROS URL:
+        rut (str): RUT del trabajador (formato: 12345678-9)
+    
+    RESPUESTA EXITOSA (200):
+        [
+            {
+                "id": int,
+                "codigo": "AGN-20251130-001",
+                "trabajador": {"rut": "12345678-9", "nombre": "Juan Pérez"},
+                "fecha_retiro": "2025-12-15",
+                "ciclo": {...},
+                "created_at": "2025-11-30T10:30:00Z"
+            },
+            ...
+        ]
+    
+    ERRORES:
+        404: Trabajador no encontrado
+        500: Error interno del servidor
     """
     try:
         service = AgendamientoService()
@@ -199,13 +405,41 @@ def listar_agendamientos_trabajador(request, rut):
 @permission_classes([AllowTotem])
 def crear_incidencia(request):
     """
-    POST /api/incidencias - reportar incidencia desde tótem o guardia.
-    Body: {
-        "trabajador_rut": "...", (opcional)
-        "tipo": "tecnica|operacional|usuario",
-        "descripcion": "...",
-        "origen": "totem|guardia"
-    }
+    POST /api/incidencias/
+    
+    Reporta una incidencia técnica, operacional o de usuario.
+    Puede ser reportada desde el tótem o por personal de guardia.
+    
+    ENDPOINT: POST /api/incidencias/
+    MÉTODO: POST
+    PERMISOS: Público (tótem sin autenticación)
+    RATE LIMIT: 20 peticiones por minuto por IP
+    
+    BODY (JSON):
+        {
+            "trabajador_rut": "12345678-9",    # OPCIONAL: RUT si involucra trabajador
+            "tipo": "tecnica",                  # REQUERIDO: tecnica | operacional | usuario
+            "descripcion": "Falla en impresora", # REQUERIDO: Descripción del problema
+            "origen": "totem"                   # REQUERIDO: totem | guardia
+        }
+    
+    RESPUESTA EXITOSA (201):
+        {
+            "id": int,
+            "codigo": "INC-20251130-001",
+            "trabajador": {"rut": "12345678-9", "nombre": "..."},  # null si no aplica
+            "tipo": "tecnica",
+            "descripcion": "Falla en impresora",
+            "estado": "pendiente",             # pendiente | en_proceso | resuelta
+            "origen": "totem",
+            "created_at": "2025-11-30T10:30:00Z",
+            "resolucion": null
+        }
+    
+    ERRORES:
+        400: Datos inválidos o tipo no permitido
+        404: Trabajador no encontrado (si se especifica RUT)
+        500: Error interno del servidor
     """
     try:
         rut = request.data.get('trabajador_rut')
@@ -232,7 +466,35 @@ def crear_incidencia(request):
 @permission_classes([AllowTotem])
 def obtener_incidencia(request, codigo):
     """
-    GET /api/incidencias/{codigo} - obtiene una incidencia por código.
+    GET /api/incidencias/{codigo}/
+    
+    Obtiene el detalle completo de una incidencia por su código único.
+    
+    ENDPOINT: GET /api/incidencias/{codigo}/
+    MÉTODO: GET
+    PERMISOS: Público (tótem sin autenticación)
+    RATE LIMIT: 30 peticiones por minuto por IP
+    
+    PARÁMETROS URL:
+        codigo (str): Código único de la incidencia (ej: "INC-20251130-001")
+    
+    RESPUESTA EXITOSA (200):
+        {
+            "id": int,
+            "codigo": "INC-20251130-001",
+            "trabajador": {...},
+            "tipo": "tecnica",
+            "descripcion": "Falla en impresora",
+            "estado": "pendiente",
+            "origen": "totem",
+            "resolucion": null,
+            "created_at": "2025-11-30T10:30:00Z",
+            "updated_at": "2025-11-30T10:30:00Z"
+        }
+    
+    ERRORES:
+        404: Incidencia no encontrada
+        500: Error interno del servidor
     """
     try:
         service = IncidenciaService()
@@ -249,7 +511,39 @@ def obtener_incidencia(request, codigo):
 @permission_classes([AllowTotem])
 def listar_incidencias(request):
     """
-    GET /api/incidencias?estado=pendiente&tipo=tecnica - lista incidencias con filtros.
+    GET /api/incidencias/
+    
+    Lista incidencias con filtros opcionales por estado, tipo y trabajador.
+    Soporta paginación para grandes volúmenes de datos.
+    
+    ENDPOINT: GET /api/incidencias/
+    MÉTODO: GET
+    PERMISOS: Público (tótem sin autenticación)
+    RATE LIMIT: 30 peticiones por minuto por IP
+    
+    QUERY PARAMETERS (todos opcionales):
+        ?estado=pendiente       # Filtro: pendiente | en_proceso | resuelta
+        ?tipo=tecnica           # Filtro: tecnica | operacional | usuario
+        ?trabajador_rut=12345678-9  # Filtro por RUT de trabajador
+    
+    RESPUESTA EXITOSA (200):
+        [
+            {
+                "id": int,
+                "codigo": "INC-20251130-001",
+                "trabajador": {...},
+                "tipo": "tecnica",
+                "estado": "pendiente",
+                "descripcion": "Falla en impresora",
+                "origen": "totem",
+                "created_at": "2025-11-30T10:30:00Z"
+            },
+            ...
+        ]
+    
+    ERRORES:
+        400: Parámetros de filtro inválidos
+        500: Error interno del servidor
     """
     try:
         estado = request.GET.get('estado')
@@ -274,8 +568,38 @@ def listar_incidencias(request):
 @permission_classes([AllowTotem])
 def resolver_incidencia(request, codigo):
     """
-    POST /api/incidencias/{codigo}/resolver/ - resuelve una incidencia.
-    Body: {"resolucion": "..."}
+    POST /api/incidencias/{codigo}/resolver/
+    
+    Marca una incidencia como resuelta, registrando la solución aplicada.
+    Cambia automáticamente el estado a 'resuelta'.
+    
+    ENDPOINT: POST /api/incidencias/{codigo}/resolver/
+    MÉTODO: POST
+    PERMISOS: Público (tótem sin autenticación)
+    RATE LIMIT: 20 peticiones por minuto por IP
+    
+    PARÁMETROS URL:
+        codigo (str): Código único de la incidencia
+    
+    BODY (JSON):
+        {
+            "resolucion": "Se reemplazó cartucho de tinta"  # OPCIONAL: Descripción de la solución
+        }
+    
+    RESPUESTA EXITOSA (200):
+        {
+            "id": int,
+            "codigo": "INC-20251130-001",
+            "estado": "resuelta",
+            "resolucion": "Se reemplazó cartucho de tinta",
+            "resuelta_at": "2025-11-30T11:00:00Z",
+            ...
+        }
+    
+    ERRORES:
+        404: Incidencia no encontrada
+        409: Incidencia ya estaba resuelta
+        500: Error interno del servidor
     """
     try:
         resolucion = request.data.get('resolucion', '')
@@ -294,8 +618,38 @@ def resolver_incidencia(request, codigo):
 @permission_classes([AllowTotem])
 def cambiar_estado_incidencia(request, codigo):
     """
-    PATCH /api/incidencias/{codigo}/estado/ - cambia el estado de una incidencia.
-    Body: {"estado": "pendiente|en_proceso|resuelta"}
+    PATCH /api/incidencias/{codigo}/estado/
+    
+    Actualiza el estado de una incidencia durante su ciclo de vida.
+    Permite transiciones: pendiente → en_proceso → resuelta.
+    
+    ENDPOINT: PATCH /api/incidencias/{codigo}/estado/
+    MÉTODO: PATCH
+    PERMISOS: Público (tótem sin autenticación)
+    RATE LIMIT: 20 peticiones por minuto por IP
+    
+    PARÁMETROS URL:
+        codigo (str): Código único de la incidencia
+    
+    BODY (JSON):
+        {
+            "estado": "en_proceso"  # REQUERIDO: pendiente | en_proceso | resuelta
+        }
+    
+    RESPUESTA EXITOSA (200):
+        {
+            "id": int,
+            "codigo": "INC-20251130-001",
+            "estado": "en_proceso",
+            "updated_at": "2025-11-30T10:45:00Z",
+            ...
+        }
+    
+    ERRORES:
+        400: Estado inválido o falta campo estado
+        404: Incidencia no encontrada
+        409: Transición de estado no permitida
+        500: Error interno del servidor
     """
     try:
         nuevo_estado = request.data.get('estado')
@@ -314,6 +668,28 @@ def cambiar_estado_incidencia(request, codigo):
 
 @api_view(['GET'])
 def ciclo_activo(request):
+    """
+    GET /api/ciclo-activo/
+    
+    Obtiene el ciclo bimensual activo actual.
+    Solo puede existir un ciclo activo a la vez.
+    
+    ENDPOINT: GET /api/ciclo-activo/
+    MÉTODO: GET
+    PERMISOS: Público (sin autenticación)
+    
+    RESPUESTA EXITOSA (200):
+        {
+            "id": int,
+            "fecha_inicio": "2025-11-01",
+            "fecha_fin": "2025-12-31",
+            "activo": true,
+            "dias_restantes": 31
+        }
+    
+    ERRORES:
+        404: Sin ciclo activo configurado
+    """
     ciclo = Ciclo.objects.filter(activo=True).order_by('-id').first()
     if not ciclo:
         return Response({'detail': 'Sin ciclo activo'}, status=404)
@@ -322,7 +698,48 @@ def ciclo_activo(request):
 
 @api_view(['GET', 'POST'])
 def parametros_operativos(request):
-    """GET: lista parámetros; POST: upsert clave/valor."""
+    """
+    GET /api/parametros/ - lista todos los parámetros operativos
+    POST /api/parametros/ - crea o actualiza un parámetro (upsert)
+    
+    Parámetros operativos permiten configurar valores dinámicamente
+    sin necesidad de reiniciar el sistema (ej: TTL de tickets, cupos).
+    
+    ENDPOINT: GET|POST /api/parametros/
+    MÉTODOS: GET, POST
+    PERMISOS: Público para GET, Admin recomendado para POST
+    
+    --- GET ---
+    RESPUESTA (200):
+        [
+            {
+                "id": int,
+                "clave": "ticket_ttl_minutos",
+                "valor": "30",
+                "descripcion": "Tiempo de vida de tickets en minutos"
+            },
+            ...
+        ]
+    
+    --- POST ---
+    BODY (JSON):
+        {
+            "clave": "ticket_ttl_minutos",        # REQUERIDO: Nombre del parámetro
+            "valor": "45",                       # OPCIONAL: Valor (string)
+            "descripcion": "TTL de tickets"     # OPCIONAL: Descripción
+        }
+    
+    RESPUESTA (201):
+        {
+            "id": int,
+            "clave": "ticket_ttl_minutos",
+            "valor": "45",
+            "descripcion": "TTL de tickets"
+        }
+    
+    ERRORES:
+        400: Falta campo 'clave' en POST
+    """
     if request.method == 'GET':
         qs = ParametroOperativo.objects.all().order_by('clave')
         return Response(ParametroOperativoSerializer(qs, many=True).data)

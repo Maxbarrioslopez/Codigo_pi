@@ -6,25 +6,56 @@ Shared across all environments.
 import os
 from pathlib import Path
 from datetime import timedelta
-import environ
 
 # Build paths
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-# Initialize django-environ
-env = environ.Env(
-    # Set default values and casting
-    DEBUG=(bool, False),
-    USE_POSTGRES=(bool, False),
-    ALLOWED_HOSTS=(list, ['localhost', '127.0.0.1']),
-    CORS_ALLOWED_ORIGINS=(list, ['http://localhost:5173']),
-)
-
-# Read .env file
-environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+# Try to import django-environ, fallback to python-decouple
+try:
+    import environ
+    
+    env = environ.Env(
+        # Set default values and casting
+        DEBUG=(bool, False),
+        USE_POSTGRES=(bool, False),
+        ALLOWED_HOSTS=(list, ['localhost', '127.0.0.1']),
+        CORS_ALLOWED_ORIGINS=(list, ['http://localhost:5173']),
+    )
+    
+    # Read .env file
+    environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+    
+    # Helper functions for compatibility
+    def get_env(key, default=None, cast=None):
+        return env(key, default=default, cast=cast) if cast else env(key, default=default)
+    
+    def get_env_list(key, default=None):
+        return env.list(key, default=default or [])
+    
+    def get_env_int(key, default=None):
+        return env.int(key, default=default)
+    
+    def get_env_bool(key, default=False):
+        return env.bool(key, default=default)
+        
+except ImportError:
+    # Fallback to python-decouple
+    from decouple import config, Csv
+    
+    def get_env(key, default=None, cast=None):
+        return config(key, default=default, cast=cast or str)
+    
+    def get_env_list(key, default=None):
+        return config(key, default=','.join(default or []), cast=Csv())
+    
+    def get_env_int(key, default=None):
+        return config(key, default=default, cast=int)
+    
+    def get_env_bool(key, default=False):
+        return config(key, default=default, cast=bool)
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = env('DJANGO_SECRET_KEY')
+SECRET_KEY = get_env('DJANGO_SECRET_KEY')
 
 # Application definition
 INSTALLED_APPS = [
@@ -38,10 +69,8 @@ INSTALLED_APPS = [
     # Third party
     'rest_framework',
     'rest_framework_simplejwt',
-    'rest_framework_simplejwt.token_blacklist',  # For token blacklist
     'corsheaders',
     'drf_spectacular',
-    'django_ratelimit',
     
     # Local apps
     'totem',
@@ -49,9 +78,21 @@ INSTALLED_APPS = [
     'rrhh',
 ]
 
+# Conditional apps (only if installed)
+try:
+    import rest_framework_simplejwt.token_blacklist
+    INSTALLED_APPS.append('rest_framework_simplejwt.token_blacklist')
+except ImportError:
+    pass
+
+try:
+    import django_ratelimit
+    INSTALLED_APPS.append('django_ratelimit')
+except ImportError:
+    pass
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'django.middleware.gzip.GZipMiddleware',  # Compression
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -59,9 +100,21 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'totem.middleware.AuditLoggingMiddleware',  # Custom audit logging
-    'totem.middleware.SecurityHeadersMiddleware',  # Custom security headers
 ]
+
+# Try to add custom middlewares if they exist
+# Don't import here to avoid AppRegistryNotReady
+try:
+    # Just check if file exists, don't import yet
+    import os
+    middleware_file = BASE_DIR / 'totem' / 'middleware.py'
+    if os.path.exists(middleware_file):
+        MIDDLEWARE.extend([
+            'totem.middleware.AuditLoggingMiddleware',
+            'totem.middleware.SecurityHeadersMiddleware',
+        ])
+except Exception:
+    pass
 
 ROOT_URLCONF = 'backend_project.urls'
 
@@ -86,7 +139,10 @@ WSGI_APPLICATION = 'backend_project.wsgi.application'
 # Database
 # Override in specific settings files
 DATABASES = {
-    'default': env.db('DATABASE_URL', default='sqlite:///db.sqlite3')
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
 }
 
 # Password validation
@@ -117,7 +173,7 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [BASE_DIR / 'static']
+STATICFILES_DIRS = []  # No custom static dirs in this project
 
 # Media files
 MEDIA_URL = '/media/'
@@ -130,7 +186,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'totem.Usuario'
 
 # CORS Configuration
-CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS')
+CORS_ALLOWED_ORIGINS = get_env_list('CORS_ALLOWED_ORIGINS', ['http://localhost:5173', 'http://127.0.0.1:5173'])
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
     'accept',
@@ -154,9 +210,7 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 50,
-    'MAX_PAGE_SIZE': 100,
+    'DEFAULT_PAGINATION_CLASS': 'totem.pagination.StandardResultsSetPagination',
     'EXCEPTION_HANDLER': 'totem.exceptions.custom_exception_handler',
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
@@ -165,6 +219,14 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/hour',
         'user': '1000/hour',
+        'auth': '10/minute',  # Autenticación
+        'ticket_create': '20/hour',  # Creación de tickets
+        'qr_validation': '100/hour',  # Validación QR
+        'reports': '30/hour',  # Generación de reportes
+        'nomina_upload': '5/hour',  # Carga de nómina
+        'stock_movement': '50/hour',  # Movimientos de stock
+        'burst': '60/minute',  # Límite de ráfaga
+        'sustained': '1000/hour',  # Límite sostenido
     },
 }
 
@@ -173,9 +235,9 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),  # Reduced from 8h to 30min
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,  # Enable blacklist
+    'BLACKLIST_AFTER_ROTATION': False,  # Enable only if token_blacklist installed
     'UPDATE_LAST_LOGIN': True,
-    'SIGNING_KEY': env('JWT_SECRET_KEY', default=SECRET_KEY),
+    'SIGNING_KEY': get_env('JWT_SECRET_KEY', SECRET_KEY),
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
     'USER_ID_FIELD': 'id',
@@ -183,6 +245,13 @@ SIMPLE_JWT = {
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
     'TOKEN_TYPE_CLAIM': 'token_type',
 }
+
+# Enable blacklist if module is installed
+try:
+    import rest_framework_simplejwt.token_blacklist
+    SIMPLE_JWT['BLACKLIST_AFTER_ROTATION'] = True
+except ImportError:
+    pass
 
 # Spectacular (OpenAPI) Configuration
 SPECTACULAR_SETTINGS = {
@@ -194,57 +263,72 @@ SPECTACULAR_SETTINGS = {
     'SCHEMA_PATH_PREFIX': '/api/',
 }
 
-# Cache Configuration (Redis)
-CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': env('REDIS_URL', default='redis://127.0.0.1:6379/1'),
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-            'PARSER_CLASS': 'redis.connection.HiredisParser',
-            'SOCKET_CONNECT_TIMEOUT': 5,
-            'SOCKET_TIMEOUT': 5,
-            'CONNECTION_POOL_CLASS_KWARGS': {
-                'max_connections': 50,
+# Cache Configuration (Redis or Local Memory)
+try:
+    import django_redis
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': get_env('REDIS_URL', 'redis://127.0.0.1:6379/1'),
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+                'SOCKET_CONNECT_TIMEOUT': 5,
+                'SOCKET_TIMEOUT': 5,
+                'CONNECTION_POOL_CLASS_KWARGS': {
+                    'max_connections': 50,
+                },
             },
-        },
-        'KEY_PREFIX': 'totem',
-        'TIMEOUT': 300,  # 5 minutes default
+            'KEY_PREFIX': 'totem',
+            'TIMEOUT': 300,  # 5 minutes default
+        }
     }
-}
+except ImportError:
+    # Fallback to local memory cache
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'totem-cache',
+        }
+    }
 
-# Celery Configuration
-CELERY_BROKER_URL = env('CELERY_BROKER_URL', default='redis://127.0.0.1:6379/0')
-CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND', default='redis://127.0.0.1:6379/0')
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TIMEZONE = TIME_ZONE
-CELERY_ENABLE_UTC = True
-CELERY_TASK_TRACK_STARTED = True
-CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
-CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60  # 25 minutes
-
-# Celery Beat Schedule
-from celery.schedules import crontab
-CELERY_BEAT_SCHEDULE = {
-    'expirar-tickets-cada-5-minutos': {
-        'task': 'totem.tasks.expirar_tickets_automatico',
-        'schedule': crontab(minute='*/5'),
-    },
-    'marcar-agendamientos-vencidos-diariamente': {
-        'task': 'totem.tasks.marcar_agendamientos_vencidos',
-        'schedule': crontab(hour=0, minute=0),
-    },
-}
+# Celery Configuration (only if Celery is installed)
+try:
+    import celery
+    
+    CELERY_BROKER_URL = get_env('CELERY_BROKER_URL', 'redis://127.0.0.1:6379/0')
+    CELERY_RESULT_BACKEND = get_env('CELERY_RESULT_BACKEND', 'redis://127.0.0.1:6379/0')
+    CELERY_ACCEPT_CONTENT = ['json']
+    CELERY_TASK_SERIALIZER = 'json'
+    CELERY_RESULT_SERIALIZER = 'json'
+    CELERY_TIMEZONE = TIME_ZONE
+    CELERY_ENABLE_UTC = True
+    CELERY_TASK_TRACK_STARTED = True
+    CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
+    CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60  # 25 minutes
+    
+    # Celery Beat Schedule
+    from celery.schedules import crontab
+    CELERY_BEAT_SCHEDULE = {
+        'expirar-tickets-cada-5-minutos': {
+            'task': 'totem.tasks.expirar_tickets_automatico',
+            'schedule': crontab(minute='*/5'),
+        },
+        'marcar-agendamientos-vencidos-diariamente': {
+            'task': 'totem.tasks.marcar_agendamientos_vencidos',
+            'schedule': crontab(hour=0, minute=0),
+        },
+    }
+except ImportError:
+    # Celery not installed, skip configuration
+    pass
 
 # Security Settings
-QR_HMAC_SECRET = env('QR_HMAC_SECRET')
-QR_TTL_MINUTES = env.int('QR_TTL_MINUTES', default=30)
+QR_HMAC_SECRET = get_env('QR_HMAC_SECRET', 'change-me-in-production')
+QR_TTL_MINUTES = get_env_int('QR_TTL_MINUTES', 30)
 
 # Operational Settings
-MAX_AGENDAMIENTOS_PER_DAY = env.int('MAX_AGENDAMIENTOS_PER_DAY', default=50)
-MAX_AGENDAMIENTOS_PER_WORKER = env.int('MAX_AGENDAMIENTOS_PER_WORKER', default=1)
+MAX_AGENDAMIENTOS_PER_DAY = get_env_int('MAX_AGENDAMIENTOS_PER_DAY', 50)
+MAX_AGENDAMIENTOS_PER_WORKER = get_env_int('MAX_AGENDAMIENTOS_PER_WORKER', 1)
 
 # Session Security
 SESSION_COOKIE_SECURE = False  # Override in production

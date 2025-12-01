@@ -22,4 +22,5 @@ urlpatterns = [
     
     # Exportaciones
     path('exportar/tickets/', views.exportar_tickets_csv, name='exportar_tickets_csv'),
+    path('exportar/tickets/excel/', views.exportar_tickets_excel, name='exportar_tickets_excel'),
 ]

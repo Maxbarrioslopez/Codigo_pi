@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { api } from '../services/api';
+import { apiClient, ApiClientWrapper } from '@/services/apiClient';
 
 /**
  * Sistema de Autenticación con JWT
  * Maneja login, logout, almacenamiento de tokens y verificación de roles
+ * Integrado con apiClient para manejo centralizado de tokens
  */
 
 // Tipos
@@ -54,10 +55,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setLoading(false);
     }, []);
 
-    // Sincroniza el token de acceso con la capa API centralizada
+    // Sincroniza el token de acceso con apiClient
     useEffect(() => {
-        api.setAuthToken(accessToken ?? null);
-    }, [accessToken]);
+        if (accessToken && refreshToken) {
+            ApiClientWrapper.setAuthTokens(accessToken, refreshToken);
+        }
+    }, [accessToken, refreshToken]);
 
     // Base de la API para endpoints de auth (coincide con api.ts)
     const API_BASE =
@@ -84,41 +87,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 }
             };
 
-            // Intentar login con backend real primero
+            // Intentar login con backend real usando apiClient
             try {
-                const response = await fetch(`${API_BASE}/auth/login/`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ username, password }),
-                });
+                const { data } = await apiClient.post('/auth/login/', { username, password });
 
-                if (response.ok) {
-                    const data = await response.json();
+                // Decodificar el token para obtener información del usuario
+                const tokenPayload = JSON.parse(atob(data.access.split('.')[1]));
 
-                    // Decodificar el token para obtener información del usuario
-                    const tokenPayload = JSON.parse(atob(data.access.split('.')[1]));
+                const userData: User = {
+                    id: tokenPayload.user_id,
+                    username: tokenPayload.username || username,
+                    rol: tokenPayload.rol || 'guardia',
+                };
 
-                    const userData: User = {
-                        id: tokenPayload.user_id,
-                        username: tokenPayload.username || username,
-                        rol: tokenPayload.rol || 'guardia',
-                    };
+                // Guardar en estado y localStorage
+                setUser(userData);
+                setAccessToken(data.access);
+                setRefreshToken(data.refresh);
 
-                    // Guardar en estado y localStorage
-                    setUser(userData);
-                    setAccessToken(data.access);
-                    setRefreshToken(data.refresh);
+                localStorage.setItem('user', JSON.stringify(userData));
+                localStorage.setItem('access_token', data.access);
+                localStorage.setItem('refresh_token', data.refresh);
+                localStorage.setItem('mock_mode', 'false');
 
-                    localStorage.setItem('user', JSON.stringify(userData));
-                    localStorage.setItem('access_token', data.access);
-                    localStorage.setItem('refresh_token', data.refresh);
-                    localStorage.setItem('mock_mode', 'false');
-                    // Inyectar token en la capa API
-                    api.setAuthToken(data.access);
-                    return;
-                }
+                // Inyectar tokens en apiClient
+                ApiClientWrapper.setAuthTokens(data.access, data.refresh);
+                return;
             } catch (backendError) {
                 console.warn('Backend no disponible, usando modo mock:', backendError);
             }
@@ -136,7 +130,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 localStorage.setItem('access_token', mockToken);
                 localStorage.setItem('refresh_token', mockToken);
                 localStorage.setItem('mock_mode', 'true');
-                api.setAuthToken(mockToken);
+                ApiClientWrapper.setAuthTokens(mockToken, mockToken);
                 return;
             }
 
@@ -156,7 +150,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         localStorage.removeItem('user');
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
-        api.setAuthToken(null);
+        ApiClientWrapper.logout();
     };
 
     const hasRole = (roles: string | string[]): boolean => {
@@ -188,29 +182,13 @@ export const useAuth = (): AuthContextType => {
     return context;
 };
 
-// Helper para refrescar el token de acceso
+// Helper para refrescar el token de acceso (delegado a apiClient interceptors)
 export const refreshAccessToken = async (refreshToken: string): Promise<string | null> => {
     try {
-        const API_BASE =
-            (import.meta as any)?.env?.VITE_API_URL?.replace(/\/$/, '') ||
-            (import.meta as any)?.env?.VITE_API_PREFIX?.replace(/\/$/, '') ||
-            '/api';
-        const response = await fetch(`${API_BASE}/auth/refresh/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ refresh: refreshToken }),
-        });
+        const { data } = await apiClient.post('/auth/refresh/', { refresh: refreshToken });
 
-        if (!response.ok) {
-            throw new Error('Fallo al refrescar token');
-        }
-
-        const data = await response.json();
         localStorage.setItem('access_token', data.access);
-        // Actualiza token en la capa API
-        api.setAuthToken(data.access);
+        ApiClientWrapper.setAuthTokens(data.access, refreshToken);
         return data.access;
     } catch (error) {
         console.error('Error al refrescar token:', error);

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Scan, Package, Clock, AlertOctagon, History, User, Eye, EyeOff, AlertCircle, BarChart3, CheckCircle2 } from 'lucide-react';
 import { ticketService } from '@/services/ticket.service';
-import { TicketDTO, MetricasGuardiaDTO } from '@/types';
+import { TicketDTO, MetricasGuardiaDTO, StockResumenDTO, StockMovimientoDTO } from '@/types';
 import { incidentService } from '@/services/incident.service';
 import { stockService } from '@/services/stock.service';
 import { ticketsQueryService } from '@/services/tickets.query.service';
@@ -275,6 +275,9 @@ function GuardiaDashboard({
               ticketUUID={ticketUUID}
               setTicketUUID={setTicketUUID}
               ticketData={ticketData}
+              setTicketData={setTicketData}
+              setHasScannedTicket={setHasScannedTicket}
+              setIsExpiredTicket={setIsExpiredTicket}
               validating={validating}
               onValidate={async () => {
                 if (!ticketUUID) return;
@@ -359,6 +362,9 @@ function ScannerView({
   ticketUUID,
   setTicketUUID,
   ticketData,
+  setTicketData,
+  setHasScannedTicket,
+  setIsExpiredTicket,
   validating,
   onValidate,
   onFetchEstado,
@@ -371,6 +377,9 @@ function ScannerView({
   ticketUUID: string;
   setTicketUUID: (v: string) => void;
   ticketData: TicketDTO | null;
+  setTicketData: (d: TicketDTO | null) => void;
+  setHasScannedTicket: (b: boolean) => void;
+  setIsExpiredTicket: (b: boolean) => void;
   validating: boolean;
   onValidate: () => void;
   onFetchEstado: () => void;
@@ -993,8 +1002,8 @@ function StockView() {
   const [observation, setObservation] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [resumen, setResumen] = useState<{ disponible: number; entregadas_hoy: number; reservadas: number; total_mes: number; por_tipo: { estandar: number; premium: number } } | null>(null);
-  const [movimientos, setMovimientos] = useState<Array<{ fecha: string; hora: string; tipo_caja: string; accion: string; cantidad: number; motivo: string; usuario: string }>>([]);
+  const [resumen, setResumen] = useState<StockResumenDTO | null>(null);
+  const [movimientos, setMovimientos] = useState<StockMovimientoDTO[]>([]);
 
   const fetchStock = async () => {
     setLoading(true); setError(null);

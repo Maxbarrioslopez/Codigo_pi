@@ -130,11 +130,11 @@ export function TotemModule() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4 md:space-y-8">
       <div>
         <h2 className="text-[#333333] mb-2">Tótem de Autoservicio</h2>
         <p className="text-[#6B6B6B]">
-          Flujo integrado del kiosko (1080×1920, vertical, sin login).
+          Sistema de retiro digital de beneficios (optimizado para kiosko vertical y tablet).
         </p>
       </div>
       {DEV_MODE && (
@@ -145,8 +145,8 @@ export function TotemModule() {
           ))}
         </div>
       )}
-      <div className="bg-[#333333] p-8 rounded-xl">
-        <div className="max-w-2xl mx-auto bg-[#F8F8F8] rounded-xl shadow-2xl overflow-hidden" style={{ aspectRatio: '9/16' }}>
+      <div className="bg-[#333333] p-4 md:p-8 rounded-xl overflow-x-hidden">
+        <div className="max-w-2xl mx-auto bg-[#F8F8F8] rounded-xl shadow-2xl overflow-hidden min-h-[600px] md:min-h-[800px]" style={{ aspectRatio: '9/16' }}>
           {currentScreen === 'initial' && (
             <TotemInitialScreen
               rutInput={rutInput}
@@ -279,16 +279,16 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
         <button
           onClick={onScan}
           disabled={!rutInput.trim()}
-          className={`w-full px-8 py-5 rounded-xl transition-colors ${rutInput.trim() ? 'bg-[#E12019] text-white hover:bg-[#B51810]' : 'bg-[#E0E0E0] text-[#6B6B6B] cursor-not-allowed'}`}
-          style={{ fontSize: '18px', fontWeight: 700, minHeight: '64px' }}
+          className={`w-full px-6 md:px-8 py-4 md:py-5 rounded-xl transition-colors ${rutInput.trim() ? 'bg-[#E12019] text-white hover:bg-[#B51810]' : 'bg-[#E0E0E0] text-[#6B6B6B] cursor-not-allowed'}`}
+          style={{ fontSize: '16px', fontWeight: 700, minHeight: '56px' }}
         >
           Validar Beneficio
         </button>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <button
             onClick={onConsultIncident}
-            className="px-6 py-4 bg-white text-[#333333] border-2 border-[#E0E0E0] rounded-xl hover:bg-[#F8F8F8] transition-colors flex flex-col items-center justify-center gap-2"
-            style={{ fontSize: '14px', fontWeight: 500, minHeight: '64px' }}
+            className="px-4 md:px-6 py-3 md:py-4 bg-white text-[#333333] border-2 border-[#E0E0E0] rounded-xl hover:bg-[#F8F8F8] transition-colors flex flex-col items-center justify-center gap-2"
+            style={{ fontSize: '14px', fontWeight: 500, minHeight: '56px' }}
           >
             <Search className="w-5 h-5" />
             Consultar Incidencia

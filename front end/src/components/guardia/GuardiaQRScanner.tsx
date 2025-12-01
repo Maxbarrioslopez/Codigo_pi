@@ -222,7 +222,8 @@ export function GuardiaQRScanner({
             const [track] = stream.getVideoTracks();
             const capabilities = (track.getCapabilities?.() || {}) as any;
             if (!capabilities.torch) return;
-            await track.applyConstraints({ advanced: [{ torch: !torchOn }] });
+            // Torch constraint not standardized yet, skip TypeScript error
+            await track.applyConstraints({ advanced: [{ torch: !torchOn } as any] });
             setTorchOn(!torchOn);
         } catch (e) {
             console.warn('Torch no soportado o fallo al alternar:', e);

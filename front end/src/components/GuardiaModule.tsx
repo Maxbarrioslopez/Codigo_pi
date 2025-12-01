@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Scan, Package, Clock, AlertOctagon, History, User, Eye, EyeOff, AlertCircle, BarChart3, CheckCircle2 } from 'lucide-react';
-import { estadoTicket, validarTicketGuardia, TicketDTO, MetricasGuardiaDTO, crearIncidencia, stockResumen, stockMovimientos, registrarMovimientoStock, listarTickets } from '../services/api';
+import { ticketService } from '@/services/ticket.service';
+import { TicketDTO, MetricasGuardiaDTO } from '@/types';
+import { incidentService } from '@/services/incident.service';
+import { stockService } from '@/services/stock.service';
+import { ticketsQueryService } from '@/services/tickets.query.service';
 import { useMetricasGuardia } from '../hooks/useMetricasGuardia';
+import { GuardiaQRScanner } from './guardia/GuardiaQRScanner';
 
 type GuardiaScreen = 'login' | 'dashboard';
 type DashboardTab = 'scanner' | 'incidents' | 'metrics';
@@ -275,7 +280,7 @@ function GuardiaDashboard({
                 if (!ticketUUID) return;
                 setValidating(true);
                 try {
-                  const data = await validarTicketGuardia(ticketUUID);
+                  const data = await ticketService.validarGuardia(ticketUUID);
                   setTicketData(data);
                   setHasScannedTicket(true);
                   setIsExpiredTicket(false);
@@ -290,7 +295,7 @@ function GuardiaDashboard({
               onFetchEstado={async () => {
                 if (!ticketUUID) return;
                 try {
-                  const data = await estadoTicket(ticketUUID);
+                  const data = await ticketService.getEstado(ticketUUID);
                   setTicketData(data);
                   setHasScannedTicket(true);
                   if (data.estado === 'expirado') setIsExpiredTicket(true);
@@ -328,7 +333,7 @@ function GuardiaDashboard({
                   ticket: ticketUUID
                 });
                 try {
-                  await crearIncidencia({
+                  await incidentService.crearIncidencia({
                     tipo: 'Caja incorrecta',
                     descripcion: descripcionExtra || `Caja escaneada (${cajaCodigo}) no coincide con beneficio asignado (${ticketData.data?.beneficio || 'N/A'})`,
                     trabajador_rut: ticketData.trabajador?.rut || '',
@@ -377,6 +382,8 @@ function ScannerView({
   const [stage, setStage] = useState<'ticket' | 'box' | 'success' | 'error'>('ticket');
   const [boxScanning, setBoxScanning] = useState(false);
   const [manualBoxInput, setManualBoxInput] = useState('');
+  const [showQRScanner, setShowQRScanner] = useState(false);
+
   const playTone = (type: 'success' | 'error') => {
     try {
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -393,7 +400,7 @@ function ScannerView({
     setBoxScanning(true);
     try {
       if (!simulateIncorrect) {
-        await validarTicketGuardia(ticketUUID, codigo);
+        await ticketService.validarGuardia(ticketUUID, codigo);
         setStage('success');
         onRegisterDelivery(codigo);
         playTone('success');
@@ -537,8 +544,41 @@ function ScannerView({
               <p className="text-[#6B6B6B] text-center max-w-md" style={{ fontSize: '16px', lineHeight: '1.5' }}>
                 Coloca el código QR del ticket frente al lector para validar el retiro
               </p>
+              <button
+                onClick={() => setShowQRScanner(true)}
+                className="mt-6 px-8 py-4 bg-[#017E49] text-white rounded-xl hover:bg-[#015A34] transition-colors flex items-center gap-2"
+                style={{ fontSize: '16px', fontWeight: 700 }}
+              >
+                <Scan className="w-5 h-5" />
+                Activar Escáner QR
+              </button>
             </div>
           </div>
+
+          {/* QR Scanner Modal */}
+          {showQRScanner && (
+            <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+              <div className="w-full max-w-3xl h-[600px]">
+                <GuardiaQRScanner
+                  onTicketScanned={async (uuid) => {
+                    setTicketUUID(uuid);
+                    setShowQRScanner(false);
+                    // Auto-fetch estado después de escanear
+                    try {
+                      const data = await ticketService.getEstado(uuid);
+                      setTicketData(data);
+                      setHasScannedTicket(true);
+                      if (data.estado === 'expirado') setIsExpiredTicket(true);
+                    } catch {
+                      setTicketData(null);
+                    }
+                  }}
+                  onClose={() => setShowQRScanner(false)}
+                  isActive={showQRScanner}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Manual Code Entry */}
           <div className="bg-white border-2 border-[#E0E0E0] rounded-xl p-6 mb-6">

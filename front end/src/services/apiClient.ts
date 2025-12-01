@@ -1,11 +1,17 @@
-import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
+/**
+ * Cliente HTTP centralizado con Axios
+ * Incluye interceptors para autenticación automática y refresh de tokens
+ * Compatible con backend Django REST Framework
+ */
+
+import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosError, AxiosRequestConfig } from 'axios';
 
 // Configuración base de la API
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 // Crear instancia de axios con configuración por defecto
 const apiClient: AxiosInstance = axios.create({
-    baseURL: API_BASE_URL,
+    baseURL: API_BASE_URL.replace(/\/$/, ''), // Remover trailing slash
     timeout: 30000, // 30 segundos
     headers: {
         'Content-Type': 'application/json',
@@ -78,17 +84,16 @@ apiClient.interceptors.response.use(
             const refreshToken = localStorage.getItem('refresh_token');
 
             if (!refreshToken) {
-                // No hay refresh token, redirigir al login
+                // Sin refresh token: rechazar y permitir que la UI decida (no redirigir aquí)
                 localStorage.removeItem('access_token');
                 localStorage.removeItem('refresh_token');
                 localStorage.removeItem('user');
-                window.location.href = '/login';
                 return Promise.reject(error);
             }
 
             try {
                 // Intentar refrescar el token
-                const response = await axios.post(`${API_BASE_URL}/auth/token/refresh/`, {
+                const response = await axios.post(`${API_BASE_URL}/auth/refresh/`, {
                     refresh: refreshToken,
                 });
 
@@ -110,14 +115,13 @@ apiClient.interceptors.response.use(
                 return apiClient(originalRequest);
 
             } catch (refreshError) {
-                // Error al refrescar el token, limpiar y redirigir al login
+                // Error al refrescar el token: limpiar y propagar
                 processQueue(refreshError as Error);
                 isRefreshing = false;
 
                 localStorage.removeItem('access_token');
                 localStorage.removeItem('refresh_token');
                 localStorage.removeItem('user');
-                window.location.href = '/login';
 
                 return Promise.reject(refreshError);
             }
@@ -127,4 +131,65 @@ apiClient.interceptors.response.use(
     }
 );
 
+/**
+ * API Client wrapper con métodos tipados
+ */
+export class ApiClientWrapper {
+    /**
+     * GET request
+     */
+    static async get<T>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+        return apiClient.get<T>(url, config);
+    }
+
+    /**
+     * POST request
+     */
+    static async post<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+        return apiClient.post<T>(url, data, config);
+    }
+
+    /**
+     * PUT request
+     */
+    static async put<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+        return apiClient.put<T>(url, data, config);
+    }
+
+    /**
+     * PATCH request
+     */
+    static async patch<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+        return apiClient.patch<T>(url, data, config);
+    }
+
+    /**
+     * DELETE request
+     */
+    static async delete<T>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+        return apiClient.delete<T>(url, config);
+    }
+
+    /**
+     * Configurar tokens de autenticación
+     */
+    static setAuthTokens(accessToken: string, refreshToken: string) {
+        localStorage.setItem('access_token', accessToken);
+        localStorage.setItem('refresh_token', refreshToken);
+    }
+
+    /**
+     * Limpiar tokens (logout)
+     */
+    static logout() {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user');
+    }
+}
+
+// Exportar instancia singleton (compatibilidad con código existente)
 export default apiClient;
+
+// Exportar wrapper tipado
+export { apiClient };

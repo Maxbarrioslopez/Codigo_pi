@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Scan, CheckCircle2, XCircle, FileText, AlertCircle, ArrowLeft, Printer, AlertTriangle, Calendar, ChevronLeft, ChevronRight, Info, Search } from 'lucide-react';
-import { api } from '../services/api';
+import { trabajadorService } from '@/services/trabajador.service';
+import { ticketService } from '@/services/ticket.service';
+import { RUTInput } from './form/RUTInput';
 
 type TotemScreen = 'initial' | 'validating' | 'success' | 'success-choice' | 'no-stock' | 'schedule-select' | 'schedule-confirm' | 'no-benefit' | 'error' | 'incident-form' | 'incident-sent' | 'incident-scan' | 'incident-status';
 
@@ -58,7 +60,7 @@ export function TotemModule() {
         setValidationSteps(prev => prev.map((s, i) => i === 0 ? { ...s, status: 'complete' } : i === 1 ? { ...s, status: 'active' } : s));
 
         // Paso 2: beneficio
-        const res = await api.getBeneficio(rutEscaneado);
+        const res = await trabajadorService.getBeneficio(rutEscaneado);
         if (cancelled) return;
         setBeneficio(res.beneficio);
         setValidationSteps(prev => prev.map((s, i) => i === 1 ? { ...s, status: 'complete' } : i === 2 ? { ...s, status: 'active' } : s));
@@ -93,7 +95,7 @@ export function TotemModule() {
     if (!rutEscaneado) return;
     setLoading(true); setErrorMsg('');
     try {
-      const t = await api.crearTicket(rutEscaneado, { sucursal: 'Central' });
+      const t = await ticketService.create(rutEscaneado, 'Central');
       setTicket(t);
       setCurrentScreen('success');
     } catch (e: any) {
@@ -247,22 +249,24 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
           Acerca tu documento al lector para verificar tu beneficio
         </p>
 
-        {/* Scan Area + Input */}
+        {/* Scan Area + RUT Input with Validation */}
         <div className="bg-white border-4 border-dashed border-[#E12019] rounded-xl p-8 mb-8 w-full max-w-md relative">
           <div className="flex flex-col items-center w-full">
             <Scan className="w-24 h-24 text-[#E12019] mb-4 animate-pulse" />
-            <p className="text-[#333333] mb-2" style={{ fontSize: '18px', fontWeight: 600 }}>
+            <p className="text-[#333333] mb-4" style={{ fontSize: '18px', fontWeight: 600 }}>
               Escáner listo
             </p>
-            <input
-              value={rutInput}
-              onChange={(e) => onRutChange(e.target.value)}
-              placeholder="Ingresa o escanea RUT (ej: 12345678-5)"
-              className="w-full px-4 py-3 rounded-lg border-2 border-[#E0E0E0] focus:border-[#E12019] outline-none text-[#333333] placeholder:text-[#6B6B6B]"
-              style={{ fontSize: '16px' }}
+            <RUTInput
+              placeholder="Ingresa o escanea RUT (ej: 12.345.678-9)"
+              onValidRUT={(rut) => {
+                onRutChange(rut);
+              }}
+              initialValue={rutInput}
+              size="lg"
+              variant="totem"
             />
             <p className="text-[#6B6B6B] mt-2" style={{ fontSize: '12px' }}>
-              Presiona el botón para validar
+              Ingresa tu RUT o escánealo para validar
             </p>
           </div>
         </div>

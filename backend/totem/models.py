@@ -71,9 +71,16 @@ class Trabajador(models.Model):
     - nombre: nombre completo
     - beneficio_disponible: texto o JSON con info del beneficio
     """
-    rut = models.CharField(max_length=12, unique=True)
+    rut = models.CharField(max_length=12, unique=True, db_index=True)
     nombre = models.CharField(max_length=200)
     beneficio_disponible = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['rut'], name='trabajador_rut_idx'),
+        ]
+        verbose_name = 'Trabajador'
+        verbose_name_plural = 'Trabajadores'
 
     def __str__(self):
         return f"{self.nombre} ({self.rut})"
@@ -117,6 +124,17 @@ class Ticket(models.Model):
 
     ciclo = models.ForeignKey('Ciclo', on_delete=models.SET_NULL, null=True, blank=True)
     sucursal = models.ForeignKey('Sucursal', on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['uuid'], name='ticket_uuid_idx'),
+            models.Index(fields=['estado', 'created_at'], name='ticket_estado_fecha_idx'),
+            models.Index(fields=['trabajador', 'ciclo'], name='ticket_trabajador_ciclo_idx'),
+            models.Index(fields=['ttl_expira_at'], name='ticket_ttl_idx'),
+        ]
+        verbose_name = 'Ticket'
+        verbose_name_plural = 'Tickets'
+        ordering = ['-created_at']
 
     def __str__(self):
         return f"Ticket {self.uuid} - {self.trabajador.rut}"
@@ -168,9 +186,19 @@ class Agendamiento(models.Model):
     )
     trabajador = models.ForeignKey(Trabajador, on_delete=models.CASCADE)
     ciclo = models.ForeignKey(Ciclo, on_delete=models.CASCADE)
-    fecha_retiro = models.DateField()
-    estado = models.CharField(max_length=12, choices=ESTADOS, default='pendiente')
+    fecha_retiro = models.DateField(db_index=True)
+    estado = models.CharField(max_length=12, choices=ESTADOS, default='pendiente', db_index=True)
     created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['trabajador', 'estado'], name='agendamiento_trabajador_estado_idx'),
+            models.Index(fields=['fecha_retiro', 'estado'], name='agendamiento_fecha_estado_idx'),
+            models.Index(fields=['ciclo', 'estado'], name='agendamiento_ciclo_estado_idx'),
+        ]
+        verbose_name = 'Agendamiento'
+        verbose_name_plural = 'Agendamientos'
+        ordering = ['-created_at']
 
     def __str__(self):
         return f"Agendamiento {self.trabajador.rut} {self.fecha_retiro} ({self.estado})"
@@ -183,15 +211,24 @@ class Incidencia(models.Model):
         ('resuelta', 'Resuelta'),
         ('rechazada', 'Rechazada'),
     )
-    codigo = models.CharField(max_length=64, unique=True)
+    codigo = models.CharField(max_length=64, unique=True, db_index=True)
     trabajador = models.ForeignKey(Trabajador, on_delete=models.SET_NULL, null=True, blank=True)
-    tipo = models.CharField(max_length=60)
+    tipo = models.CharField(max_length=60, db_index=True)
     descripcion = models.TextField(blank=True)
-    estado = models.CharField(max_length=15, choices=ESTADOS, default='pendiente')
+    estado = models.CharField(max_length=15, choices=ESTADOS, default='pendiente', db_index=True)
     creada_por = models.CharField(max_length=40, help_text="Origen: totem, guardia, rrhh")
     created_at = models.DateTimeField(default=timezone.now)
     resolved_at = models.DateTimeField(blank=True, null=True)
     metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['estado', 'created_at'], name='incidencia_estado_fecha_idx'),
+            models.Index(fields=['tipo', 'estado'], name='incidencia_tipo_estado_idx'),
+        ]
+        verbose_name = 'Incidencia'
+        verbose_name_plural = 'Incidencias'
+        ordering = ['-created_at']
 
     def __str__(self):
         return f"Incidencia {self.codigo} ({self.estado})"

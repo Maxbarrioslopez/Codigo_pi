@@ -1,13 +1,134 @@
 """
-Validadores de reglas de negocio.
+Validadores de reglas de negocio y sanitización de inputs.
+Cumple con OWASP A03:2021 (Injection).
 """
 import logging
+import re
 from datetime import date, datetime
 from django.conf import settings
 from django.utils import timezone
-from typing import Tuple
+from typing import Tuple, Any
+import bleach
 
 logger = logging.getLogger(__name__)
+
+
+class InputSanitizer:
+    """
+    Sanitizador de inputs para prevenir inyecciones.
+    """
+    
+    @staticmethod
+    def sanitize_string(value: str, max_length: int = 255) -> str:
+        """
+        Sanitiza string eliminando HTML/scripts y limitando longitud.
+        
+        Args:
+            value: String a sanitizar
+            max_length: Longitud máxima permitida
+            
+        Returns:
+            String sanitizado y seguro
+        """
+        if not value:
+            return ""
+        
+        # Eliminar HTML tags completamente
+        clean_value = bleach.clean(value, tags=[], strip=True)
+        
+        # Eliminar caracteres de control excepto newline/tab
+        clean_value = ''.join(char for char in clean_value if ord(char) >= 32 or char in '\n\t')
+        
+        # Limitar longitud
+        clean_value = clean_value[:max_length]
+        
+        # Strip whitespace
+        return clean_value.strip()
+    
+    @staticmethod
+    def sanitize_rut(rut: str) -> str:
+        """
+        Sanitiza RUT permitiendo solo dígitos, K y guión.
+        
+        Args:
+            rut: RUT a sanitizar
+            
+        Returns:
+            RUT sanitizado
+        """
+        if not rut:
+            return ""
+        
+        # Solo permitir: dígitos, K, k, guión, punto
+        sanitized = re.sub(r'[^0-9Kk\-\.]', '', str(rut))
+        
+        # Normalizar: eliminar puntos, uppercase
+        sanitized = sanitized.replace('.', '').upper()
+        
+        return sanitized
+    
+    @staticmethod
+    def sanitize_email(email: str) -> str:
+        """
+        Sanitiza email básicamente.
+        
+        Args:
+            email: Email a sanitizar
+            
+        Returns:
+            Email sanitizado
+        """
+        if not email:
+            return ""
+        
+        # Solo caracteres válidos en emails
+        sanitized = re.sub(r'[^a-zA-Z0-9@._\-\+]', '', email.strip().lower())
+        
+        # Limitar longitud
+        return sanitized[:254]  # RFC 5321
+    
+    @staticmethod
+    def sanitize_phone(phone: str) -> str:
+        """
+        Sanitiza teléfono dejando solo dígitos y +.
+        
+        Args:
+            phone: Teléfono a sanitizar
+            
+        Returns:
+            Teléfono sanitizado
+        """
+        if not phone:
+            return ""
+        
+        # Solo dígitos, +, espacios, guiones, paréntesis
+        sanitized = re.sub(r'[^0-9\+\s\-\(\)]', '', phone)
+        
+        return sanitized.strip()[:20]
+    
+    @staticmethod
+    def validate_mime_type(file, allowed_types: list) -> bool:
+        """
+        Valida MIME type de archivo subido.
+        
+        Args:
+            file: Archivo Django UploadedFile
+            allowed_types: Lista de MIME types permitidos
+            
+        Returns:
+            True si es válido, False si no
+        """
+        if not file:
+            return False
+        
+        # Verificar MIME type del archivo
+        content_type = getattr(file, 'content_type', None)
+        
+        if content_type not in allowed_types:
+            logger.warning(f"MIME type no permitido: {content_type}")
+            return False
+        
+        return True
 
 
 class AgendamientoValidator:

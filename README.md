@@ -62,17 +62,16 @@ http://localhost:3000/
 
 ## 📖 DOCUMENTACIÓN
 
-**Para empezar YA:**  
-→ `GUIA_RAPIDA_INICIO.md` (5 minutos)
+👉 **[VER ÍNDICE COMPLETO](./DOCUMENTACION_INDEX.md)** ← EMPIEZA AQUÍ
 
-**Para entender qué pasó:**  
-→ `RESUMEN_EJECUTIVO_CAMBIOS.md` (10 minutos)
-
-**Para detalles técnicos:**  
-→ `IMPLEMENTACION_COMPLETADA.md` (30 minutos)
-
-**Para análisis profundo:**  
-→ `AUDIT_FRONTEND_BACKEND_ALIGNMENT.md` (60 minutos)
+**Rutas rápidas:**
+- **5 min**: `GUIA_RAPIDA_INICIO.md` — Empezar ahora mismo
+- **10 min**: `RESUMEN_VISUAL.md` — Entender el problema y solución  
+- **15 min**: `RESUMEN_EJECUTIVO_CAMBIOS.md` — Visión de impacto
+- **20 min**: `CAMBIOS_TECNICOS_EXACTOS.md` — Detalles de código
+- **30 min**: `IMPLEMENTACION_COMPLETADA.md` — Guía completa
+- **30 min**: `CHECKLIST_VALIDACION_FINAL.md` — Testing y validación
+- **60 min**: `AUDIT_FRONTEND_BACKEND_ALIGNMENT.md` — Análisis profundo
 
 ---
 

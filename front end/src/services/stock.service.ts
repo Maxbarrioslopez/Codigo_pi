@@ -15,7 +15,7 @@ export class StockService {
 
     async stockResumen(): Promise<StockResumenDTO> {
         try {
-            const { data } = await apiClient.get<StockResumenDTO>('/stock/resumen/');
+            const { data } = await apiClient.get<StockResumenDTO>('stock/resumen/');
             return data;
         } catch (error) {
             throw ErrorHandler.handle(error, 'StockService.stockResumen', false);
@@ -24,7 +24,7 @@ export class StockService {
 
     async stockMovimientos(): Promise<StockMovimientoDTO[]> {
         try {
-            const { data } = await apiClient.get<StockMovimientoDTO[]>('/stock/movimientos/');
+            const { data } = await apiClient.get<StockMovimientoDTO[]>('stock/movimientos/');
             return data;
         } catch (error) {
             throw ErrorHandler.handle(error, 'StockService.stockMovimientos', false);
@@ -33,7 +33,7 @@ export class StockService {
 
     async registrarMovimiento(tipo: 'entrada' | 'salida', cantidad: number, referencia?: string): Promise<void> {
         try {
-            await apiClient.post('/stock/movimientos/', { tipo, cantidad, referencia });
+            await apiClient.post('stock/movimientos/', { tipo, cantidad, referencia });
         } catch (error) {
             throw ErrorHandler.handle(error, 'StockService.registrarMovimiento', false);
         }

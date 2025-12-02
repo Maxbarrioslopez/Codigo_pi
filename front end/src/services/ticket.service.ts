@@ -36,7 +36,7 @@ export class TicketService {
             }
             // Idempotency-Key para evitar duplicados ante reintentos
             const idempotencyKey = `tk_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-            const { data } = await apiClient.post<TicketDTO>('/tickets/', {
+            const { data } = await apiClient.post<TicketDTO>('tickets/', {
                 trabajador_rut: trabajadorRut,
                 data: { sucursal: sucursal || 'Central' },
             }, { headers: { 'Idempotency-Key': idempotencyKey } });
@@ -52,7 +52,7 @@ export class TicketService {
      */
     async getEstado(uuid: string): Promise<TicketDTO> {
         try {
-            const { data } = await apiClient.get<TicketDTO>(`/tickets/${uuid}/estado/`);
+            const { data } = await apiClient.get<TicketDTO>(`tickets/${uuid}/estado/`);
             return data;
         } catch (error) {
             throw ErrorHandler.handle(error, 'TicketService.getEstado', false);
@@ -67,7 +67,7 @@ export class TicketService {
     async validarGuardia(uuid: string, codigoCaja?: string): Promise<TicketDTO> {
         try {
             const { data } = await apiClient.post<TicketDTO>(
-                `/tickets/${uuid}/validar_guardia/`,
+                `tickets/${uuid}/validar_guardia/`,
                 { codigo_caja: codigoCaja }
             );
             return data;
@@ -84,7 +84,7 @@ export class TicketService {
     async anular(uuid: string, motivo?: string): Promise<TicketDTO> {
         try {
             const { data } = await apiClient.post<TicketDTO>(
-                `/tickets/${uuid}/anular/`,
+                `tickets/${uuid}/anular/`,
                 { motivo }
             );
             return data;
@@ -99,7 +99,7 @@ export class TicketService {
      */
     async reimprimir(uuid: string): Promise<TicketDTO> {
         try {
-            const { data } = await apiClient.post<TicketDTO>(`/tickets/${uuid}/reimprimir/`);
+            const { data } = await apiClient.post<TicketDTO>(`tickets/${uuid}/reimprimir/`);
             return data;
         } catch (error) {
             throw ErrorHandler.handle(error, 'TicketService.reimprimir', false);
@@ -112,7 +112,7 @@ export class TicketService {
      */
     async listar(rut?: string): Promise<TicketDTO[]> {
         try {
-            const url = rut ? `/tickets/listar/?rut=${encodeURIComponent(rut)}` : '/tickets/listar/';
+            const url = rut ? `tickets/listar/?rut=${encodeURIComponent(rut)}` : 'tickets/listar/';
             const { data } = await apiClient.get<TicketDTO[]>(url);
             return data;
         } catch (error) {

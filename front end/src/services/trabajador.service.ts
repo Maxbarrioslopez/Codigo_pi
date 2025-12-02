@@ -29,7 +29,7 @@ export class TrabajadorService {
      */
     async getBeneficio(rut: string): Promise<BeneficioResponse> {
         try {
-            const { data } = await apiClient.get<BeneficioResponse>(`/beneficios/${rut}/`);
+            const { data } = await apiClient.get<BeneficioResponse>(`beneficios/${rut}/`);
             return data;
         } catch (error) {
             throw ErrorHandler.handle(error, 'TrabajadorService.getBeneficio', false);
@@ -44,7 +44,7 @@ export class TrabajadorService {
         try {
             const params = new URLSearchParams(filters);
             const { data } = await apiClient.get<TrabajadorDTO[]>(
-                `/trabajadores/?${params.toString()}`
+                `trabajadores/?${params.toString()}`
             );
             return data;
         } catch (error) {
@@ -58,7 +58,7 @@ export class TrabajadorService {
      */
     async getByRUT(rut: string): Promise<TrabajadorDTO> {
         try {
-            const { data } = await apiClient.get<TrabajadorDTO>(`/trabajadores/${rut}/`);
+            const { data } = await apiClient.get<TrabajadorDTO>(`trabajadores/${rut}/`);
             return data;
         } catch (error) {
             throw ErrorHandler.handle(error, 'TrabajadorService.getByRUT', false);
@@ -72,7 +72,7 @@ export class TrabajadorService {
      */
     async bloquear(rut: string, motivo: string): Promise<void> {
         try {
-            await apiClient.post(`/trabajadores/${rut}/bloquear/`, { motivo });
+            await apiClient.post(`trabajadores/${rut}/bloquear/`, { motivo });
         } catch (error) {
             throw ErrorHandler.handle(error, 'TrabajadorService.bloquear', false);
         }
@@ -84,7 +84,7 @@ export class TrabajadorService {
      */
     async desbloquear(rut: string): Promise<void> {
         try {
-            await apiClient.post(`/trabajadores/${rut}/desbloquear/`);
+            await apiClient.post(`trabajadores/${rut}/desbloquear/`);
         } catch (error) {
             throw ErrorHandler.handle(error, 'TrabajadorService.desbloquear', false);
         }
@@ -96,7 +96,7 @@ export class TrabajadorService {
      */
     async create(data: Partial<TrabajadorDTO>): Promise<TrabajadorDTO> {
         try {
-            const { data: result } = await apiClient.post<TrabajadorDTO>('/trabajadores/', data);
+            const { data: result } = await apiClient.post<TrabajadorDTO>('trabajadores/', data);
             return result;
         } catch (error) {
             throw ErrorHandler.handle(error, 'TrabajadorService.create', false);
@@ -110,7 +110,7 @@ export class TrabajadorService {
      */
     async update(rut: string, data: Partial<TrabajadorDTO>): Promise<TrabajadorDTO> {
         try {
-            const { data: result } = await apiClient.put<TrabajadorDTO>(`/trabajadores/${rut}/`, data);
+            const { data: result } = await apiClient.put<TrabajadorDTO>(`trabajadores/${rut}/`, data);
             return result;
         } catch (error) {
             throw ErrorHandler.handle(error, 'TrabajadorService.update', false);

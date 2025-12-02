@@ -17,7 +17,7 @@ export const scheduleService = {
      */
     async crearAgendamiento(trabajadorRut: string, fechaISO: string): Promise<{ ok: boolean; id?: string }> {
         try {
-            const res = await apiClient.post('/agendamientos/', {
+            const res = await apiClient.post('agendamientos/', {
                 trabajador_rut: trabajadorRut,
                 fecha_iso: fechaISO,
             } as AgendamientoRequest);

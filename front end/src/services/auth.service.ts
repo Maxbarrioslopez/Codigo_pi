@@ -80,7 +80,7 @@ export class AuthService {
      */
     async login(credentials: LoginRequest): Promise<LoginResponse> {
         try {
-            const { data } = await apiClient.post<LoginResponse>('/auth/login/', credentials);
+            const { data } = await apiClient.post<LoginResponse>('auth/login/', credentials);
             return data;
         } catch (error) {
             throw ErrorHandler.handle(error, 'AuthService.login', false);
@@ -92,7 +92,7 @@ export class AuthService {
      */
     async logout(): Promise<void> {
         try {
-            await apiClient.post('/auth/logout/', {});
+            await apiClient.post('auth/logout/', {});
         } catch (error) {
             // No lanzar error en logout, simplemente limpiar localStorage
             console.warn('Error al hacer logout:', error);
@@ -105,7 +105,7 @@ export class AuthService {
      */
     async changePassword(request: ChangePasswordRequest): Promise<void> {
         try {
-            await apiClient.post('/auth/change-password/', request);
+            await apiClient.post('auth/change-password/', request);
         } catch (error) {
             throw ErrorHandler.handle(error, 'AuthService.changePassword', false);
         }
@@ -117,7 +117,7 @@ export class AuthService {
      */
     async createUser(data: CreateUserRequest): Promise<CreateUserResponse> {
         try {
-            const { data: result } = await apiClient.post<CreateUserResponse>('/usuarios/', data);
+            const { data: result } = await apiClient.post<CreateUserResponse>('usuarios/', data);
             return result;
         } catch (error) {
             throw ErrorHandler.handle(error, 'AuthService.createUser', false);
@@ -131,7 +131,7 @@ export class AuthService {
      */
     async resetPassword(username: string, newPassword: string): Promise<ResetPasswordResponse> {
         try {
-            const { data } = await apiClient.post<ResetPasswordResponse>('/usuarios/reset-password/', {
+            const { data } = await apiClient.post<ResetPasswordResponse>('usuarios/reset-password/', {
                 username,
                 new_password: newPassword
             });
@@ -146,7 +146,7 @@ export class AuthService {
      */
     async getCurrentUser(): Promise<CreateUserResponse> {
         try {
-            const { data } = await apiClient.get<CreateUserResponse>('/auth/me/');
+            const { data } = await apiClient.get<CreateUserResponse>('auth/me/');
             return data;
         } catch (error) {
             throw ErrorHandler.handle(error, 'AuthService.getCurrentUser', false);

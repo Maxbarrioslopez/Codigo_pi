@@ -30,7 +30,7 @@ export class CicloService {
         try {
             const params = new URLSearchParams(filters);
             const { data } = await apiClient.get<CicloDTO[]>(
-                `/ciclos/?${params.toString()}`
+                `ciclos/?${params.toString()}`
             );
             return data;
         } catch (error) {
@@ -44,7 +44,7 @@ export class CicloService {
      */
     async getById(cicloId: number): Promise<CicloDTO> {
         try {
-            const { data } = await apiClient.get<CicloDTO>(`/ciclos/${cicloId}/`);
+            const { data } = await apiClient.get<CicloDTO>(`ciclos/${cicloId}/`);
             return data;
         } catch (error) {
             throw ErrorHandler.handle(error, 'CicloService.getById', false);
@@ -57,7 +57,7 @@ export class CicloService {
      */
     async create(data: Partial<CicloDTO>): Promise<CicloDTO> {
         try {
-            const { data: result } = await apiClient.post<CicloDTO>('/ciclos/', data);
+            const { data: result } = await apiClient.post<CicloDTO>('ciclos/', data);
             return result;
         } catch (error) {
             throw ErrorHandler.handle(error, 'CicloService.create', false);
@@ -71,7 +71,7 @@ export class CicloService {
      */
     async update(cicloId: number, data: Partial<CicloDTO>): Promise<CicloDTO> {
         try {
-            const { data: result } = await apiClient.put<CicloDTO>(`/ciclos/${cicloId}/`, data);
+            const { data: result } = await apiClient.put<CicloDTO>(`ciclos/${cicloId}/`, data);
             return result;
         } catch (error) {
             throw ErrorHandler.handle(error, 'CicloService.update', false);
@@ -84,7 +84,7 @@ export class CicloService {
      */
     async cerrar(cicloId: number): Promise<CicloDTO> {
         try {
-            const { data } = await apiClient.post<CicloDTO>(`/ciclos/${cicloId}/cerrar/`, {});
+            const { data } = await apiClient.post<CicloDTO>(`ciclos/${cicloId}/cerrar/`, {});
             return data;
         } catch (error) {
             throw ErrorHandler.handle(error, 'CicloService.cerrar', false);
@@ -97,7 +97,7 @@ export class CicloService {
      */
     async getEstadisticas(cicloId: number): Promise<any> {
         try {
-            const { data } = await apiClient.get<any>(`/ciclos/${cicloId}/estadisticas/`);
+            const { data } = await apiClient.get<any>(`ciclos/${cicloId}/estadisticas/`);
             return data;
         } catch (error) {
             throw ErrorHandler.handle(error, 'CicloService.getEstadisticas', false);

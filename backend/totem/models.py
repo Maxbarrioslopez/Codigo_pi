@@ -42,6 +42,10 @@ class Usuario(AbstractUser):
     )
     telefono = models.CharField(max_length=20, blank=True)
     activo = models.BooleanField(default=True)
+    debe_cambiar_contraseña = models.BooleanField(
+        default=False,
+        help_text="Indica si el usuario debe cambiar su contraseña en el próximo ingreso"
+    )
     
     class Meta:
         verbose_name = 'Usuario'

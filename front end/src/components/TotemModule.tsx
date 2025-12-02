@@ -141,7 +141,13 @@ export function TotemModule() {
             <TotemInitialScreen
               rutInput={rutInput}
               onRutChange={setRutInput}
-              onScan={() => { if (rutInput.trim()) { setRutEscaneado(rutInput.trim()); setCurrentScreen('validating'); } }}
+              onScan={(rut?: string) => {
+                const rutToUse = rut || rutInput.trim();
+                if (rutToUse) {
+                  setRutEscaneado(rutToUse);
+                  setCurrentScreen('validating');
+                }
+              }}
               onConsultIncident={() => setCurrentScreen('incident-scan')}
               onReportIncident={() => setCurrentScreen('incident-form')}
             />
@@ -214,7 +220,7 @@ export function TotemModule() {
 }
 
 function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutInput, onRutChange }: {
-  onScan: () => void;
+  onScan: (rut?: string) => void;
   onConsultIncident: () => void;
   onReportIncident: () => void;
   rutInput: string;
@@ -369,8 +375,7 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
 
                 // INICIAR VALIDACIÓN AUTOMÁTICA SIN CLICK
                 setTimeout(() => {
-                  setRutEscaneado(rut);
-                  setCurrentScreen('validating');
+                  onScan(rut);
                 }, 100);
               } else if (isAcceptedFormat && !rut) {
                 // QR o PDF417 detectado pero sin RUT válido
@@ -521,10 +526,7 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
       <div className="space-y-3 mb-6">
         <button
           onClick={() => {
-            if (rutInput.trim()) {
-              setRutEscaneado(rutInput.trim());
-              setCurrentScreen('validating');
-            }
+            onScan();
           }}
           disabled={!rutInput.trim()}
           className={`w-full px-6 md:px-8 py-4 md:py-5 rounded-xl transition-colors font-bold text-base md:text-lg ${rutInput.trim()

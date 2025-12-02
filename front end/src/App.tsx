@@ -8,6 +8,7 @@ import { TotemModule } from './components/TotemModule';
 import { GuardiaModule } from './components/GuardiaModule';
 import { RRHHModuleNew } from './components/RRHHModuleNew';
 import { AdministradorModule } from './components/AdministradorModule';
+import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { Menu, X, LogOut } from 'lucide-react';
 
 // Layout principal con sidebar para usuarios autenticados
@@ -87,8 +88,8 @@ function DashboardLayout() {
                         setMenuOpen(false);
                       }}
                       className={`w-full text-left px-3 md:px-4 py-2 md:py-3 rounded-lg md:rounded-xl transition-all text-sm md:text-base ${currentSection === section.id
-                          ? 'bg-[#E12019] text-white'
-                          : 'text-[#333333] hover:bg-[#F8F8F8]'
+                        ? 'bg-[#E12019] text-white'
+                        : 'text-[#333333] hover:bg-[#F8F8F8]'
                         }`}
                     >
                       <span className="mr-2">{section.icon}</span>
@@ -126,7 +127,27 @@ function DashboardLayout() {
 
 // Wrapper para usar el hook de Auth
 function DashboardLayoutWrapper() {
-  return <DashboardLayout />;
+  const { user, logout } = useAuth();
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(
+    user?.debe_cambiar_contraseña === true
+  );
+
+  const handlePasswordChangeSuccess = () => {
+    setShowChangePasswordModal(false);
+  };
+
+  return (
+    <>
+      <DashboardLayout />
+      {showChangePasswordModal && (
+        <ChangePasswordModal
+          isOpen={showChangePasswordModal}
+          onSuccess={handlePasswordChangeSuccess}
+          requireChange={true}
+        />
+      )}
+    </>
+  );
 }
 
 export default function App() {

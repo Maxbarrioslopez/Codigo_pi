@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views  # vistas núcleo tótem
+from . import views_auth  # vistas de autenticación
 from guardia import views as guardia_views
 from rrhh import views as rrhh_views
 from . import views_trabajadores as trab_views
@@ -14,6 +15,15 @@ urlpatterns = [
     path('health/', health_views.health_check, name='health_check'),
     path('health/liveness/', health_views.liveness_check, name='liveness_check'),
     path('health/readiness/', health_views.readiness_check, name='readiness_check'),
+    
+    # Autenticación
+    path('auth/me/', views_auth.auth_me, name='auth_me'),
+    path('auth/logout/', views_auth.auth_logout, name='auth_logout'),
+    path('auth/change-password/', views_auth.auth_change_password, name='auth_change_password'),
+    
+    # Gestión de Usuarios (admin)
+    path('usuarios/', views_auth.usuarios_create, name='usuarios_create'),
+    path('usuarios/reset-password/', views_auth.usuarios_reset_password, name='usuarios_reset_password'),
     
     # Beneficios / trabajador
     path('beneficios/<str:rut>/', views.obtener_beneficio, name='obtener_beneficio'),

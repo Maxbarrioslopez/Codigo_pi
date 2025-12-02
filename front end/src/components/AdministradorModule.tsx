@@ -9,6 +9,7 @@ import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { UserManagementDialog } from './UserManagementDialog';
 
 const roles = [
   { id: 1, name: 'Administrador', users: 3, color: '#E12019', description: 'Acceso total al sistema' },
@@ -73,6 +74,8 @@ const systemUsers = [
 export function AdministradorModule() {
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
+  const [userManagementMode, setUserManagementMode] = useState<'create' | 'reset'>('create');
+  const [userManagementUsername, setUserManagementUsername] = useState<string>('');
   const { params, loading, saving, save, getValor } = useParametrosOperativos();
   const initialCycleDuration = parseInt(getValor('cycle_duration', '60')) || 60;
   const initialStockThreshold = parseInt(getValor('stock_threshold', '20')) || 20;
@@ -252,7 +255,11 @@ export function AdministradorModule() {
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-[#333333]">Usuarios del Sistema</h3>
               <Button
-                onClick={() => setShowUserModal(true)}
+                onClick={() => {
+                  setUserManagementMode('create');
+                  setUserManagementUsername('');
+                  setShowUserModal(true);
+                }}
                 className="bg-[#E12019] text-white hover:bg-[#B51810] h-10 px-4 rounded-xl"
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -308,9 +315,14 @@ export function AdministradorModule() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-9 px-3 rounded-lg border-2 border-[#E0E0E0]"
+                            onClick={() => {
+                              setUserManagementMode('reset');
+                              setUserManagementUsername(user.email.split('@')[0]);
+                              setShowUserModal(true);
+                            }}
+                            className="h-9 px-3 rounded-lg border-2 border-[#017E49] text-[#017E49] hover:bg-[#E7F8F3] text-xs"
                           >
-                            <Edit className="w-4 h-4" />
+                            <Lock className="w-4 h-4" />
                           </Button>
                           <Button
                             size="sm"
@@ -585,63 +597,16 @@ export function AdministradorModule() {
         </DialogContent>
       </Dialog>
 
-      {/* Create User Modal */}
-      <Dialog open={showUserModal} onOpenChange={setShowUserModal}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-[#333333]">Crear Nuevo Usuario</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="user-name" className="text-[#333333]">Nombre Completo</Label>
-              <Input
-                id="user-name"
-                placeholder="Juan Pérez"
-                className="h-11 border-2 border-[#E0E0E0] rounded-xl mt-2"
-              />
-            </div>
-            <div>
-              <Label htmlFor="user-email" className="text-[#333333]">Email Corporativo</Label>
-              <Input
-                id="user-email"
-                type="email"
-                placeholder="juan.perez@tml.cl"
-                className="h-11 border-2 border-[#E0E0E0] rounded-xl mt-2"
-              />
-            </div>
-            <div>
-              <Label className="text-[#333333]">Rol Asignado</Label>
-              <Select>
-                <SelectTrigger className="h-11 border-2 border-[#E0E0E0] rounded-xl mt-2">
-                  <SelectValue placeholder="Seleccionar rol" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">Administrador</SelectItem>
-                  <SelectItem value="rrhh">RRHH</SelectItem>
-                  <SelectItem value="guardia">Guardia</SelectItem>
-                  <SelectItem value="supervisor">Supervisor</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end gap-3 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => setShowUserModal(false)}
-                className="h-11 px-6 rounded-xl border-2 border-[#E0E0E0]"
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={() => setShowUserModal(false)}
-                className="bg-[#E12019] text-white hover:bg-[#B51810] h-11 px-6 rounded-xl"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Crear Usuario
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Create/Reset User Modal */}
+      <UserManagementDialog
+        type={userManagementMode}
+        existingUsername={userManagementUsername}
+        trigger={showUserModal}
+        onSuccess={() => {
+          setShowUserModal(false);
+          // Aquí podrías refrescar la lista de usuarios
+        }}
+      />
     </div>
   );
 }

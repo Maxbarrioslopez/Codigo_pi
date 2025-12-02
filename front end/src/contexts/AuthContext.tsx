@@ -13,6 +13,9 @@ export interface User {
     username: string;
     rol: 'admin' | 'rrhh' | 'guardia' | 'supervisor';
     email?: string;
+    first_name?: string;
+    last_name?: string;
+    debe_cambiar_contraseña?: boolean;
 }
 
 interface AuthContextType {
@@ -98,6 +101,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     id: tokenPayload.user_id,
                     username: tokenPayload.username || username,
                     rol: tokenPayload.rol || 'guardia',
+                    email: tokenPayload.email,
+                    debe_cambiar_contraseña: tokenPayload.debe_cambiar_contraseña || false,
                 };
 
                 // Guardar en estado y localStorage

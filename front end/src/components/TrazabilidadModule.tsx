@@ -8,6 +8,7 @@ import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { ticketService } from '../services/ticket.service';
+import { showSuccess, showError } from '../utils/toast';
 
 export function TrazabilidadModule() {
   const [qrCodes, setQrCodes] = useState<any[]>([]);
@@ -17,6 +18,8 @@ export function TrazabilidadModule() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [generatingQR, setGeneratingQR] = useState(false);
+  const [qrForm, setQrForm] = useState({ boxId: '', benefitType: '', quantity: '1' });
 
   useEffect(() => {
     const loadQRCodes = async () => {
@@ -26,6 +29,7 @@ export function TrazabilidadModule() {
         setQrCodes(tickets || []);
       } catch (error) {
         console.error('Error loading QR codes:', error);
+        showError('Error', 'No se pudieron cargar los códigos QR');
         setQrCodes([]);
       } finally {
         setLoading(false);
@@ -33,6 +37,53 @@ export function TrazabilidadModule() {
     };
     loadQRCodes();
   }, []);
+
+  const handleGenerateSingleQR = async () => {
+    if (!qrForm.boxId || !qrForm.benefitType) {
+      showError('Validación', 'Por favor completa todos los campos');
+      return;
+    }
+
+    try {
+      setGeneratingQR(true);
+      const newQR = await ticketService.generateQR({
+        box_id: qrForm.boxId,
+        benefit_type: qrForm.benefitType,
+      });
+      setQrCodes([...qrCodes, newQR]);
+      showSuccess('Éxito', `QR ${newQR.qrCode} generado correctamente`);
+      setShowGenerateModal(false);
+      setQrForm({ boxId: '', benefitType: '', quantity: '1' });
+    } catch (error) {
+      showError('Error', 'No se pudo generar el código QR');
+      console.error(error);
+    } finally {
+      setGeneratingQR(false);
+    }
+  };
+
+  const handleGenerateBatchQR = async () => {
+    if (!qrForm.quantity || parseInt(qrForm.quantity) < 1) {
+      showError('Validación', 'Ingresa una cantidad válida');
+      return;
+    }
+
+    try {
+      setGeneratingQR(true);
+      const newQRs = await ticketService.generateBatchQR({
+        quantity: parseInt(qrForm.quantity),
+      });
+      setQrCodes([...qrCodes, ...newQRs]);
+      showSuccess('Éxito', `${qrForm.quantity} códigos QR generados correctamente`);
+      setShowGenerateModal(false);
+      setQrForm({ boxId: '', benefitType: '', quantity: '1' });
+    } catch (error) {
+      showError('Error', 'No se pudieron generar los códigos QR');
+      console.error(error);
+    } finally {
+      setGeneratingQR(false);
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     const styles = {
@@ -401,18 +452,21 @@ export function TrazabilidadModule() {
                 <Input
                   id="box-id"
                   placeholder="BOX-PRM-0000"
+                  value={qrForm.boxId}
+                  onChange={(e) => setQrForm({ ...qrForm, boxId: e.target.value })}
                   className="h-11 border-2 border-[#E0E0E0] rounded-xl mt-2"
                 />
               </div>
               <div>
                 <Label htmlFor="benefit-type" className="text-[#333333]">Tipo de Beneficio</Label>
-                <Select>
+                <Select value={qrForm.benefitType} onValueChange={(val) => setQrForm({ ...qrForm, benefitType: val })}>
                   <SelectTrigger className="h-11 border-2 border-[#E0E0E0] rounded-xl mt-2">
                     <SelectValue placeholder="Seleccionar tipo" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="premium">Premium</SelectItem>
-                    <SelectItem value="estandar">Estándar</SelectItem>
+                    <SelectItem value="Premium">Premium</SelectItem>
+                    <SelectItem value="Estándar">Estándar</SelectItem>
+                    <SelectItem value="Básico">Básico</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -433,11 +487,12 @@ export function TrazabilidadModule() {
                   Cancelar
                 </Button>
                 <Button
-                  onClick={() => setShowGenerateModal(false)}
+                  onClick={handleGenerateSingleQR}
+                  disabled={generatingQR}
                   className="bg-[#E12019] text-white hover:bg-[#B51810] h-11 px-6 rounded-xl"
                 >
                   <QrCode className="w-4 h-4 mr-2" />
-                  Generar QR
+                  {generatingQR ? 'Generando...' : 'Generar QR'}
                 </Button>
               </div>
             </TabsContent>
@@ -449,27 +504,10 @@ export function TrazabilidadModule() {
                   id="quantity"
                   type="number"
                   placeholder="100"
+                  value={qrForm.quantity}
+                  onChange={(e) => setQrForm({ ...qrForm, quantity: e.target.value })}
                   className="h-11 border-2 border-[#E0E0E0] rounded-xl mt-2"
-                />
-              </div>
-              <div>
-                <Label htmlFor="batch-benefit" className="text-[#333333]">Tipo de Beneficio</Label>
-                <Select>
-                  <SelectTrigger className="h-11 border-2 border-[#E0E0E0] rounded-xl mt-2">
-                    <SelectValue placeholder="Seleccionar tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="premium">Premium</SelectItem>
-                    <SelectItem value="estandar">Estándar</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="prefix" className="text-[#333333]">Prefijo (Opcional)</Label>
-                <Input
-                  id="prefix"
-                  placeholder="BOX-PRM-"
-                  className="h-11 border-2 border-[#E0E0E0] rounded-xl mt-2"
+                  min="1"
                 />
               </div>
               <div className="bg-[#FFF4E6] border-2 border-[#FF9F55] rounded-xl p-4">
@@ -492,17 +530,50 @@ export function TrazabilidadModule() {
                   Cancelar
                 </Button>
                 <Button
-                  onClick={() => setShowGenerateModal(false)}
+                  onClick={handleGenerateBatchQR}
+                  disabled={generatingQR}
                   className="bg-[#E12019] text-white hover:bg-[#B51810] h-11 px-6 rounded-xl"
                 >
                   <QrCode className="w-4 h-4 mr-2" />
-                  Generar Lote
+                  {generatingQR ? 'Generando...' : 'Generar Lote'}
                 </Button>
               </div>
             </TabsContent>
-          </Tabs>
-        </DialogContent>
-      </Dialog>
-    </div>
+            placeholder="BOX-PRM-"
+            className="h-11 border-2 border-[#E0E0E0] rounded-xl mt-2"
+                />
+          </div>
+          <div className="bg-[#FFF4E6] border-2 border-[#FF9F55] rounded-xl p-4">
+            <div className="flex gap-3">
+              <AlertCircle className="w-5 h-5 text-[#FF9F55] flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-[#333333] mb-1">Generación por Lote</p>
+                <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>
+                  Se generarán códigos QR únicos para cada caja. El proceso puede tardar unos minutos.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowGenerateModal(false)}
+              className="h-11 px-6 rounded-xl border-2 border-[#E0E0E0]"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => setShowGenerateModal(false)}
+              className="bg-[#E12019] text-white hover:bg-[#B51810] h-11 px-6 rounded-xl"
+            >
+              <QrCode className="w-4 h-4 mr-2" />
+              Generar Lote
+            </Button>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </DialogContent>
+      </Dialog >
+    </div >
   );
 }

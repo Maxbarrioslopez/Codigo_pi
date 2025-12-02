@@ -93,11 +93,22 @@ export function TotemModule() {
     if (!rutEscaneado) return;
     setLoading(true); setErrorMsg('');
     try {
+      // Validar que existe ciclo activo antes de generar ticket
+      try {
+        await fetch('/api/ciclo-activo/', { method: 'GET', headers: { 'Content-Type': 'application/json' } })
+          .then(r => {
+            if (!r.ok) throw new Error('No hay ciclo activo');
+            return r.json();
+          });
+      } catch (e: any) {
+        throw new Error('No hay ciclo de beneficios activo en este momento. Contacta a RRHH.');
+      }
+
       const t = await ticketService.create(rutEscaneado, 'Central');
       setTicket(t);
       setCurrentScreen('success');
     } catch (e: any) {
-      setErrorMsg(e.detail || 'Error generando ticket');
+      setErrorMsg(e.message || e.detail || 'Error generando ticket');
       setCurrentScreen('error');
     } finally { setLoading(false); }
   };

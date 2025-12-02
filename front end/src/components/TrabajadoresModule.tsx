@@ -15,6 +15,8 @@ export function TrabajadoresModule() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'list' | 'detail'>('list');
   const [selectedWorker, setSelectedWorker] = useState<any>(null);
+  const [timeline, setTimeline] = useState<any[]>([]);
+  const [timelineLoading, setTimelineLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterContract, setFilterContract] = useState('all');
@@ -40,6 +42,37 @@ export function TrabajadoresModule() {
     };
     loadWorkers();
   }, []);
+
+  // Load timeline when worker is selected
+  useEffect(() => {
+    const loadTimeline = async () => {
+      if (!selectedWorker || !selectedWorker.rut) {
+        setTimeline([]);
+        return;
+      }
+      try {
+        setTimelineLoading(true);
+        const response = await fetch(`/api/trabajadores/${selectedWorker.rut}/timeline/`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (!response.ok) {
+          // If timeline endpoint not found, use mock data
+          setTimeline(getMockTimeline());
+        } else {
+          const data = await response.json();
+          setTimeline(Array.isArray(data) ? data : data.timeline || getMockTimeline());
+        }
+      } catch (error) {
+        console.error('Error loading timeline:', error);
+        // Fallback to mock data
+        setTimeline(getMockTimeline());
+      } finally {
+        setTimelineLoading(false);
+      }
+    };
+    loadTimeline();
+  }, [selectedWorker]);
 
   const handleRegisterWorker = async () => {
     if (!registerForm.rut || !registerForm.nombre || !registerForm.seccion || !registerForm.contrato) {
@@ -135,6 +168,41 @@ export function TrabajadoresModule() {
     }
   };
 
+  const getMockTimeline = () => [
+    {
+      id: '1',
+      type: 'benefit',
+      title: 'Beneficio Activado',
+      description: 'Beneficio Premium asignado al trabajador',
+      date: '12-Nov-2024',
+      admin: 'Carlos Ruiz'
+    },
+    {
+      id: '2',
+      type: 'delivery',
+      title: 'Retiro de Beneficio',
+      description: 'Caja de beneficio entregada en portería',
+      date: '15-Oct-2024',
+      guard: 'Juan González'
+    },
+    {
+      id: '3',
+      type: 'scheduled',
+      title: 'Retiro Agendado',
+      description: 'Retiro programado para el día siguiente',
+      date: '14-Oct-2024',
+      admin: 'Sistema'
+    },
+    {
+      id: '4',
+      type: 'qr',
+      title: 'Ticket Generado',
+      description: 'QR de retiro generado en tótem',
+      date: '15-Oct-2024',
+      admin: 'Tótem Digital'
+    }
+  ];
+
   if (view === 'detail' && selectedWorker) {
     return (
       <div className="space-y-6">
@@ -226,43 +294,49 @@ export function TrabajadoresModule() {
         {/* Timeline */}
         <div className="bg-white border-2 border-[#E0E0E0] rounded-xl p-6">
           <h3 className="text-[#333333] mb-6">Historial Completo (Timeline)</h3>
-          <div className="space-y-4">
-            {mockTimeline.map((event, index) => (
-              <div key={event.id} className="flex gap-4">
-                <div className="flex flex-col items-center">
-                  <div className="w-8 h-8 rounded-full bg-[#017E49] text-white flex items-center justify-center">
-                    {getTimelineIcon(event.type)}
+          {timelineLoading ? (
+            <p className="text-[#6B6B6B]">Cargando historial...</p>
+          ) : timeline && timeline.length > 0 ? (
+            <div className="space-y-4">
+              {timeline.map((event, index) => (
+                <div key={event.id} className="flex gap-4">
+                  <div className="flex flex-col items-center">
+                    <div className="w-8 h-8 rounded-full bg-[#017E49] text-white flex items-center justify-center">
+                      {getTimelineIcon(event.type)}
+                    </div>
+                    {index < timeline.length - 1 && (
+                      <div className="w-0.5 h-full bg-[#E0E0E0] mt-2" />
+                    )}
                   </div>
-                  {index < mockTimeline.length - 1 && (
-                    <div className="w-0.5 h-full bg-[#E0E0E0] mt-2" />
-                  )}
-                </div>
-                <div className="flex-1 pb-6">
-                  <div className="flex items-start justify-between mb-1">
-                    <h4 className="text-[#333333]" style={{ fontSize: '16px', fontWeight: 500 }}>
-                      {event.title}
-                    </h4>
-                    <span className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>
-                      {event.date}
-                    </span>
+                  <div className="flex-1 pb-6">
+                    <div className="flex items-start justify-between mb-1">
+                      <h4 className="text-[#333333]" style={{ fontSize: '16px', fontWeight: 500 }}>
+                        {event.title}
+                      </h4>
+                      <span className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>
+                        {event.date}
+                      </span>
+                    </div>
+                    <p className="text-[#6B6B6B] mb-2" style={{ fontSize: '14px' }}>
+                      {event.description}
+                    </p>
+                    {event.guard && (
+                      <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>
+                        Guardia: {event.guard}
+                      </p>
+                    )}
+                    {event.admin && (
+                      <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>
+                        Admin: {event.admin}
+                      </p>
+                    )}
                   </div>
-                  <p className="text-[#6B6B6B] mb-2" style={{ fontSize: '14px' }}>
-                    {event.description}
-                  </p>
-                  {event.guard && (
-                    <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>
-                      Guardia: {event.guard}
-                    </p>
-                  )}
-                  {event.admin && (
-                    <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>
-                      Admin: {event.admin}
-                    </p>
-                  )}
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[#6B6B6B]">No hay eventos en el historial</p>
+          )}
         </div>
       </div>
     );

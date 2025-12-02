@@ -22,9 +22,7 @@ export function TotemModule() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [validationSteps, setValidationSteps] = useState<Array<{ label: string; status: 'pending' | 'active' | 'complete' | 'error'; }>>([
-    { label: 'Verificando identidad', status: 'pending' },
-    { label: 'Verificando beneficio', status: 'pending' },
-    { label: 'Verificando stock', status: 'pending' },
+    { label: 'Validando beneficio', status: 'pending' },
   ]);
   const DEV_MODE = typeof window !== 'undefined' && window.location.search.includes('dev');
   const isWeekend = (() => { const d = new Date().getDay(); return d === 0 || d === 6; })();
@@ -49,7 +47,7 @@ export function TotemModule() {
     return target.toISOString();
   }
 
-  // Flujo de validación secuencial real
+  // Flujo de validación secuencial real - OPTIMIZADO
   useEffect(() => {
     let cancelled = false;
     async function runValidation() {
@@ -58,23 +56,19 @@ export function TotemModule() {
       setErrorMsg('');
       setValidationSteps(prev => prev.map((s, i) => ({ ...s, status: i === 0 ? 'active' : 'pending' })));
       try {
-        // Paso 1: identidad (en este contexto asumimos que el RUT es el ID, podríamos tener endpoint futuro)
-        await new Promise(r => setTimeout(r, 350)); // pequeña pausa visual
-        if (cancelled) return;
-        setValidationSteps(prev => prev.map((s, i) => i === 0 ? { ...s, status: 'complete' } : i === 1 ? { ...s, status: 'active' } : s));
-
-        // Paso 2: beneficio
+        // Paso único: obtener beneficio (incluye identidad y stock)
         const res = await trabajadorService.getBeneficio(rutEscaneado);
         if (cancelled) return;
         setBeneficio(res.beneficio);
-        setValidationSteps(prev => prev.map((s, i) => i === 1 ? { ...s, status: 'complete' } : i === 2 ? { ...s, status: 'active' } : s));
-
-        // Paso 3: stock
         const stock = res.beneficio?.beneficio_disponible?.stock ?? 0;
-        await new Promise(r => setTimeout(r, 250));
-        if (cancelled) return;
-        setValidationSteps(prev => prev.map((s, i) => i === 2 ? { ...s, status: 'complete' } : s));
 
+        setValidationSteps(prev => prev.map(s => ({ ...s, status: 'complete' })));
+
+        // Pausa mínima visual (200ms)
+        await new Promise(r => setTimeout(r, 200));
+        if (cancelled) return;
+
+        // Saltar directamente al siguiente paso basado en resultado
         if (!res.beneficio) {
           setCurrentScreen('no-benefit');
         } else if (stock <= 0) {
@@ -84,7 +78,7 @@ export function TotemModule() {
         }
       } catch (e: any) {
         if (cancelled) return;
-        setValidationSteps(prev => prev.map((s, i) => i === 0 || i === 1 || i === 2 ? { ...s, status: s.status === 'active' ? 'error' : s.status } : s));
+        setValidationSteps(prev => prev.map(s => ({ ...s, status: 'error' })));
         setErrorMsg(e?.detail || 'Error validando beneficio');
         setCurrentScreen('error');
       } finally {
@@ -372,6 +366,12 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
                   setCameraActive(false);
                   console.log('✋ Scanner detenido - Carnet capturado exitosamente');
                 }
+
+                // INICIAR VALIDACIÓN AUTOMÁTICA SIN CLICK
+                setTimeout(() => {
+                  setRutEscaneado(rut);
+                  setCurrentScreen('validating');
+                }, 100);
               } else if (isAcceptedFormat && !rut) {
                 // QR o PDF417 detectado pero sin RUT válido
                 if (scanCount % 20 === 0) {
@@ -520,12 +520,20 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
       {/* Bottom Actions */}
       <div className="space-y-3 mb-6">
         <button
-          onClick={onScan}
+          onClick={() => {
+            if (rutInput.trim()) {
+              setRutEscaneado(rutInput.trim());
+              setCurrentScreen('validating');
+            }
+          }}
           disabled={!rutInput.trim()}
-          className={`w-full px-6 md:px-8 py-4 md:py-5 rounded-xl transition-colors ${rutInput.trim() ? 'bg-[#E12019] text-white hover:bg-[#B51810]' : 'bg-[#E0E0E0] text-[#6B6B6B] cursor-not-allowed'}`}
-          style={{ fontSize: '16px', fontWeight: 700, minHeight: '56px' }}
+          className={`w-full px-6 md:px-8 py-4 md:py-5 rounded-xl transition-colors font-bold text-base md:text-lg ${rutInput.trim()
+            ? 'bg-[#017E49] text-white hover:bg-[#015A34]'
+            : 'bg-[#E0E0E0] text-[#6B6B6B] cursor-not-allowed'
+            }`}
+          style={{ minHeight: '56px' }}
         >
-          Validar Beneficio
+          ✓ Validar Beneficio
         </button>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <button
@@ -558,52 +566,44 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
 }
 
 function TotemValidatingScreen({ loading, errorMsg, steps }: { loading?: boolean; errorMsg?: string; steps: { label: string; status: 'pending' | 'active' | 'complete' | 'error'; }[] }) {
-  const total = steps.length;
-  const completed = steps.filter(s => s.status === 'complete').length;
-  const progressPct = Math.min(100, Math.round((completed / total) * 100));
-
   return (
-    <div className="h-full flex flex-col items-center justify-center p-12">
-      <div className="mb-12">
-        <div className="w-32 h-32 bg-gradient-to-br from-[#E12019] to-[#B51810] rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
-          <Scan className="w-16 h-16 text-white" />
+    <div className="h-full flex flex-col items-center justify-center p-8 md:p-12">
+      <div className="mb-8 md:mb-12">
+        <div className="w-20 h-20 md:w-32 md:h-32 bg-gradient-to-br from-[#E12019] to-[#B51810] rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 animate-spin">
+          <Scan className="w-10 h-10 md:w-16 md:h-16 text-white" />
         </div>
-        <div style={{ fontSize: '36px', fontWeight: 700 }} className="text-[#333333] text-center mb-4">
-          Validando tu beneficio...
+        <div style={{ fontSize: '24px', fontWeight: 700 }} className="text-[#333333] text-center md:text-3xl">
+          Validando beneficio...
         </div>
       </div>
 
-      <div className="w-full max-w-md space-y-6">
+      {/* Paso simple y directo */}
+      <div className="w-full max-w-sm mb-8">
         {steps.map((step, index) => (
-          <div key={index} className="flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${step.status === 'complete' ? 'bg-[#017E49]' : step.status === 'active' ? 'bg-[#FF9F55]' : step.status === 'error' ? 'bg-[#E12019]' : 'bg-[#E0E0E0]'} }`}>
+          <div key={index} className="flex items-center gap-3 md:gap-4">
+            <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${step.status === 'complete' ? 'bg-[#017E49] scale-110' :
+              step.status === 'active' ? 'bg-[#FF9F55]' :
+                step.status === 'error' ? 'bg-[#E12019]' :
+                  'bg-[#E0E0E0]'
+              }`}>
               {step.status === 'complete' ? (
-                <CheckCircle2 className="w-6 h-6 text-white" />
+                <CheckCircle2 className="w-5 h-5 md:w-6 md:h-6 text-white" />
               ) : step.status === 'error' ? (
-                <XCircle className="w-6 h-6 text-white" />
+                <XCircle className="w-5 h-5 md:w-6 md:h-6 text-white" />
               ) : (
-                <span className="text-white" style={{ fontSize: '18px', fontWeight: 700 }}>
-                  {index + 1}
-                </span>
+                <span className="text-white text-sm md:text-base font-bold">✓</span>
               )}
             </div>
-            <p className="text-[#333333]" style={{ fontSize: '18px', fontWeight: step.status === 'active' ? 600 : 400 }}>
+            <p className="text-[#333333] text-sm md:text-lg" style={{ fontWeight: step.status === 'active' ? 600 : 400 }}>
               {step.label}
             </p>
           </div>
         ))}
       </div>
 
-      {/* Progress Bar */}
-      <div className="w-full max-w-md mt-12">
-        <div className="h-3 bg-[#E0E0E0] rounded-full overflow-hidden">
-          <div className="h-full bg-[#E12019] rounded-full transition-all" style={{ width: `${progressPct}%` }} />
-        </div>
-        <p className="text-center text-[#6B6B6B] mt-2" style={{ fontSize: '12px' }}>{progressPct}%</p>
-      </div>
       {errorMsg && (
-        <div className="bg-white border-2 border-[#E12019] rounded-xl p-4 w-full max-w-md mt-6">
-          <p className="text-[#E12019] text-center" style={{ fontSize: '14px' }}>{errorMsg}</p>
+        <div className="bg-[#FFE5E5] border-2 border-[#E12019] rounded-xl p-4 w-full max-w-sm">
+          <p className="text-[#E12019] text-center text-sm md:text-base">{errorMsg}</p>
         </div>
       )}
     </div>
@@ -632,41 +632,36 @@ function TotemSuccessChoice({ isWeekend, onSameDay, onSchedule, beneficio }: {
       </p>
 
       {/* Benefit Info Card (optional) */}
-      <div className="bg-white border-2 border-[#E0E0E0] rounded-xl p-6 w-full max-w-md mb-12">
-        <div className="space-y-2">
-          <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>Beneficio</p>
-          <p className="text-[#333333]" style={{ fontSize: '18px', fontWeight: 500 }}>
-            {beneficio?.beneficio_disponible?.nombre || 'Caja de beneficio'}
-          </p>
-        </div>
+      <div className="bg-white border-2 border-[#E0E0E0] rounded-lg p-4 w-full max-w-md mb-8">
+        <p className="text-[#6B6B6B] text-xs">Beneficio disponible</p>
+        <p className="text-[#333333] font-semibold text-base">
+          {beneficio?.beneficio_disponible?.nombre || 'Caja de beneficio'}
+        </p>
       </div>
 
       {/* Actions */}
-      <div className="w-full max-w-md space-y-4">
+      <div className="w-full max-w-md space-y-3">
         <button
           onClick={onSameDay}
-          className="w-full px-8 py-6 bg-[#017E49] text-white rounded-xl hover:bg-[#015A34] transition-colors flex items-center justify-center gap-3"
-          style={{ fontSize: '18px', fontWeight: 700, minHeight: '64px' }}
+          className="w-full px-8 py-5 bg-[#017E49] text-white rounded-xl hover:bg-[#015A34] transition-colors font-bold text-lg"
+          style={{ minHeight: '56px' }}
         >
-          Retirar Hoy
+          ✓ Retirar Hoy
         </button>
 
         {!isWeekend && (
           <button
             onClick={onSchedule}
-            className="w-full px-8 py-6 bg-white text-[#333333] border-2 border-[#FF9F55] rounded-xl hover:bg-[#F8F8F8] transition-colors flex items-center justify-center gap-3"
-            style={{ fontSize: '18px', fontWeight: 700, minHeight: '64px' }}
+            className="w-full px-8 py-5 bg-white text-[#333333] border-2 border-[#FF9F55] rounded-xl hover:bg-[#F8F8F8] transition-colors font-bold text-lg"
+            style={{ minHeight: '56px' }}
           >
-            <Calendar className="w-6 h-6" />
-            Agendar para Otro Día
+            📅 Agendar Otro Día
           </button>
         )}
 
         {isWeekend && (
-          <div className="bg-[#FFF4E6] border-2 border-[#FF9F55] rounded-xl p-4">
-            <p className="text-[#333333] text-center" style={{ fontSize: '14px', lineHeight: '1.5' }}>
-              Durante fines de semana no está disponible la opción de agendamiento.
-            </p>
+          <div className="bg-[#FFF4E6] border-2 border-[#FF9F55] rounded-lg p-3 text-center text-sm">
+            <p className="text-[#333333]">No hay agendamiento en fines de semana</p>
           </div>
         )}
       </div>
@@ -678,84 +673,55 @@ function TotemSuccessScreen({ ticket, onFinish }: { ticket: any; onFinish: () =>
   const nombreTrabajador = ticket?.trabajador?.nombre ?? '';
   const rutTrabajador = ticket?.trabajador?.rut ?? '';
   const codigoTicket = ticket?.uuid ?? '';
-  const expiraISO = ticket?.ttl_expira_at ? new Date(ticket.ttl_expira_at) : null;
-  const minutosRestantes = expiraISO ? Math.max(0, Math.floor((expiraISO.getTime() - Date.now()) / 60000)) : null;
+  
   return (
-    <div className="h-full flex flex-col items-center justify-center p-12">
-      <div className="w-32 h-32 bg-[#017E49] rounded-full flex items-center justify-center mb-8">
-        <CheckCircle2 className="w-20 h-20 text-white" />
+    <div className="h-full flex flex-col items-center justify-center p-6 md:p-8">
+      <div className="w-24 h-24 md:w-32 md:h-32 bg-[#017E49] rounded-full flex items-center justify-center mb-4 md:mb-6">
+        <CheckCircle2 className="w-16 h-16 md:w-20 md:h-20 text-white" />
       </div>
 
-      <div style={{ fontSize: '36px', fontWeight: 700 }} className="text-[#333333] text-center mb-4">
-        Ticket generado exitosamente
-      </div>
-      <p className="text-[#6B6B6B] text-center mb-12" style={{ fontSize: '16px', lineHeight: '1.5' }}>
-        Dirígete a portería para retirar tu beneficio.
+      <h1 className="text-2xl md:text-3xl font-bold text-[#333333] text-center mb-2">
+        ✓ Ticket Generado
+      </h1>
+      <p className="text-[#6B6B6B] text-center mb-6 text-sm md:text-base">
+        Dirígete a portería para retirar tu beneficio
       </p>
 
-      {/* Ticket Card */}
-      <div className="bg-white border-2 border-[#E0E0E0] rounded-xl p-8 w-full max-w-md mb-12 shadow-lg">
-        <div className="flex items-center justify-between mb-6 pb-6 border-b-2 border-[#E0E0E0]">
-          <FileText className="w-12 h-12 text-[#E12019]" />
-          <span className="px-4 py-2 bg-[#017E49] text-white rounded-full uppercase" style={{ fontSize: '14px', fontWeight: 700 }}>
-            Aprobado
+      {/* Ticket Card - Compacto */}
+      <div className="bg-white border-2 border-[#E0E0E0] rounded-lg p-4 md:p-6 w-full max-w-sm mb-6 shadow-md">
+        <div className="flex items-center justify-between mb-4 pb-4 border-b border-[#E0E0E0]">
+          <FileText className="w-8 h-8 md:w-10 md:h-10 text-[#E12019]" />
+          <span className="px-3 py-1 bg-[#017E49] text-white rounded-full text-xs md:text-sm font-bold">
+            APROBADO
           </span>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3 text-sm">
           <div>
-            <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>Nombre trabajador</p>
-            <p className="text-[#333333]" style={{ fontSize: '18px', fontWeight: 500 }}>
-              {nombreTrabajador}
+            <p className="text-[#6B6B6B] text-xs">Trabajador</p>
+            <p className="text-[#333333] font-semibold">{nombreTrabajador}</p>
+          </div>
+          <div>
+            <p className="text-[#6B6B6B] text-xs">RUT</p>
+            <p className="text-[#333333] font-semibold">{rutTrabajador}</p>
+          </div>
+          <div className="bg-[#F8F8F8] rounded-lg p-3 text-center">
+            <p className="text-[#6B6B6B] text-xs mb-1">Código de retiro</p>
+            <p className="text-[#E12019] text-2xl md:text-3xl font-bold tracking-wider">
+              {codigoTicket ? codigoTicket.slice(0, 8).toUpperCase() : '—'}
             </p>
           </div>
-          <div>
-            <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>RUT</p>
-            <p className="text-[#333333]" style={{ fontSize: '18px', fontWeight: 500 }}>
-              {rutTrabajador}
-            </p>
-          </div>
-          <div>
-            <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>Código de retiro</p>
-            <div className="bg-[#F8F8F8] rounded-lg p-4 mt-2">
-              <p className="text-[#E12019] text-center" style={{ fontSize: '32px', fontWeight: 700, letterSpacing: '0.1em' }}>
-                {codigoTicket ? codigoTicket.slice(0, 8) : '—'}
-              </p>
-            </div>
-          </div>
-          {minutosRestantes !== null && (
-            <div>
-              <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>Expira en</p>
-              <p className="text-[#333333]" style={{ fontSize: '18px', fontWeight: 500 }}>
-                {minutosRestantes} min
-              </p>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Info Note */}
-      <div className="bg-white border-2 border-[#E0E0E0] rounded-xl p-4 w-full max-w-md mb-8">
-        <p className="text-[#6B6B6B] text-center" style={{ fontSize: '14px', lineHeight: '1.5' }}>
-          Tu ticket es válido hasta la expiración indicada. Si expira, puedes reimprimir desde este mismo tótem.
-        </p>
-      </div>
-
-      {/* Actions */}
-      <div className="w-full max-w-md space-y-4">
-        <button
-          className="w-full px-8 py-6 bg-[#E12019] text-white rounded-xl hover:bg-[#B51810] transition-colors flex items-center justify-center gap-3"
-          style={{ fontSize: '18px', fontWeight: 700, minHeight: '64px' }}
-        >
-          <Printer className="w-6 h-6" />
-          Generar Ticket Ahora
-        </button>
+      {/* Actions - Simplificado */}
+      <div className="w-full max-w-sm space-y-3">
         <button
           onClick={onFinish}
-          className="w-full px-8 py-6 bg-white text-[#333333] border-2 border-[#E12019] rounded-xl hover:bg-[#F8F8F8] transition-colors"
-          style={{ fontSize: '18px', fontWeight: 700, minHeight: '64px' }}
+          className="w-full px-6 py-4 md:py-5 bg-[#017E49] text-white rounded-xl hover:bg-[#015A34] font-bold text-base transition-colors"
+          style={{ minHeight: '50px' }}
         >
-          Finalizar
+          ✓ Finalizar
         </button>
       </div>
     </div>

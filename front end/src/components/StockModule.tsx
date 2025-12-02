@@ -24,7 +24,7 @@ export function StockModule() {
     const loadResumen = async () => {
         try {
             setLoading(true);
-            const data = await stockService.getResumen();
+            const data = await stockService.stockResumen();
             setResumen(data);
         } catch (error) {
             showError('Error', 'No se pudo cargar el resumen de stock');
@@ -41,11 +41,11 @@ export function StockModule() {
         }
 
         try {
-            await stockService.registrarMovimiento({
-                tipo: tipoMovimiento,
-                cantidad: parseInt(cantidad),
-                tipo_beneficio: tipo,
-            });
+            await stockService.registrarMovimiento(
+                tipoMovimiento as 'entrada' | 'salida',
+                parseInt(cantidad),
+                tipo
+            );
             showSuccess('Éxito', 'Movimiento registrado correctamente');
             setShowMovimiento(false);
             setCantidad('');

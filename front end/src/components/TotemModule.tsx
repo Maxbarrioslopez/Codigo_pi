@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
-import { Scan, CheckCircle2, XCircle, FileText, AlertCircle, ArrowLeft, Printer, AlertTriangle, Calendar, ChevronLeft, ChevronRight, Info, Search } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Scan, CheckCircle2, XCircle, FileText, AlertCircle, ArrowLeft, Printer, AlertTriangle, Calendar, ChevronLeft, ChevronRight, Info, Search, Camera, X } from 'lucide-react';
 import { trabajadorService } from '@/services/trabajador.service';
 import { ticketService } from '@/services/ticket.service';
 import { incidentService } from '@/services/incident.service';
 import { scheduleService } from '@/services/schedule.service';
 import { RUTInput } from './form/RUTInput';
+import { BrowserMultiFormatReader, IScannerControls } from '@zxing/browser';
+import { BarcodeFormat, DecodeHintType } from '@zxing/library';
 
 type TotemScreen = 'initial' | 'validating' | 'success' | 'success-choice' | 'no-stock' | 'schedule-select' | 'schedule-confirm' | 'no-benefit' | 'error' | 'incident-form' | 'incident-sent' | 'incident-scan' | 'incident-status';
 
@@ -131,12 +133,6 @@ export function TotemModule() {
 
   return (
     <div className="space-y-4 md:space-y-8">
-      <div>
-        <h2 className="text-[#333333] mb-2">Tótem de Autoservicio</h2>
-        <p className="text-[#6B6B6B]">
-          Sistema de retiro digital de beneficios (optimizado para kiosko vertical y tablet).
-        </p>
-      </div>
       {DEV_MODE && (
         <div className="flex flex-wrap gap-2 p-4 bg-[#F8F8F8] border rounded-xl">
           <p className="text-xs text-[#6B6B6B] w-full">Modo desarrollador: navegación manual</p>
@@ -230,46 +226,285 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
   rutInput: string;
   onRutChange: (v: string) => void;
 }) {
+  const [cameraActive, setCameraActive] = useState(true);
+  const [cameraError, setCameraError] = useState('');
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const controlsRef = useRef<IScannerControls | null>(null);
+
+  // Activar cámara automáticamente al montar
+  useEffect(() => {
+    let mounted = true;
+    let scanCount = 0;
+    let warmupFrames = 10; // Ignorar primeros frames para estabilidad de cámara
+    // Usar MultiFormatReader con hints para soportar PDF417 (carnets chilenos), QR y códigos de barras
+    const hints = new Map();
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+      BarcodeFormat.PDF_417,
+      BarcodeFormat.QR_CODE,
+      BarcodeFormat.CODE_128,
+      BarcodeFormat.CODE_39,
+      BarcodeFormat.EAN_13,
+      BarcodeFormat.EAN_8,
+      BarcodeFormat.UPC_A,
+      BarcodeFormat.UPC_E
+    ]);
+    // Configurar tiempo entre intentos de decodificación (ms)
+    const codeReader = new BrowserMultiFormatReader(hints, { timeBetweenScansMillis: 450 });
+
+    async function startScanner() {
+      try {
+        if (!videoRef.current || !mounted) return;
+
+        console.log('🎥 Iniciando scanner...');
+
+        // Solicitar cámara con restricciones específicas para mejor calidad
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            // Intentar enfoque continuo y zoom si el dispositivo lo soporta
+            // Algunos navegadores soportan constraints extendidos vía any-cast
+            // @ts-expect-error extended constraints
+            focusMode: 'continuous',
+            // @ts-expect-error extended constraints
+            zoom: 1.5
+          }
+        });
+
+        if (videoRef.current && mounted) {
+          videoRef.current.srcObject = stream;
+        }
+
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(d => d.kind === 'videoinput');
+        console.log(`📷 ${videoDevices.length} cámara(s) disponible(s)`);
+        videoDevices.forEach((d, i) => console.log(`  ${i + 1}. ${d.label}`));
+
+        const controls = await codeReader.decodeFromVideoDevice(
+          undefined, // Usar la cámara ya configurada
+          videoRef.current,
+          (result, error) => {
+            scanCount++;
+            // Silenciar errores NotFoundException salvo cada 50 intentos
+            if (error && (error as any)?.name === 'NotFoundException') {
+              if (scanCount % 50 === 0) {
+                console.log(`🔍 Buscando código... (${scanCount} intentos)`);
+              }
+              return;
+            }
+
+            if (result && mounted) {
+              // Ignorar primeros frames para evitar captura temprana
+              if (warmupFrames > 0) {
+                warmupFrames--;
+                return;
+              }
+              const text = result.getText().trim();
+              const format = result.getBarcodeFormat();
+              console.log(`✅ [Scan #${scanCount}] Código detectado!`, {
+                formato: format,
+                texto: text.substring(0, 50) + (text.length > 50 ? '...' : '')
+              });
+
+              // Múltiples patrones para detectar RUT
+              let rut = '';
+
+              // 1. Buscar patrón con puntos y guión: 12.345.678-9
+              const pattern1 = text.match(/(\d{1,2})\.(\d{3})\.(\d{3})[-](\d{1})/);
+              if (pattern1) {
+                rut = `${pattern1[1]}.${pattern1[2]}.${pattern1[3]}-${pattern1[4]}`;
+                console.log('📋 Patrón 1 (con puntos):', rut);
+              } else {
+                // 2. Buscar patrón sin puntos pero con guión: 12345678-9
+                const pattern2 = text.match(/(\d{7,8})[-](\d{1})/);
+                if (pattern2) {
+                  const num = pattern2[1];
+                  const dv = pattern2[2];
+                  if (num.length === 8) {
+                    rut = `${num.slice(0, 2)}.${num.slice(2, 5)}.${num.slice(5, 8)}-${dv}`;
+                  } else {
+                    rut = `${num.slice(0, 1)}.${num.slice(1, 4)}.${num.slice(4, 7)}-${dv}`;
+                  }
+                  console.log('📋 Patrón 2 (sin puntos):', rut);
+                } else {
+                  // 3. Buscar solo números: 123456789
+                  const pattern3 = text.match(/(\d{8,9})/);
+                  if (pattern3) {
+                    const numStr = pattern3[1];
+                    if (numStr.length === 9) {
+                      const num = numStr.slice(0, 8);
+                      const dv = numStr.slice(8);
+                      rut = `${num.slice(0, 2)}.${num.slice(2, 5)}.${num.slice(5, 8)}-${dv}`;
+                    } else if (numStr.length === 8) {
+                      const num = numStr.slice(0, 7);
+                      const dv = numStr.slice(7);
+                      rut = `${num.slice(0, 1)}.${num.slice(1, 4)}.${num.slice(4, 7)}-${dv}`;
+                    }
+                    console.log('📋 Patrón 3 (solo números):', rut);
+                  }
+                }
+              }
+
+              // Solo aceptar PDF417 o QR_CODE con RUT válido
+              const isAcceptedFormat = String(format) === 'PDF_417' || String(format) === 'QR_CODE';
+              if (rut && isAcceptedFormat) {
+                console.log('🎯 RUT FINAL formateado:', rut);
+                console.log('📱 Formato aceptado (carnet):', String(format));
+                onRutChange(rut);
+                // Reproducir sonido de éxito
+                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZUQ0PVKzn77BfGAg+ltryxnMpBSh+zPLaizsIGGS57OihUhELTKXh8bllHAU2jdXzzn0vBSF1xe/glEoODlOq5O+zYxoJPJPY88p2KwUme8rx3I0+CRZiturqpVMRC0mi4PK8aB8GM4/T8tGAMQYeb8Lv45ZPDRBWrefwsGIaCT6U2PLJdSsFKH7M8tqLOwgYZLns6KFSEQtMpeHxuWUcBTaN1fPOfS8FIXbF7+CUSg4OU6rk77NjGgk8k9jzynYrBSZ7yvHcjT4JFmK26uqlUxELSaLg8rxoHwYzj9Py0YAxBh5vwu/jlk8NEFat5/CwYhoJPpTY8sl1KwUofszy2os7CBhkuezooVIRC0yl4fG5ZRwFNo3V885+LwUhdsXv4JRKDg5TquTvs2MaCTyT2PPKdisFJnvK8dyNPgkWYrbq6qVTEQtJouDyvGgfBjOP0/LRgDEGHm/C7+OWTw0QVq3n8LBiGgk+lNjyyXUrBSh+zPLaizsIGGS57OihUhELTKXh8bllHAU2jdXzzn4vBSF2xe/glEoODlOq5O+zYxoJPJPY88p2KwUme8rx3I0+CRZiturqpVMRC0mi4PK8aB8GM4/T8tGAMQYeb8Lv45ZPDRBWrefwsGIaCT6U2PLJdSsFKH7M8tqLOwgYZLns6KFSEQtMpeHxuWUcBTaN1fPOfi8FIXbF7+CUSg4OU6rk77NjGgk8k9jzynYrBSZ7yvHcjT4JFmK26uqlUxELSaLg8rxoHwYzj9Py0YAxBh5vwu/jlk8NEFat5/CwYhoJPpTY8sl1KwUofszy2os7CBhkuezooVIRC0yl4fG5ZRwFNo3V885+LwUhdsXv4JRKDg5TquTvs2MaCTyT2PPKdisFJnvK8dyNPgkWYrbq6qVTEQtJouDyvGgfBjOP0/LRgDEGHm/C7+OWTw0Q==');
+                audio.volume = 0.3;
+                audio.play().catch(() => { });
+
+                // Detener scanner solo tras lectura válida del carnet
+                if (controlsRef.current) {
+                  controlsRef.current.stop();
+                  controlsRef.current = null;
+                  setCameraActive(false);
+                  console.log('✋ Scanner detenido - Carnet capturado exitosamente');
+                }
+              } else if (isAcceptedFormat && !rut) {
+                // QR o PDF417 detectado pero sin RUT válido
+                if (scanCount % 20 === 0) {
+                  console.log('⚠️ Carnet detectado pero sin RUT válido extraído');
+                }
+              } else {
+                // Formato no aceptado (no es carnet)
+                if (scanCount % 30 === 0) {
+                  console.log('⚠️ Ignorando: se espera carnet, formato detectado:', String(format));
+                }
+              }
+            }
+            // Solo mostrar errores reales con menor frecuencia
+            if (error && (error as any)?.name !== 'NotFoundException') {
+              if (scanCount % 10 === 0) {
+                const name = (error as any)?.name || 'Error';
+                const msg = (error as any)?.message || String(error);
+                console.error('❌ Error de scanner:', name, msg);
+              }
+            }
+          }
+        );
+
+        if (mounted) {
+          controlsRef.current = controls;
+          console.log('✅ Scanner iniciado correctamente');
+        }
+      } catch (err: any) {
+        if (mounted) {
+          console.error('❌ Error starting camera:', err);
+          setCameraError('No se pudo acceder a la cámara. Verifica los permisos.');
+          setCameraActive(false);
+        }
+      }
+    }
+
+    if (cameraActive) {
+      startScanner();
+    }
+
+    return () => {
+      console.log('🧹 Limpiando scanner...');
+      mounted = false;
+      if (controlsRef.current) {
+        controlsRef.current.stop();
+        controlsRef.current = null;
+      }
+    };
+  }, [cameraActive, onRutChange]);
+
+  const toggleCamera = () => {
+    if (cameraActive && controlsRef.current) {
+      controlsRef.current.stop();
+      controlsRef.current = null;
+    }
+    setCameraActive(!cameraActive);
+    setCameraError('');
+  };
+
   return (
-    <div className="h-full flex flex-col p-12">
+    <div className="h-full flex flex-col p-6 md:p-12">
       {/* Header */}
       <div className="text-center mb-8">
         <div className="w-24 h-24 bg-gradient-to-br from-[#E12019] to-[#B51810] rounded-xl flex items-center justify-center mx-auto mb-6">
           <span className="text-white" style={{ fontSize: '32px', fontWeight: 700 }}>TML</span>
         </div>
-        <h3 className="text-[#333333] mb-2" style={{ fontSize: '24px', fontWeight: 500 }}>
-          Sistema de Retiro Digital de Beneficios
-        </h3>
       </div>
 
       {/* Central Content */}
       <div className="flex-1 flex flex-col items-center justify-center">
         <div style={{ fontSize: '32px', fontWeight: 700 }} className="text-[#333333] mb-3 text-center">
-          Escanea tu cédula o código QR
+          Escanea tu Cédula de Identidad
         </div>
         <p className="text-[#6B6B6B] mb-8 text-center max-w-md" style={{ fontSize: '16px', lineHeight: '1.5' }}>
-          Acerca tu documento al lector para verificar tu beneficio
+          Acerca la parte posterior de tu carnet (código de barras)
         </p>
 
-        {/* Scan Area + RUT Input with Validation */}
-        <div className="bg-white border-4 border-dashed border-[#E12019] rounded-xl p-8 mb-8 w-full max-w-md relative">
+        {/* Camera View + RUT Input */}
+        <div className="bg-white border-4 border-dashed border-[#E12019] rounded-xl p-4 md:p-6 mb-6 w-full max-w-2xl relative">
           <div className="flex flex-col items-center w-full">
-            <Scan className="w-24 h-24 text-[#E12019] mb-4 animate-pulse" />
-            <p className="text-[#333333] mb-4" style={{ fontSize: '18px', fontWeight: 600 }}>
-              Escáner listo
-            </p>
-            <RUTInput
-              placeholder="Ingresa o escanea RUT (ej: 12.345.678-9)"
-              onValidRUT={(rut) => {
-                onRutChange(rut);
-              }}
-              initialValue={rutInput}
-              size="lg"
-              variant="totem"
-            />
-            <p className="text-[#6B6B6B] mt-2" style={{ fontSize: '12px' }}>
-              Ingresa tu RUT o escánealo para validar
-            </p>
+            {cameraActive ? (
+              <div className="relative w-full mb-4">
+                <video
+                  ref={videoRef}
+                  className="w-full h-96 md:h-[500px] object-cover rounded-lg bg-black"
+                  autoPlay
+                  playsInline
+                  muted
+                />
+                <button
+                  onClick={toggleCamera}
+                  className="absolute top-2 right-2 p-2 bg-[#E12019] text-white rounded-full hover:bg-[#B51810] transition-colors shadow-lg z-10"
+                  title="Desactivar cámara"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                {/* Marco de guía para centrar el QR - MÁS GRANDE */}
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                  <div className="relative">
+                    {/* Esquinas del marco - área más amplia */}
+                    <div className="w-72 h-72 md:w-80 md:h-80 relative">
+                      {/* Esquina superior izquierda */}
+                      <div className="absolute top-0 left-0 w-16 h-16 border-t-[6px] border-l-[6px] border-[#E12019] rounded-tl-lg"></div>
+                      {/* Esquina superior derecha */}
+                      <div className="absolute top-0 right-0 w-16 h-16 border-t-[6px] border-r-[6px] border-[#E12019] rounded-tr-lg"></div>
+                      {/* Esquina inferior izquierda */}
+                      <div className="absolute bottom-0 left-0 w-16 h-16 border-b-[6px] border-l-[6px] border-[#E12019] rounded-bl-lg"></div>
+                      {/* Esquina inferior derecha */}
+                      <div className="absolute bottom-0 right-0 w-16 h-16 border-b-[6px] border-r-[6px] border-[#E12019] rounded-br-lg"></div>
+                      {/* Línea de escaneo animada */}
+                      <div className="absolute inset-x-0 h-1 bg-[#E12019] animate-pulse" style={{
+                        top: '50%',
+                        boxShadow: '0 0 15px #E12019'
+                      }}></div>
+                      {/* Punto central de referencia */}
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-[#E12019] rounded-full animate-pulse"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <Scan className="w-24 h-24 text-[#E12019] mb-4" />
+                <button
+                  onClick={toggleCamera}
+                  className="mb-4 px-6 py-3 bg-[#E12019] text-white rounded-lg hover:bg-[#B51810] transition-colors flex items-center gap-2 shadow-md"
+                  style={{ fontSize: '16px', fontWeight: 600 }}
+                >
+                  <Camera className="w-5 h-5" />
+                  Activar Cámara
+                </button>
+              </>
+            )}
+
+            {cameraError && (
+              <div className="mb-4 p-3 bg-[#FFE5E5] border border-[#E12019] rounded-lg">
+                <p className="text-[#E12019] text-center" style={{ fontSize: '12px' }}>
+                  {cameraError}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>

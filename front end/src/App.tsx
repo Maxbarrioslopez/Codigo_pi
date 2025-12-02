@@ -143,11 +143,11 @@ export default function App() {
             }
           />
 
-          {/* Ruta por defecto - Redirige al login */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
+          {/* Ruta por defecto - Redirige al Tótem */}
+          <Route path="/" element={<Navigate to="/totem" replace />} />
 
-          {/* Ruta 404 - Redirige al login */}
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          {/* Ruta 404 - Redirige al Tótem */}
+          <Route path="*" element={<Navigate to="/totem" replace />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

@@ -10,6 +10,8 @@ import { RRHHModuleNew } from './components/RRHHModuleNew';
 import { AdministradorModule } from './components/AdministradorModule';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { Toaster } from './components/ui/toaster';
+import { StockModule } from './components/StockModule';
+import { NominaModule } from './components/NominaModule';
 import { Menu, X, LogOut } from 'lucide-react';
 
 // Layout principal con sidebar para usuarios autenticados
@@ -24,6 +26,8 @@ function DashboardLayout() {
       { id: 'totem' as const, label: 'Tótem Autoservicio', icon: '🖥️', roles: ['admin'] },
       { id: 'guardia' as const, label: 'Panel Guardia', icon: '👮', roles: ['guardia', 'admin'] },
       { id: 'rrhh' as const, label: 'Dashboard RRHH', icon: '📊', roles: ['rrhh', 'admin', 'supervisor'] },
+      { id: 'stock' as const, label: 'Gestión de Stock', icon: '📦', roles: ['admin', 'rrhh'] },
+      { id: 'nomina' as const, label: 'Gestión de Nómina', icon: '💰', roles: ['admin', 'rrhh'] },
       { id: 'admin' as const, label: 'Administración', icon: '⚙️', roles: ['admin'] },
     ];
 
@@ -119,6 +123,8 @@ function DashboardLayout() {
           {currentSection === 'totem' && <TotemModule />}
           {currentSection === 'guardia' && <GuardiaModule />}
           {currentSection === 'rrhh' && <RRHHModuleNew />}
+          {currentSection === 'stock' && <StockModule />}
+          {currentSection === 'nomina' && <NominaModule />}
           {currentSection === 'admin' && <AdministradorModule />}
         </main>
       </div>

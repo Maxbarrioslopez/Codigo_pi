@@ -21,7 +21,7 @@ export class IncidentService {
 
     async crearIncidencia(payload: IncidenciaPayload): Promise<void> {
         try {
-            await apiClient.post('/incidencias/', payload);
+            await apiClient.post('incidencias/', payload);
         } catch (error) {
             throw ErrorHandler.handle(error, 'IncidentService.crearIncidencia', false);
         }

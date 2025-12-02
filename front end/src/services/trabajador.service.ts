@@ -123,7 +123,7 @@ export class TrabajadorService {
      */
     async delete(rut: string): Promise<void> {
         try {
-            await apiClient.delete(`/trabajadores/${rut}/`);
+            await apiClient.delete(`trabajadores/${rut}/`);
         } catch (error) {
             throw ErrorHandler.handle(error, 'TrabajadorService.delete', false);
         }
@@ -135,7 +135,7 @@ export class TrabajadorService {
      */
     async getTimeline(rut: string): Promise<any[]> {
         try {
-            const { data } = await apiClient.get<any[]>(`/trabajadores/${rut}/timeline/`);
+            const { data } = await apiClient.get<any[]>(`trabajadores/${rut}/timeline/`);
             return data;
         } catch (error) {
             throw ErrorHandler.handle(error, 'TrabajadorService.getTimeline', false);

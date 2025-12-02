@@ -69,7 +69,7 @@ class Command(BaseCommand):
         self.stdout.write('')
         if usuarios_creados:
             self.stdout.write(
-                self.style.SUCCESS(f'✅ {len(usuarios_creados)} usuario(s) creado(s): {", ".join(usuarios_creados)}')
+                self.style.SUCCESS(f'{len(usuarios_creados)} usuario(s) creado(s): {", ".join(usuarios_creados)}')
             )
         if usuarios_existentes:
             self.stdout.write(

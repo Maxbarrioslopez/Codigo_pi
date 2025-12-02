@@ -4,11 +4,11 @@ Plataforma de Beneficios TMLUC — Backend (Django DRF) + Frontend (React + Vite
 
 **Última actualización:** 1 Diciembre 2025  
 **Commits:** 3 (12f8558, 5a006c0, aa05eeb)  
-**Features:** ✅ Agregar trabajador, ✅ CRUD Ciclos, ✅ Nómina Preview, ✅ Responsive Mobile
+**Features:** Agregar trabajador, CRUD Ciclos, Nómina Preview, Responsive Mobile
 
 ---
 
-## 📋 Estructura actual:
+## Estructura actual
 - **backend/**: proyecto Django con apps de dominio
 	- backend_project/: settings, urls, wsgi
 	- totem/: modelos y vistas núcleo (tickets, agendamientos, incidencias, ciclo, parámetros)
@@ -25,14 +25,14 @@ Plataforma de Beneficios TMLUC — Backend (Django DRF) + Frontend (React + Vite
 ## ✨ LO QUE FUNCIONA
 
 ```
-✅ Agregar Trabajador para Beneficio → POST /api/trabajadores/
-✅ CRUD Ciclos Bimensuales → /api/ciclos/
-✅ Vista Previa Nómina → POST /api/nomina/preview/
-✅ Confirmar Nómina → POST /api/nomina/confirmar/
-✅ Listar Incidencias/Trazabilidad → /api/incidencias/
-✅ Reportes por período → /api/reportes/
-✅ Responsive Mobile (360px-1440px) ✓
-✅ Sincronización BD en tiempo real ✓
+Agregar Trabajador para Beneficio → POST /api/trabajadores/
+CRUD Ciclos Bimensuales → /api/ciclos/
+Vista Previa Nómina → POST /api/nomina/preview/
+Confirmar Nómina → POST /api/nomina/confirmar/
+Listar Incidencias/Trazabilidad → /api/incidencias/
+Reportes por período → /api/reportes/
+Responsive Mobile (360px-1440px)
+Sincronización BD en tiempo real
 ```
 
 ---
@@ -96,16 +96,16 @@ Ver `backend/README.md` para lista completa (40+ endpoints).
 
 ---
 
-## 📱 CARACTERÍSTICAS NUEVAS
+## Características nuevas
 
 | Característica | Status | Móvil | Desktop |
 |---|---|---|---|
-| Agregar Trabajador | ✅ | ✓ | ✓ |
-| Gestión Ciclos | ✅ | ✓ | ✓ |
-| Nómina Preview | ✅ | ✓ | ✓ |
-| Trazabilidad QR | ✅ | ✓ | ✓ |
-| Reportes | ✅ | ✓ | ✓ |
-| Responsive | ✅ | ✓ | ✓ |
+| Agregar Trabajador | Sí | Sí | Sí |
+| Gestión Ciclos | Sí | Sí | Sí |
+| Nómina Preview | Sí | Sí | Sí |
+| Trazabilidad QR | Sí | Sí | Sí |
+| Reportes | Sí | Sí | Sí |
+| Responsive | Sí | Sí | Sí |
 
 ---
 
@@ -123,7 +123,7 @@ pytest
 
 ---
 
-## 📊 CAMBIOS RECIENTES
+## Cambios recientes
 
 - **RRHHModuleNew.tsx**: 6 tabs integrados (dashboard, trabajadores, ciclo, nómina, trazabilidad, reportes)
 - **ciclo.service.ts**: CRUD completo para ciclos bimensuales

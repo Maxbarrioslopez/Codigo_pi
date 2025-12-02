@@ -1,6 +1,6 @@
 # 🚀 Backend Django + DRF — Sistema Tótem Digital
 
-## 📋 Resumen
+## Resumen
 
 Sistema backend robusto para retiro digital de beneficios con:
 
@@ -29,11 +29,11 @@ python setup_backend.py
 ```
 
 Este script:
-- ✅ Instala dependencias
-- ✅ Crea archivo .env con secrets seguros
-- ✅ Ejecuta migraciones
-- ✅ Carga datos iniciales
-- ✅ Te guía para crear superusuario
+- Instala dependencias
+- Crea archivo .env con secrets seguros
+- Ejecuta migraciones
+- Carga datos iniciales
+- Te guía para crear superusuario
 
 ### Opción 2: Setup Manual
 
@@ -260,7 +260,7 @@ Ajustar en Admin Django o via API:
 
 ---
 
-## 📊 Modelos de Datos
+## Modelos de Datos
 
 ### Core
 - **Usuario**: Usuario del sistema con roles
@@ -312,7 +312,7 @@ tail -f logs/django.log
 
 ---
 
-## 📦 Dependencias Principales
+## Dependencias Principales
 
 ```
 Django>=4.2                      # Framework web
@@ -330,13 +330,13 @@ pytest-django                    # Testing Django
 
 ---
 
-## 🎯 Próximos Pasos
+## Próximos Pasos
 
-1. ✅ Refactorizar views existentes para usar servicios
-2. ✅ Implementar rate limiting en endpoints públicos
-3. ✅ Expandir tests de cobertura
-4. ✅ Configurar Sentry para monitoreo de errores
-5. ✅ Implementar health check endpoint
+1. Refactorizar views existentes para usar servicios
+2. Implementar rate limiting en endpoints públicos
+3. Expandir tests de cobertura
+4. Configurar Sentry para monitoreo de errores
+5. Implementar health check endpoint
 
 ---
 

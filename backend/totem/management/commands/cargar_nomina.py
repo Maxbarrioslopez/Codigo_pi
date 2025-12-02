@@ -75,9 +75,9 @@ class Command(BaseCommand):
         sucursal_defecto = options.get('sucursal_defecto')
         
         if dry_run:
-            self.stdout.write(self.style.WARNING('🔍 Modo DRY-RUN: No se guardará en BD'))
+            self.stdout.write(self.style.WARNING('Modo DRY-RUN: No se guardará en BD'))
         
-        self.stdout.write(f'📂 Cargando archivo: {archivo}')
+        self.stdout.write(f'Cargando archivo: {archivo}')
         
         # Detectar tipo de archivo
         if archivo.endswith('.csv'):
@@ -161,7 +161,7 @@ class Command(BaseCommand):
                 if ws:
                     self.stdout.write(
                         self.style.WARNING(
-                            f'⚠️ Hoja "{sheet_name}" no encontrada, usando: {ws.title}'
+                            f'Hoja "{sheet_name}" no encontrada, usando: {ws.title}'
                         )
                     )
             
@@ -176,8 +176,8 @@ class Command(BaseCommand):
             columnas_faltantes = [c for c in self.COLUMNAS_REQUERIDAS if c not in headers]
             if columnas_faltantes:
                 raise CommandError(
-                    f'❌ Faltan columnas requeridas: {", ".join(columnas_faltantes)}\n'
-                    f'📋 Columnas encontradas: {", ".join(headers)}'
+                    f'Faltan columnas requeridas: {", ".join(columnas_faltantes)}\n'
+                    f'Columnas encontradas: {", ".join(headers)}'
                 )
             
             # Procesar filas
@@ -190,7 +190,7 @@ class Command(BaseCommand):
                         trabajadores.append(trabajador)
                 except Exception as e:
                     self.stdout.write(
-                        self.style.ERROR(f'❌ Error fila {idx}: {e}')
+                        self.style.ERROR(f'Error fila {idx}: {e}')
                     )
                     continue
         
@@ -211,7 +211,7 @@ class Command(BaseCommand):
             # 1. VALIDAR Y LIMPIAR RUT
             rut = str(row.get('rut', '')).strip()
             if not rut:
-                self.stdout.write(self.style.ERROR(f'❌ Línea {linea}: RUT vacío'))
+                self.stdout.write(self.style.ERROR(f'Línea {linea}: RUT vacío'))
                 return None
             
             rut = InputSanitizer.sanitize_rut(rut)
@@ -220,14 +220,14 @@ class Command(BaseCommand):
             
             if not es_valido:
                 self.stdout.write(
-                    self.style.ERROR(f'❌ Línea {linea}: RUT inválido {rut} - {error}')
+                    self.style.ERROR(f'Línea {linea}: RUT inválido {rut} - {error}')
                 )
                 return None
             
             # 2. VALIDAR NOMBRE
             nombre = str(row.get('nombre', '')).strip()
             if not nombre:
-                self.stdout.write(self.style.ERROR(f'❌ Línea {linea}: Nombre vacío'))
+                self.stdout.write(self.style.ERROR(f'Línea {linea}: Nombre vacío'))
                 return None
             
             nombre = InputSanitizer.sanitize_string(nombre, max_length=200)
@@ -245,12 +245,12 @@ class Command(BaseCommand):
             
             if not seccion:
                 self.stdout.write(
-                    self.style.WARNING(f'⚠️  Línea {linea}: Sección vacía para {nombre}')
+                    self.style.WARNING(f'Línea {linea}: Sección vacía para {nombre}')
                 )
             
             if not contrato:
                 self.stdout.write(
-                    self.style.WARNING(f'⚠️  Línea {linea}: Tipo de contrato vacío para {nombre}')
+                    self.style.WARNING(f'Línea {linea}: Tipo de contrato vacío para {nombre}')
                 )
             
             # 4. CAMPOS OPCIONALES
@@ -310,7 +310,7 @@ class Command(BaseCommand):
                 except Exception as e:
                     self.stdout.write(
                         self.style.WARNING(
-                            f'⚠️  Línea {linea}: Formato de beneficio inválido "{beneficio_raw}": {e}'
+                            f'Línea {linea}: Formato de beneficio inválido "{beneficio_raw}": {e}'
                         )
                     )
                     beneficio = {'tipo': beneficio_raw, 'error': str(e)}
@@ -339,7 +339,7 @@ class Command(BaseCommand):
             
         except Exception as e:
             self.stdout.write(
-                self.style.ERROR(f'❌ Línea {linea}: Error parseando fila: {e}')
+                self.style.ERROR(f'Línea {linea}: Error parseando fila: {e}')
             )
             logger.error(f'Error parseando línea {linea}: {row} - {e}', exc_info=True)
             return None
@@ -359,7 +359,7 @@ class Command(BaseCommand):
         errores = 0
         sin_beneficio_count = 0
         
-        self.stdout.write(f'\n📊 Procesando {len(trabajadores)} trabajadores...\n')
+        self.stdout.write(f'\nProcesando {len(trabajadores)} trabajadores...\n')
         
         for idx, data in enumerate(trabajadores, start=1):
             try:
@@ -381,15 +381,15 @@ class Command(BaseCommand):
                         if sucursal_obj:
                             self.stdout.write(
                                 self.style.NOTICE(
-                                    f'  ℹ️  {data["nombre"]}: Usando sucursal por defecto {sucursal_defecto}'
+                                    f'  {data["nombre"]}: Usando sucursal por defecto {sucursal_defecto}'
                                 )
                             )
                     
                     if not sucursal_obj:
                         self.stdout.write(
-                            self.style.WARNING(
-                                f'  ⚠️  {data["nombre"]}: Sucursal "{sucursal_codigo}" no existe'
-                            )
+                                self.style.WARNING(
+                                    f'  {data["nombre"]}: Sucursal "{sucursal_codigo}" no existe'
+                                )
                         )
                 
                 # Verificar si existe
@@ -404,14 +404,14 @@ class Command(BaseCommand):
                             trabajador_existente.save()
                         
                         actualizados += 1
-                        estado = '🔄' if sin_beneficio else '↻'
+                        estado = 'SIN' if sin_beneficio else 'ACT'
                         msg = f'  {estado} {rut} - {data["nombre"]} (actualizado)'
                         if sin_beneficio:
                             msg += f' - SIN BENEFICIO: {motivo_sin_beneficio}'
                         self.stdout.write(self.style.WARNING(msg))
                     else:
                         self.stdout.write(
-                            self.style.NOTICE(f'  ⊘ {rut} - {data["nombre"]} (ya existe, omitido)')
+                            self.style.NOTICE(f'  {rut} - {data["nombre"]} (ya existe, omitido)')
                         )
                 else:
                     if not dry_run:
@@ -423,7 +423,7 @@ class Command(BaseCommand):
                         )
                     
                     creados += 1
-                    estado = '🔄' if sin_beneficio else '✓'
+                    estado = 'SIN' if sin_beneficio else 'OK'
                     msg = f'  {estado} {rut} - {data["nombre"]} (creado)'
                     if sin_beneficio:
                         msg += f' - SIN BENEFICIO: {motivo_sin_beneficio}'
@@ -432,37 +432,37 @@ class Command(BaseCommand):
             except Exception as e:
                 errores += 1
                 self.stdout.write(
-                    self.style.ERROR(f'  ✗ Error procesando {data.get("rut", "UNKNOWN")}: {e}')
+                    self.style.ERROR(f'  Error procesando {data.get("rut", "UNKNOWN")}: {e}')
                 )
                 logger.error(f'Error cargando trabajador {data}: {e}', exc_info=True)
         
         # Resumen
         self.stdout.write('\n' + '=' * 70)
         if dry_run:
-            self.stdout.write(self.style.WARNING('🔍 SIMULACIÓN (DRY-RUN) - No se guardó en BD'))
+            self.stdout.write(self.style.WARNING('SIMULACIÓN (DRY-RUN) - No se guardó en BD'))
         else:
-            self.stdout.write(self.style.SUCCESS('✅ CARGA COMPLETADA'))
+            self.stdout.write(self.style.SUCCESS('CARGA COMPLETADA'))
         
         self.stdout.write('=' * 70)
-        self.stdout.write(f'📊 Total procesados:           {len(trabajadores)}')
+        self.stdout.write(f'Total procesados:           {len(trabajadores)}')
         self.stdout.write(self.style.SUCCESS(f'  ✓ Creados:                   {creados}'))
         
         if actualizar:
-            self.stdout.write(self.style.WARNING(f'  ↻ Actualizados:              {actualizados}'))
+            self.stdout.write(self.style.WARNING(f'  Actualizados:              {actualizados}'))
         
         if sin_beneficio_count > 0:
-            self.stdout.write(self.style.NOTICE(f'  🔄 Sin beneficio:            {sin_beneficio_count}'))
+            self.stdout.write(self.style.NOTICE(f'  Sin beneficio:            {sin_beneficio_count}'))
         
         if errores > 0:
-            self.stdout.write(self.style.ERROR(f'  ✗ Errores:                   {errores}'))
+            self.stdout.write(self.style.ERROR(f'  Errores:                   {errores}'))
         
         self.stdout.write('=' * 70)
         
         if sin_beneficio_count > 0:
-            self.stdout.write('\nℹ️  Los trabajadores sin beneficio fueron cargados correctamente.')
+            self.stdout.write('\nLos trabajadores sin beneficio fueron cargados correctamente.')
             self.stdout.write('   Revisa las observaciones en la base de datos para conocer el motivo.')
         
         if not dry_run and (creados + actualizados) > 0:
-            self.stdout.write('\n💡 Trabajadores cargados exitosamente en el sistema')
+            self.stdout.write('\nTrabajadores cargados exitosamente en el sistema')
             self.stdout.write('   Los que tienen beneficio pueden generar tickets en el tótem')
 

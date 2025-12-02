@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { UserManagementDialog } from './UserManagementDialog';
+import { authService } from '../services/auth.service';
 
 const roles = [
   { id: 1, name: 'Administrador', users: 3, color: '#E12019', description: 'Acceso total al sistema' },
@@ -75,9 +76,8 @@ export function AdministradorModule() {
     const loadUsers = async () => {
       try {
         setLoadingUsers(true);
-        // Nota: Este endpoint puede no existir en el backend actual
-        // Se incluye como ejemplo. Verificar si existe /api/usuarios/
-        setSystemUsers([]);
+        const users = await authService.listUsers();
+        setSystemUsers(users || []);
       } catch (error) {
         console.error('Error loading users:', error);
         setSystemUsers([]);

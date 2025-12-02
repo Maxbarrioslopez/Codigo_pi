@@ -59,6 +59,18 @@ export interface ResetPasswordResponse {
     new_password?: string; // Si es temporal
 }
 
+export interface User {
+    id: number;
+    username: string;
+    email: string;
+    first_name: string;
+    last_name: string;
+    rol: 'admin' | 'rrhh' | 'guardia' | 'supervisor';
+    is_active: boolean;
+    last_login: string | null;
+    date_joined: string;
+}
+
 /**
  * Servicio Singleton para autenticación
  */
@@ -162,6 +174,18 @@ export class AuthService {
             return true;
         } catch {
             return false;
+        }
+    }
+
+    /**
+     * Listar todos los usuarios del sistema (solo admin)
+     */
+    async listUsers(): Promise<User[]> {
+        try {
+            const { data } = await apiClient.get<User[]>('usuarios/');
+            return data;
+        } catch (error) {
+            throw ErrorHandler.handle(error, 'AuthService.listUsers', false);
         }
     }
 }

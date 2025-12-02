@@ -253,3 +253,52 @@ def usuarios_reset_password(request):
     except Exception as e:
         logger.error(f"Error en usuarios_reset_password: {e}")
         return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def usuarios_list(request):
+    """
+    Lista todos los usuarios del sistema (solo admin)
+    ENDPOINT: GET /api/usuarios/
+    PERMISOS: Admin (JWT)
+    
+    RESPUESTA (200):
+    [
+        {
+            "id": 1,
+            "username": "admin.usuario",
+            "email": "admin@example.com",
+            "first_name": "Admin",
+            "last_name": "Usuario",
+            "rol": "admin",
+            "is_active": true,
+            "last_login": "2025-01-15T10:00:00Z",
+            "date_joined": "2025-01-01T08:00:00Z"
+        },
+        ...
+    ]
+    
+    ERRORES:
+        401: No autenticado
+        403: Sin permisos de administrador
+        500: Error interno del servidor
+    """
+    try:
+        # Verificar que el usuario es admin
+        if request.user.rol != 'admin' and not request.user.is_superuser:
+            return Response({'detail': 'Solo administradores pueden listar usuarios'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Obtener todos los usuarios
+        usuarios = Usuario.objects.all().values(
+            'id', 'username', 'email', 'first_name', 'last_name', 
+            'rol', 'is_active', 'last_login', 'date_joined'
+        )
+        
+        usuarios_list = list(usuarios)
+        return Response(usuarios_list, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Error en usuarios_list: {e}")
+        return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

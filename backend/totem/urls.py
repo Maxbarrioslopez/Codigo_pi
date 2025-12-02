@@ -22,6 +22,7 @@ urlpatterns = [
     path('auth/change-password/', views_auth.auth_change_password, name='auth_change_password'),
     
     # Gestión de Usuarios (admin)
+    path('usuarios/', views_auth.usuarios_list, name='usuarios_list'),
     path('usuarios/', views_auth.usuarios_create, name='usuarios_create'),
     path('usuarios/reset-password/', views_auth.usuarios_reset_password, name='usuarios_reset_password'),
     

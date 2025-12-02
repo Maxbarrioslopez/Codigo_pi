@@ -7,7 +7,6 @@ from . import views_trabajadores as trab_views
 from . import views_ciclos as ciclos_views
 from . import views_stock as stock_views
 from . import views_nomina as nomina_views
-from . import views_debug as debug_views
 from . import views_health as health_views
 
 urlpatterns = [
@@ -77,6 +76,5 @@ urlpatterns = [
     path('nomina/confirmar/', nomina_views.nomina_confirmar, name='nomina_confirmar'),
     path('nomina/historial/', nomina_views.nomina_historial, name='nomina_historial'),
 
-    # Debug
-    path('debug/user/', debug_views.debug_user, name='debug_user'),
+    # Debug (removido: views_debug no disponible)
 ]

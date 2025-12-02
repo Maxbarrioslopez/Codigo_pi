@@ -8,7 +8,7 @@ from rest_framework import status
 from totem.models import Ticket, TicketEvent, CajaFisica, Incidencia
 from totem.serializers import TicketSerializer
 from totem.permissions import IsGuardia, IsGuardiaOrAdmin
-from totem.exceptions import TotemBaseException
+from totem.exceptions import TotemBaseException, QRInvalidException, TicketExpiredException, TicketInvalidStateException, TicketNotFoundException, NoStockException
 from .services.guardia_service import GuardiaService
 import logging
 
@@ -87,6 +87,16 @@ def validar_ticket_guardia(request, uuid):
         )
         
         return Response(TicketSerializer(ticket).data, status=status.HTTP_200_OK)
+    except QRInvalidException as e:
+        return Response({'code': 'qr_invalid', 'message': str(e) or 'QR inválido o manipulado'}, status=status.HTTP_400_BAD_REQUEST)
+    except TicketExpiredException:
+        return Response({'code': 'ticket_expired', 'message': 'Ticket expirado'}, status=status.HTTP_410_GONE)
+    except TicketInvalidStateException as e:
+        return Response({'code': 'ticket_already_used', 'message': str(e) or 'Ticket ya entregado/anulado'}, status=status.HTTP_409_CONFLICT)
+    except NoStockException as e:
+        return Response({'code': 'no_stock', 'message': str(e) or 'Caja física no disponible'}, status=status.HTTP_409_CONFLICT)
+    except TicketNotFoundException:
+        return Response({'code': 'ticket_not_found', 'message': 'Ticket no encontrado'}, status=status.HTTP_404_NOT_FOUND)
     except TotemBaseException:
         raise
     except Exception as e:
@@ -267,6 +277,10 @@ def verificar_tiempo_restante(request, uuid):
         service = GuardiaService()
         resultado = service.verificar_ticket_tiempo_restante(uuid)
         return Response(resultado, status=status.HTTP_200_OK)
+    except TicketNotFoundException:
+        return Response({'code': 'ticket_not_found', 'message': 'Ticket no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+    except TicketExpiredException:
+        return Response({'code': 'ticket_expired', 'message': 'Ticket expirado'}, status=status.HTTP_410_GONE)
     except TotemBaseException:
         raise
     except Exception as e:

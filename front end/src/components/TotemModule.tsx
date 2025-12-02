@@ -4,9 +4,16 @@ import { trabajadorService } from '@/services/trabajador.service';
 import { ticketService } from '@/services/ticket.service';
 import { incidentService } from '@/services/incident.service';
 import { scheduleService } from '@/services/schedule.service';
+import { mapApiErrorToStateAndToast } from '@/lib/apiErrorMapping';
 import { RUTInput } from './form/RUTInput';
-import { BrowserMultiFormatReader, IScannerControls } from '@zxing/browser';
-import { BarcodeFormat, DecodeHintType } from '@zxing/library';
+import { IScannerControls } from '@zxing/browser';
+import TotemScannerPanel from '@/components/TotemScannerPanel';
+// Modular screens
+import TotemInitialScreen from '@/components/totem/TotemInitialScreen';
+import TotemValidatingScreen from '@/components/totem/TotemValidatingScreen';
+import TotemSuccessScreen from '@/components/totem/TotemSuccessScreen';
+import TotemNoStockScreen from '@/components/totem/TotemNoStockScreen';
+import TotemIncidentForm from '@/components/totem/TotemIncidentForm';
 
 type TotemScreen = 'initial' | 'validating' | 'success' | 'success-choice' | 'no-stock' | 'schedule-select' | 'schedule-confirm' | 'no-benefit' | 'error' | 'incident-form' | 'incident-sent' | 'incident-scan' | 'incident-status';
 
@@ -108,8 +115,7 @@ export function TotemModule() {
       setTicket(t);
       setCurrentScreen('success');
     } catch (e: any) {
-      setErrorMsg(e.message || e.detail || 'Error generando ticket');
-      setCurrentScreen('error');
+      mapApiErrorToStateAndToast(e, { setError: setErrorMsg, toState: setCurrentScreen });
     } finally { setLoading(false); }
   };
 
@@ -119,8 +125,7 @@ export function TotemModule() {
       await scheduleService.crearAgendamiento(rutEscaneado, fechaISO);
       setCurrentScreen('schedule-confirm');
     } catch (e: any) {
-      setErrorMsg(e.detail || 'Error agendando');
-      setCurrentScreen('error');
+      mapApiErrorToStateAndToast(e, { setError: setErrorMsg, toState: setCurrentScreen });
     } finally { setLoading(false); }
   };
 
@@ -131,8 +136,7 @@ export function TotemModule() {
       await incidentService.crearIncidencia({ trabajador_rut: rutEscaneado, tipo: selectedIncidentType, descripcion: incidentDescription, origen: 'totem' } as any);
       setCurrentScreen('incident-sent');
     } catch (e: any) {
-      setErrorMsg(e.detail || 'Error reportando incidencia');
-      setCurrentScreen('error');
+      mapApiErrorToStateAndToast(e, { setError: setErrorMsg, toState: setCurrentScreen });
     } finally { setLoading(false); }
   };
 
@@ -150,11 +154,15 @@ export function TotemModule() {
         <div className="max-w-2xl mx-auto bg-[#F8F8F8] rounded-xl shadow-2xl overflow-hidden min-h-[600px] md:min-h-[800px]" style={{ aspectRatio: '9/16' }}>
           {currentScreen === 'initial' && (
             <TotemInitialScreen
-              rutInput={rutInput}
-              onRutChange={setRutInput}
-              onScan={(rut?: string) => {
-                const rutToUse = rut || rutInput.trim();
+              onRutDetected={(rut) => {
+                setRutInput(rut);
+                setRutEscaneado(rut);
+                setCurrentScreen('validating');
+              }}
+              onManualRut={(rut) => {
+                const rutToUse = rut.trim();
                 if (rutToUse) {
+                  setRutInput(rutToUse);
                   setRutEscaneado(rutToUse);
                   setCurrentScreen('validating');
                 }
@@ -163,7 +171,9 @@ export function TotemModule() {
               onReportIncident={() => setCurrentScreen('incident-form')}
             />
           )}
-          {currentScreen === 'validating' && <TotemValidatingScreen loading={loading} errorMsg={errorMsg} steps={validationSteps} />}
+          {currentScreen === 'validating' && (
+            <TotemValidatingScreen />
+          )}
           {currentScreen === 'success-choice' && (
             <TotemSuccessChoice
               isWeekend={isWeekend}
@@ -174,17 +184,16 @@ export function TotemModule() {
           )}
           {currentScreen === 'success' && (
             <TotemSuccessScreen
-              ticket={ticket}
-              onFinish={() => {
-                setTicket(null);
-                setBeneficio(null);
-                setSelectedIncidentType('');
-                setIncidentDescription('');
-                setCurrentScreen('initial');
-              }}
+              beneficio={beneficio}
+              onGenerateTicket={generarTicket}
+              loading={loading}
             />
           )}
-          {currentScreen === 'no-stock' && <TotemNoStockScreen onSchedule={() => { setSelectedDay(''); setCurrentScreen('schedule-select'); }} onBack={() => setCurrentScreen('initial')} />}
+          {currentScreen === 'no-stock' && (
+            <TotemNoStockScreen
+              onSchedule={() => { setSelectedDay(''); setCurrentScreen('schedule-select'); }}
+            />
+          )}
           {currentScreen === 'schedule-select' && (
             <TotemScheduleSelect
               selectedDay={selectedDay}
@@ -213,14 +222,12 @@ export function TotemModule() {
           )}
           {currentScreen === 'incident-form' && (
             <TotemIncidentForm
-              selectedType={selectedIncidentType}
-              onSelectType={setSelectedIncidentType}
-              description={incidentDescription}
-              onDescriptionChange={setIncidentDescription}
-              submitting={loading}
-              errorMsg={errorMsg}
-              onSubmit={reportarIncidencia}
-              onCancel={() => setCurrentScreen('initial')}
+              onSubmit={(tipo, desc) => {
+                setSelectedIncidentType(tipo);
+                setIncidentDescription(desc);
+                reportarIncidencia();
+              }}
+              loading={loading}
             />
           )}
           {currentScreen === 'incident-sent' && <TotemIncidentSent onBack={() => setCurrentScreen('initial')} />}
@@ -230,7 +237,7 @@ export function TotemModule() {
   );
 }
 
-function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutInput, onRutChange }: {
+function LocalTotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutInput, onRutChange }: {
   onScan: (rut?: string) => void;
   onConsultIncident: () => void;
   onReportIncident: () => void;
@@ -239,7 +246,6 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
 }) {
   const [cameraActive, setCameraActive] = useState(true);
   const [cameraError, setCameraError] = useState('');
-  const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
 
   // Activar cámara automáticamente al montar
@@ -247,174 +253,11 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
     let mounted = true;
     let scanCount = 0;
     let warmupFrames = 10; // Ignorar primeros frames para estabilidad de cámara
-    // Usar MultiFormatReader con hints para soportar PDF417 (carnets chilenos), QR y códigos de barras
-    const hints = new Map();
-    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-      BarcodeFormat.PDF_417,
-      BarcodeFormat.QR_CODE,
-      BarcodeFormat.CODE_128,
-      BarcodeFormat.CODE_39,
-      BarcodeFormat.EAN_13,
-      BarcodeFormat.EAN_8,
-      BarcodeFormat.UPC_A,
-      BarcodeFormat.UPC_E
-    ]);
-    // Configurar tiempo entre intentos de decodificación (ms)
-    const codeReader = new BrowserMultiFormatReader(hints);
+    // El escaneo ahora lo maneja TotemScannerPanel con useScanner
 
     async function startScanner() {
       try {
-        if (!videoRef.current || !mounted) return;
-
-        console.log('>> Iniciando scanner...');
-
-        // Solicitar cámara: intentar trasera primero (móvil), luego frontal (fallback)
-        let stream;
-        try {
-          // Intentar cámara trasera (environment) - para móviles
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: 'environment',
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            }
-          });
-        } catch (e) {
-          // Si no hay cámara trasera, usar la frontal
-          console.log('>> Cámara trasera no disponible, usando frontal...');
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: 'user',
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            }
-          });
-        }
-
-        if (videoRef.current && mounted) {
-          videoRef.current.srcObject = stream;
-        }
-
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = devices.filter(d => d.kind === 'videoinput');
-        console.log(`>> ${videoDevices.length} cámara(s) disponible(s)`);
-        videoDevices.forEach((d, i) => console.log(`  ${i + 1}. ${d.label}`));
-
-        const controls = await codeReader.decodeFromVideoDevice(
-          undefined, // Usar la cámara ya configurada
-          videoRef.current,
-          (result, error) => {
-            scanCount++;
-            // Silenciar errores NotFoundException salvo cada 50 intentos
-            if (error && (error as any)?.name === 'NotFoundException') {
-              if (scanCount % 50 === 0) {
-                console.log(`>> Buscando código... (${scanCount} intentos)`);
-              }
-              return;
-            }
-
-            if (result && mounted) {
-              // Ignorar primeros frames para evitar captura temprana
-              if (warmupFrames > 0) {
-                warmupFrames--;
-                return;
-              }
-              const text = result.getText().trim();
-              const format = result.getBarcodeFormat();
-              console.log(`[OK] [Scan #${scanCount}] Código detectado!`, {
-                formato: format,
-                texto: text.substring(0, 50) + (text.length > 50 ? '...' : '')
-              });
-
-              // Múltiples patrones para detectar RUT
-              let rut = '';
-
-              // 1. Buscar patrón con puntos y guión: 12.345.678-9
-              const pattern1 = text.match(/(\d{1,2})\.(\d{3})\.(\d{3})[-](\d{1})/);
-              if (pattern1) {
-                rut = `${pattern1[1]}.${pattern1[2]}.${pattern1[3]}-${pattern1[4]}`;
-                console.log('  - Patrón 1 (con puntos):', rut);
-              } else {
-                // 2. Buscar patrón sin puntos pero con guión: 12345678-9
-                const pattern2 = text.match(/(\d{7,8})[-](\d{1})/);
-                if (pattern2) {
-                  const num = pattern2[1];
-                  const dv = pattern2[2];
-                  if (num.length === 8) {
-                    rut = `${num.slice(0, 2)}.${num.slice(2, 5)}.${num.slice(5, 8)}-${dv}`;
-                  } else {
-                    rut = `${num.slice(0, 1)}.${num.slice(1, 4)}.${num.slice(4, 7)}-${dv}`;
-                  }
-                  console.log('  - Patrón 2 (sin puntos):', rut);
-                } else {
-                  // 3. Buscar solo números: 123456789
-                  const pattern3 = text.match(/(\d{8,9})/);
-                  if (pattern3) {
-                    const numStr = pattern3[1];
-                    if (numStr.length === 9) {
-                      const num = numStr.slice(0, 8);
-                      const dv = numStr.slice(8);
-                      rut = `${num.slice(0, 2)}.${num.slice(2, 5)}.${num.slice(5, 8)}-${dv}`;
-                    } else if (numStr.length === 8) {
-                      const num = numStr.slice(0, 7);
-                      const dv = numStr.slice(7);
-                      rut = `${num.slice(0, 1)}.${num.slice(1, 4)}.${num.slice(4, 7)}-${dv}`;
-                    }
-                    console.log('  - Patrón 3 (solo números):', rut);
-                  }
-                }
-              }
-
-              // Solo aceptar PDF417 o QR_CODE con RUT válido
-              const isAcceptedFormat = String(format) === 'PDF_417' || String(format) === 'QR_CODE';
-              if (rut && isAcceptedFormat) {
-                console.log('>> RUT FINAL formateado:', rut);
-                console.log('>> Formato aceptado (carnet):', String(format));
-                onRutChange(rut);
-                // Reproducir sonido de éxito
-                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZUQ0PVKzn77BfGAg+ltryxnMpBSh+zPLaizsIGGS57OihUhELTKXh8bllHAU2jdXzzn0vBSF1xe/glEoODlOq5O+zYxoJPJPY88p2KwUme8rx3I0+CRZiturqpVMRC0mi4PK8aB8GM4/T8tGAMQYeb8Lv45ZPDRBWrefwsGIaCT6U2PLJdSsFKH7M8tqLOwgYZLns6KFSEQtMpeHxuWUcBTaN1fPOfS8FIXbF7+CUSg4OU6rk77NjGgk8k9jzynYrBSZ7yvHcjT4JFmK26uqlUxELSaLg8rxoHwYzj9Py0YAxBh5vwu/jlk8NEFat5/CwYhoJPpTY8sl1KwUofszy2os7CBhkuezooVIRC0yl4fG5ZRwFNo3V885+LwUhdsXv4JRKDg5TquTvs2MaCTyT2PPKdisFJnvK8dyNPgkWYrbq6qVTEQtJouDyvGgfBjOP0/LRgDEGHm/C7+OWTw0QVq3n8LBiGgk+lNjyyXUrBSh+zPLaizsIGGS57OihUhELTKXh8bllHAU2jdXzzn4vBSF2xe/glEoODlOq5O+zYxoJPJPY88p2KwUme8rx3I0+CRZiturqpVMRC0mi4PK8aB8GM4/T8tGAMQYeb8Lv45ZPDRBWrefwsGIaCT6U2PLJdSsFKH7M8tqLOwgYZLns6KFSEQtMpeHxuWUcBTaN1fPOfi8FIXbF7+CUSg4OU6rk77NjGgk8k9jzynYrBSZ7yvHcjT4JFmK26uqlUxELSaLg8rxoHwYzj9Py0YAxBh5vwu/jlk8NEFat5/CwYhoJPpTY8sl1KwUofszy2os7CBhkuezooVIRC0yl4fG5ZRwFNo3V885+LwUhdsXv4JRKDg5TquTvs2MaCTyT2PPKdisFJnvK8dyNPgkWYrbq6qVTEQtJouDyvGgfBjOP0/LRgDEGHm/C7+OWTw0Q==');
-                audio.volume = 0.3;
-                audio.play().catch(() => { });
-
-                // Detener scanner solo tras lectura válida del carnet
-                if (controlsRef.current) {
-                  controlsRef.current.stop();
-                  controlsRef.current = null;
-                  setCameraActive(false);
-                  console.log('>> Scanner detenido - Carnet capturado exitosamente');
-                }
-
-                // INICIAR VALIDACIÓN AUTOMÁTICA SIN CLICK
-                setTimeout(() => {
-                  onScan(rut);
-                }, 100);
-              } else if (isAcceptedFormat && !rut) {
-                // QR o PDF417 detectado pero sin RUT válido
-                if (scanCount % 20 === 0) {
-                  console.log('[WARN] Carnet detectado pero sin RUT válido extraído');
-                }
-              } else {
-                // Formato no aceptado (no es carnet)
-                if (scanCount % 30 === 0) {
-                  console.log('[WARN] Ignorando: se espera carnet, formato detectado:', String(format));
-                }
-              }
-            }
-            // Solo mostrar errores reales con menor frecuencia
-            if (error && (error as any)?.name !== 'NotFoundException') {
-              if (scanCount % 10 === 0) {
-                const name = (error as any)?.name || 'Error';
-                const msg = (error as any)?.message || String(error);
-                console.error('[ERROR] Error de scanner:', name, msg);
-              }
-            }
-          }
-        );
-
-        if (mounted) {
-          controlsRef.current = controls;
-          console.log('>> Scanner iniciado correctamente');
-        }
+        // El control de cámara lo gestiona TotemScannerPanel
       } catch (err: any) {
         if (mounted) {
           console.error('❌ Error starting camera:', err);
@@ -470,12 +313,12 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
           <div className="flex flex-col items-center w-full">
             {cameraActive ? (
               <div className="relative w-full mb-4">
-                <video
-                  ref={videoRef}
-                  className="w-full h-48 md:h-80 lg:h-[500px] object-cover rounded-lg bg-black"
-                  autoPlay
-                  playsInline
-                  muted
+                <TotemScannerPanel
+                  onRutDetected={(rut: string) => {
+                    onRutChange(rut);
+                    setTimeout(() => onScan(rut), 100);
+                  }}
+                  onError={(msg: string) => setCameraError(msg)}
                 />
                 <button
                   onClick={toggleCamera}
@@ -578,7 +421,7 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
   );
 }
 
-function TotemValidatingScreen({ loading, errorMsg, steps }: { loading?: boolean; errorMsg?: string; steps: { label: string; status: 'pending' | 'active' | 'complete' | 'error'; }[] }) {
+function LocalTotemValidatingScreen({ loading, errorMsg, steps }: { loading?: boolean; errorMsg?: string; steps: { label: string; status: 'pending' | 'active' | 'complete' | 'error'; }[] }) {
   return (
     <div className="h-full flex flex-col items-center justify-center p-8 md:p-12">
       <div className="mb-8 md:mb-12">
@@ -682,7 +525,7 @@ function TotemSuccessChoice({ isWeekend, onSameDay, onSchedule, beneficio }: {
   );
 }
 
-function TotemSuccessScreen({ ticket, onFinish }: { ticket: any; onFinish: () => void }) {
+function LocalTotemTicketScreen({ ticket, onFinish }: { ticket: any; onFinish: () => void }) {
   const nombreTrabajador = ticket?.trabajador?.nombre ?? '';
   const rutTrabajador = ticket?.trabajador?.rut ?? '';
   const codigoTicket = ticket?.uuid ?? '';
@@ -741,7 +584,7 @@ function TotemSuccessScreen({ ticket, onFinish }: { ticket: any; onFinish: () =>
   );
 }
 
-function TotemNoStockScreen({ onSchedule, onBack }: { onSchedule: () => void; onBack: () => void }) {
+function LocalTotemNoStockScreen({ onSchedule, onBack }: { onSchedule: () => void; onBack: () => void }) {
   return (
     <div className="h-full flex flex-col items-center justify-center p-12">
       <div className="w-32 h-32 bg-[#FF9F55] rounded-full flex items-center justify-center mb-8">
@@ -1100,7 +943,7 @@ function TotemErrorScreen({ onReportIncident, onRetry }: { onReportIncident: () 
   );
 }
 
-function TotemIncidentForm({
+function LocalTotemIncidentForm({
   selectedType,
   onSelectType,
   description,

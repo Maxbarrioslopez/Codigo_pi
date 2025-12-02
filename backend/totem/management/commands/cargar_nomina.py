@@ -20,6 +20,8 @@ Beneficio puede ser:
 
 Observaciones: Campo opcional para explicar por qué no recibe beneficio
 """
+     Nota: Uso orientado a desarrollo/operaciones manuales (dev-only).
+     No se ejecuta en runtime de la aplicación.
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction

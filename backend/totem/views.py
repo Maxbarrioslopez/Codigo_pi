@@ -24,7 +24,8 @@ from .services.incidencia_service import IncidenciaService
 from .exceptions import (
     TotemBaseException, RUTInvalidException, TrabajadorNotFoundException,
     TicketNotFoundException, TicketInvalidStateException, CupoExcedidoException,
-    AgendamientoInvalidException
+    AgendamientoInvalidException, NoCicloActivoException, ValidationException,
+    TicketExpiredException, NoStockException, QRInvalidException
 )
 import qrcode
 import logging
@@ -139,6 +140,14 @@ def crear_ticket(request):
         
         serializer = TicketSerializer(ticket)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+    except TrabajadorNotFoundException as e:
+        return Response({'code': 'rut_not_found', 'message': str(e) or 'Trabajador no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+    except RUTInvalidException as e:
+        return Response({'code': 'rut_invalid', 'message': str(e) or 'RUT inválido'}, status=status.HTTP_400_BAD_REQUEST)
+    except NoStockException as e:
+        return Response({'code': 'no_stock', 'message': str(e) or 'No hay stock disponible'}, status=status.HTTP_409_CONFLICT)
+    except TicketInvalidStateException as e:
+        return Response({'code': 'ticket_already_pending', 'message': str(e) or 'Ticket pendiente ya existe'}, status=status.HTTP_409_CONFLICT)
     except TotemBaseException:
         raise
     except Exception as e:
@@ -189,6 +198,8 @@ def estado_ticket(request, uuid):
         service = TicketService()
         ticket = service.obtener_estado_ticket(uuid)
         return Response(TicketSerializer(ticket).data)
+    except TicketNotFoundException:
+        return Response({'code': 'ticket_not_found', 'message': 'Ticket no encontrado'}, status=status.HTTP_404_NOT_FOUND)
     except TotemBaseException:
         raise
     except Exception as e:
@@ -238,6 +249,10 @@ def anular_ticket(request, uuid):
         service = TicketService()
         ticket = service.anular_ticket(uuid, razon=razon)
         return Response(TicketSerializer(ticket).data)
+    except TicketNotFoundException:
+        return Response({'code': 'ticket_not_found', 'message': 'Ticket no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+    except TicketInvalidStateException as e:
+        return Response({'code': 'ticket_invalid_state', 'message': str(e) or 'Estado inválido para anulación'}, status=status.HTTP_409_CONFLICT)
     except TotemBaseException:
         raise
     except Exception as e:
@@ -286,6 +301,10 @@ def reimprimir_ticket(request, uuid):
         service = TicketService()
         ticket = service.reimprimir_ticket(uuid)
         return Response(TicketSerializer(ticket).data)
+    except TicketNotFoundException:
+        return Response({'code': 'ticket_not_found', 'message': 'Ticket no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+    except TicketInvalidStateException as e:
+        return Response({'code': 'ticket_invalid_state', 'message': str(e) or 'No se puede reimprimir'}, status=status.HTTP_409_CONFLICT)
     except TotemBaseException:
         raise
     except Exception as e:
@@ -654,7 +673,7 @@ def cambiar_estado_incidencia(request, codigo):
     try:
         nuevo_estado = request.data.get('estado')
         if not nuevo_estado:
-            return Response({'detail': 'Falta campo estado'}, status=status.HTTP_400_BAD_REQUEST)
+            raise ValidationException(detail='Falta campo estado')
         
         service = IncidenciaService()
         incidencia = service.cambiar_estado(codigo, nuevo_estado)
@@ -692,7 +711,7 @@ def ciclo_activo(request):
     """
     ciclo = Ciclo.objects.filter(activo=True).order_by('-id').first()
     if not ciclo:
-        return Response({'detail': 'Sin ciclo activo'}, status=404)
+        raise NoCicloActivoException('Sin ciclo activo')
     return Response(CicloSerializer(ciclo).data)
 
 
@@ -746,7 +765,7 @@ def parametros_operativos(request):
     clave = request.data.get('clave')
     valor = request.data.get('valor')
     if not clave:
-        return Response({'detail': 'Falta clave'}, status=400)
+        raise ValidationException(detail='Falta clave')
     po, _created = ParametroOperativo.objects.get_or_create(clave=clave, defaults={'valor': valor or ''})
     if valor is not None:
         po.valor = valor

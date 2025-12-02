@@ -6,6 +6,11 @@ from .models import Trabajador, Ticket, TicketEvent, Incidencia, Agendamiento
 from .serializers import TrabajadorSerializer
 from .permissions import IsRRHHOrSupervisor
 from .utils_rut import clean_rut, valid_rut
+from .exceptions import (
+    TrabajadorNotFoundException,
+    RUTInvalidException,
+    ValidationException,
+)
 
 
 @api_view(['GET', 'POST'])
@@ -102,12 +107,12 @@ def trabajadores_list_create(request):
     payload = request.data
     rut = clean_rut(payload.get('rut', ''))
     if not rut or not valid_rut(rut):
-        return Response({'detail': 'RUT inválido'}, status=400)
+        raise RUTInvalidException()
     nombre = payload.get('nombre')
     if not nombre:
-        return Response({'detail': 'Nombre requerido'}, status=400)
+        raise ValidationException(detail='Nombre requerido')
     if Trabajador.objects.filter(rut__iexact=rut).exists():
-        return Response({'detail': 'Trabajador ya existe'}, status=400)
+        raise ValidationException(detail='Trabajador ya existe')
     t = Trabajador.objects.create(rut=rut, nombre=nombre, beneficio_disponible=payload.get('beneficio_disponible') or {})
     return Response(TrabajadorSerializer(t).data, status=201)
 
@@ -187,7 +192,7 @@ def trabajador_detail(request, rut):
     try:
         t = Trabajador.objects.get(rut__iexact=rc)
     except Trabajador.DoesNotExist:
-        return Response({'detail': 'No encontrado'}, status=404)
+        raise TrabajadorNotFoundException()
 
     if request.method == 'GET':
         return Response(TrabajadorSerializer(t).data)
@@ -260,7 +265,7 @@ def trabajador_bloquear(request, rut):
     try:
         t = Trabajador.objects.get(rut__iexact=rc)
     except Trabajador.DoesNotExist:
-        return Response({'detail': 'No encontrado'}, status=404)
+        raise TrabajadorNotFoundException()
     bd = t.beneficio_disponible or {}
     bd['tipo'] = 'BLOQUEADO'
     bd['motivo'] = request.data.get('motivo', 'Bloqueado por RRHH')
@@ -315,7 +320,7 @@ def trabajador_desbloquear(request, rut):
     try:
         t = Trabajador.objects.get(rut__iexact=rc)
     except Trabajador.DoesNotExist:
-        return Response({'detail': 'No encontrado'}, status=404)
+        raise TrabajadorNotFoundException()
     bd = t.beneficio_disponible or {}
     if bd.get('tipo') == 'BLOQUEADO':
         bd['tipo'] = 'SIN_BENEFICIO'

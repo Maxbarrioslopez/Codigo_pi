@@ -2,6 +2,9 @@
 Management command para crear usuarios de prueba por defecto.
 Crea: admin, guardia, rrhh
 Uso: python manage.py crear_usuarios_test
+
+Nota: Uso orientado a desarrollo/operaciones manuales (dev-only).
+No se ejecuta en runtime de la aplicación.
 """
 from django.core.management.base import BaseCommand
 from totem.models import Usuario

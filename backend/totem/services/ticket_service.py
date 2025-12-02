@@ -25,7 +25,8 @@ from totem.exceptions import (
     NoBeneficioException,
     NoStockException,
     QRInvalidException,
-    ConcurrencyException
+    ConcurrencyException,
+    NoCicloActivoException
 )
 
 logger = logging.getLogger(__name__)
@@ -89,10 +90,17 @@ class TicketService:
         else:
             ciclo = Ciclo.objects.get(id=ciclo_id)
         
-        # Verificar que no haya retirado ya en este ciclo
+        # Verificar que no haya ticket pendiente existente en el ciclo
         es_valido, error = TicketValidator.validar_unicidad_retiro(rut_limpio, ciclo.id)
         if not es_valido:
             raise TicketInvalidStateException(error)
+        pendiente_existente = Ticket.objects.filter(
+            trabajador=trabajador,
+            ciclo=ciclo,
+            estado='pendiente'
+        ).exists()
+        if pendiente_existente:
+            raise TicketInvalidStateException('Ya existe un ticket pendiente para este trabajador en el ciclo actual')
         
         # Verificar stock
         stock = StockSucursal.objects.filter(
@@ -347,17 +355,10 @@ class TicketService:
         }
     
     def _obtener_ciclo_activo(self) -> Ciclo:
-        """Obtiene el ciclo activo actual."""
+        """Obtiene el ciclo activo actual o lanza excepción si no existe."""
         ciclo = Ciclo.objects.filter(activo=True).first()
         if not ciclo:
-            # Si no hay ciclo activo, crear uno por defecto
-            hoy = timezone.now().date()
-            ciclo = Ciclo.objects.create(
-                fecha_inicio=hoy,
-                fecha_fin=hoy + timedelta(days=60),
-                activo=True
-            )
-            logger.info(f"Ciclo activo creado automáticamente: {ciclo.id}")
+            raise NoCicloActivoException('No hay ciclo activo configurado')
         return ciclo
     
     def _generar_imagen_qr(self, payload: str, identificador: str) -> ContentFile:

@@ -26,7 +26,7 @@ function DashboardLayout() {
       { id: 'totem' as const, label: 'Tótem Autoservicio', icon: '◨', roles: ['admin'] },
       { id: 'guardia' as const, label: 'Panel Guardia', icon: '◆', roles: ['guardia', 'admin'] },
       { id: 'rrhh' as const, label: 'Dashboard RRHH', icon: '▲', roles: ['rrhh', 'admin', 'supervisor'] },
-      { id: 'stock' as const, label: 'Gestión de Stock', icon: '◙', roles: ['admin', 'rrhh'] },
+      { id: 'stock' as const, label: 'Gestión de Stock', icon: '◙', roles: ['rrhh', 'guardia'] },
       { id: 'nomina' as const, label: 'Gestión de Nómina', icon: '◉', roles: ['admin', 'rrhh'] },
       { id: 'admin' as const, label: 'Administración', icon: '⚙', roles: ['admin'] },
     ];

@@ -257,20 +257,28 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
 
         console.log('🎥 Iniciando scanner...');
 
-        // Solicitar cámara con restricciones específicas para mejor calidad
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: 'environment' },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
-            // Intentar enfoque continuo y zoom si el dispositivo lo soporta
-            // Algunos navegadores soportan constraints extendidos vía any-cast
-            // @ts-expect-error extended constraints
-            focusMode: 'continuous',
-            // @ts-expect-error extended constraints
-            zoom: 1.5
-          }
-        });
+        // Solicitar cámara: intentar trasera primero (móvil), luego frontal (fallback)
+        let stream;
+        try {
+          // Intentar cámara trasera (environment) - para móviles
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: 'environment',
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            }
+          });
+        } catch (e) {
+          // Si no hay cámara trasera, usar la frontal
+          console.log('📷 Cámara trasera no disponible, usando frontal...');
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: 'user',
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            }
+          });
+        }
 
         if (videoRef.current && mounted) {
           videoRef.current.srcObject = stream;
@@ -424,31 +432,31 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
   };
 
   return (
-    <div className="h-full flex flex-col p-6 md:p-12">
+    <div className="h-screen w-screen flex flex-col p-3 md:p-6 lg:p-12 bg-white">
       {/* Header */}
-      <div className="text-center mb-8">
-        <div className="w-24 h-24 bg-gradient-to-br from-[#E12019] to-[#B51810] rounded-xl flex items-center justify-center mx-auto mb-6">
-          <span className="text-white" style={{ fontSize: '32px', fontWeight: 700 }}>TML</span>
+      <div className="text-center mb-4 md:mb-8">
+        <div className="w-16 h-16 md:w-24 md:h-24 bg-gradient-to-br from-[#E12019] to-[#B51810] rounded-xl flex items-center justify-center mx-auto mb-3 md:mb-6">
+          <span className="text-white text-xl md:text-3xl" style={{ fontWeight: 700 }}>TML</span>
         </div>
       </div>
 
       {/* Central Content */}
-      <div className="flex-1 flex flex-col items-center justify-center">
-        <div style={{ fontSize: '32px', fontWeight: 700 }} className="text-[#333333] mb-3 text-center">
+      <div className="flex-1 flex flex-col items-center justify-center overflow-y-auto">
+        <div style={{ fontSize: '20px', fontWeight: 700 }} className="text-[#333333] mb-2 md:mb-3 text-center">
           Escanea tu Cédula de Identidad
         </div>
-        <p className="text-[#6B6B6B] mb-8 text-center max-w-md" style={{ fontSize: '16px', lineHeight: '1.5' }}>
-          Acerca la parte posterior de tu carnet (código de barras)
+        <p className="text-[#6B6B6B] mb-4 md:mb-8 text-center max-w-md text-sm md:text-base" style={{ lineHeight: '1.5' }}>
+          Acerca la parte posterior de tu carnet
         </p>
 
         {/* Camera View + RUT Input */}
-        <div className="bg-white border-4 border-dashed border-[#E12019] rounded-xl p-4 md:p-6 mb-6 w-full max-w-2xl relative">
+        <div className="bg-white border-4 border-dashed border-[#E12019] rounded-xl p-2 md:p-4 mb-4 md:mb-6 w-full max-w-lg md:max-w-2xl relative">
           <div className="flex flex-col items-center w-full">
             {cameraActive ? (
               <div className="relative w-full mb-4">
                 <video
                   ref={videoRef}
-                  className="w-full h-96 md:h-[500px] object-cover rounded-lg bg-black"
+                  className="w-full h-48 md:h-80 lg:h-[500px] object-cover rounded-lg bg-black"
                   autoPlay
                   playsInline
                   muted
@@ -458,49 +466,49 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
                   className="absolute top-2 right-2 p-2 bg-[#E12019] text-white rounded-full hover:bg-[#B51810] transition-colors shadow-lg z-10"
                   title="Desactivar cámara"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4 md:w-5 md:h-5" />
                 </button>
-                {/* Marco de guía para centrar el QR - MÁS GRANDE */}
+                {/* Marco de guía para centrar el QR */}
                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                   <div className="relative">
-                    {/* Esquinas del marco - área más amplia */}
-                    <div className="w-72 h-72 md:w-80 md:h-80 relative">
+                    {/* Esquinas del marco - responsive */}
+                    <div className="w-40 h-40 md:w-64 md:h-64 lg:w-80 lg:h-80 relative">
                       {/* Esquina superior izquierda */}
-                      <div className="absolute top-0 left-0 w-16 h-16 border-t-[6px] border-l-[6px] border-[#E12019] rounded-tl-lg"></div>
+                      <div className="absolute top-0 left-0 w-10 h-10 md:w-16 md:h-16 border-t-[4px] md:border-t-[6px] border-l-[4px] md:border-l-[6px] border-[#E12019] rounded-tl-lg"></div>
                       {/* Esquina superior derecha */}
-                      <div className="absolute top-0 right-0 w-16 h-16 border-t-[6px] border-r-[6px] border-[#E12019] rounded-tr-lg"></div>
+                      <div className="absolute top-0 right-0 w-10 h-10 md:w-16 md:h-16 border-t-[4px] md:border-t-[6px] border-r-[4px] md:border-r-[6px] border-[#E12019] rounded-tr-lg"></div>
                       {/* Esquina inferior izquierda */}
-                      <div className="absolute bottom-0 left-0 w-16 h-16 border-b-[6px] border-l-[6px] border-[#E12019] rounded-bl-lg"></div>
+                      <div className="absolute bottom-0 left-0 w-10 h-10 md:w-16 md:h-16 border-b-[4px] md:border-b-[6px] border-l-[4px] md:border-l-[6px] border-[#E12019] rounded-bl-lg"></div>
                       {/* Esquina inferior derecha */}
-                      <div className="absolute bottom-0 right-0 w-16 h-16 border-b-[6px] border-r-[6px] border-[#E12019] rounded-br-lg"></div>
+                      <div className="absolute bottom-0 right-0 w-10 h-10 md:w-16 md:h-16 border-b-[4px] md:border-b-[6px] border-r-[4px] md:border-r-[6px] border-[#E12019] rounded-br-lg"></div>
                       {/* Línea de escaneo animada */}
                       <div className="absolute inset-x-0 h-1 bg-[#E12019] animate-pulse" style={{
                         top: '50%',
                         boxShadow: '0 0 15px #E12019'
                       }}></div>
                       {/* Punto central de referencia */}
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-[#E12019] rounded-full animate-pulse"></div>
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 md:w-4 md:h-4 bg-[#E12019] rounded-full animate-pulse"></div>
                     </div>
                   </div>
                 </div>
               </div>
             ) : (
               <>
-                <Scan className="w-24 h-24 text-[#E12019] mb-4" />
+                <Scan className="w-16 h-16 md:w-24 md:h-24 text-[#E12019] mb-4" />
                 <button
                   onClick={toggleCamera}
-                  className="mb-4 px-6 py-3 bg-[#E12019] text-white rounded-lg hover:bg-[#B51810] transition-colors flex items-center gap-2 shadow-md"
-                  style={{ fontSize: '16px', fontWeight: 600 }}
+                  className="mb-4 px-4 md:px-6 py-2 md:py-3 bg-[#E12019] text-white rounded-lg hover:bg-[#B51810] transition-colors flex items-center gap-2 shadow-md text-sm md:text-base"
+                  style={{ fontWeight: 600 }}
                 >
-                  <Camera className="w-5 h-5" />
+                  <Camera className="w-4 h-4 md:w-5 md:h-5" />
                   Activar Cámara
                 </button>
               </>
             )}
 
             {cameraError && (
-              <div className="mb-4 p-3 bg-[#FFE5E5] border border-[#E12019] rounded-lg">
-                <p className="text-[#E12019] text-center" style={{ fontSize: '12px' }}>
+              <div className="mb-4 p-3 bg-[#FFE5E5] border border-[#E12019] rounded-lg w-full">
+                <p className="text-[#E12019] text-center text-xs md:text-sm">
                   {cameraError}
                 </p>
               </div>

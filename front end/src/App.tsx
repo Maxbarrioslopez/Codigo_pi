@@ -9,6 +9,7 @@ import { GuardiaModule } from './components/GuardiaModule';
 import { RRHHModuleNew } from './components/RRHHModuleNew';
 import { AdministradorModule } from './components/AdministradorModule';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
+import { Toaster } from './components/ui/toaster';
 import { Menu, X, LogOut } from 'lucide-react';
 
 // Layout principal con sidebar para usuarios autenticados
@@ -205,6 +206,7 @@ export default function App() {
           {/* Ruta 404 - Redirige al Tótem */}
           <Route path="*" element={<Navigate to="/totem" replace />} />
         </Routes>
+        <Toaster />
       </AuthProvider>
     </BrowserRouter>
   );

@@ -245,42 +245,44 @@ export function RRHHModuleNew() {
                                     </DialogTrigger>
                                     <DialogContent className="w-full max-w-xs sm:max-w-md md:max-w-lg">
                                         <DialogHeader>
-                                            <DialogTitle>Agregar Nuevo Trabajador</DialogTitle>
+                                            <DialogTitle className="text-[#333333] text-base md:text-lg font-semibold">Agregar Nuevo Trabajador</DialogTitle>
                                         </DialogHeader>
                                         <div className="space-y-4">
                                             <div>
-                                                <Label className="text-sm">RUT</Label>
+                                                <Label className="text-sm font-medium text-[#333333]">RUT</Label>
                                                 <Input
                                                     placeholder="12.345.678-9"
                                                     value={trabajadorForm.rut || ''}
                                                     onChange={(e) => setTrabajadorForm({ ...trabajadorForm, rut: e.target.value })}
-                                                    className="text-sm"
+                                                    className="text-sm h-10 border-2 border-[#E0E0E0] rounded-lg mt-1"
                                                 />
                                             </div>
                                             <div>
-                                                <Label className="text-sm">Nombre Completo</Label>
+                                                <Label className="text-sm font-medium text-[#333333]">Nombre Completo</Label>
                                                 <Input
                                                     placeholder="Nombre completo..."
                                                     value={trabajadorForm.nombre || ''}
                                                     onChange={(e) => setTrabajadorForm({ ...trabajadorForm, nombre: e.target.value })}
-                                                    className="text-sm"
+                                                    className="text-sm h-10 border-2 border-[#E0E0E0] rounded-lg mt-1"
                                                 />
                                             </div>
                                             <div>
-                                                <Label className="text-sm">Sección</Label>
+                                                <Label className="text-sm font-medium text-[#333333]">Sección</Label>
                                                 <Input
                                                     placeholder="Producción, Logística, etc."
                                                     value={trabajadorForm.nombre || ''}
                                                     onChange={(e) => setTrabajadorForm({ ...trabajadorForm, nombre: e.target.value })}
-                                                    className="text-sm"
+                                                    className="text-sm h-10 border-2 border-[#E0E0E0] rounded-lg mt-1"
                                                 />
                                             </div>
-                                            <Button
-                                                onClick={handleAddTrabajador}
-                                                className="w-full bg-[#017E49] hover:bg-[#015A34] text-white text-sm"
-                                            >
-                                                Crear Trabajador
-                                            </Button>
+                                            <div className="pt-2">
+                                                <Button
+                                                    onClick={handleAddTrabajador}
+                                                    className="w-full bg-[#017E49] hover:bg-[#015A34] text-white text-sm font-medium py-2 h-10"
+                                                >
+                                                    Crear Trabajador
+                                                </Button>
+                                            </div>
                                         </div>
                                     </DialogContent>
                                 </Dialog>
@@ -338,24 +340,26 @@ export function RRHHModuleNew() {
                                     </DialogTrigger>
                                     <DialogContent className="w-full max-w-xs sm:max-w-md">
                                         <DialogHeader>
-                                            <DialogTitle>Crear Nuevo Ciclo</DialogTitle>
+                                            <DialogTitle className="text-[#333333] text-base md:text-lg font-semibold">Crear Nuevo Ciclo</DialogTitle>
                                         </DialogHeader>
                                         <div className="space-y-4">
                                             <div>
-                                                <Label className="text-sm">Nombre</Label>
+                                                <Label className="text-sm font-medium text-[#333333]">Nombre</Label>
                                                 <Input
                                                     placeholder="Ciclo 2024-01"
                                                     value={cicloForm.fecha_inicio || ''}
                                                     onChange={(e) => setCicloForm({ ...cicloForm, fecha_inicio: e.target.value })}
-                                                    className="text-sm"
+                                                    className="text-sm h-10 border-2 border-[#E0E0E0] rounded-lg mt-1"
                                                 />
                                             </div>
-                                            <Button
-                                                onClick={handleAddCiclo}
-                                                className="w-full bg-[#017E49] hover:bg-[#015A34] text-white text-sm"
-                                            >
-                                                Crear Ciclo
-                                            </Button>
+                                            <div className="pt-2">
+                                                <Button
+                                                    onClick={handleAddCiclo}
+                                                    className="w-full bg-[#017E49] hover:bg-[#015A34] text-white text-sm font-medium py-2 h-10"
+                                                >
+                                                    Crear Ciclo
+                                                </Button>
+                                            </div>
                                         </div>
                                     </DialogContent>
                                 </Dialog>
@@ -401,36 +405,38 @@ export function RRHHModuleNew() {
                                 <Dialog open={showNominaPreview} onOpenChange={setShowNominaPreview}>
                                     <DialogContent className="w-full max-w-xs sm:max-w-md md:max-w-lg max-h-[80vh] overflow-y-auto">
                                         <DialogHeader>
-                                            <DialogTitle>Preview Nómina - Ciclo {ciclo?.id}</DialogTitle>
+                                            <DialogTitle className="text-[#333333] text-base md:text-lg font-semibold">Preview Nómina - Ciclo {ciclo?.id}</DialogTitle>
                                         </DialogHeader>
                                         <div className="space-y-4">
-                                            <div className="grid grid-cols-2 gap-4 text-xs md:text-sm">
+                                            <div className="grid grid-cols-2 gap-4 text-xs md:text-sm bg-[#F8F8F8] rounded-lg p-3">
                                                 <div>
-                                                    <span className="text-[#6B6B6B]">Total Trabajadores</span>
-                                                    <p className="font-bold text-[#333333]">{nominaPreview.total_trabajadores}</p>
+                                                    <span className="text-[#6B6B6B] text-xs">Total Trabajadores</span>
+                                                    <p className="font-bold text-[#333333] text-base">{nominaPreview.total_trabajadores}</p>
                                                 </div>
                                                 <div>
-                                                    <span className="text-[#6B6B6B]">Total Beneficios</span>
-                                                    <p className="font-bold text-[#333333]">${nominaPreview.total_beneficios.toLocaleString()}</p>
+                                                    <span className="text-[#6B6B6B] text-xs">Total Beneficios</span>
+                                                    <p className="font-bold text-[#017E49] text-base">${nominaPreview.total_beneficios.toLocaleString()}</p>
                                                 </div>
                                             </div>
                                             <div className="border-t border-[#E0E0E0] pt-4">
-                                                <h4 className="font-semibold text-[#333333] text-sm mb-2">Detalles</h4>
+                                                <h4 className="font-semibold text-[#333333] text-sm mb-3">Detalles de Beneficios</h4>
                                                 <div className="max-h-48 overflow-y-auto text-xs">
                                                     {nominaPreview.detalles.map((det) => (
-                                                        <div key={det.rut} className="flex justify-between items-center py-1 border-b border-[#E0E0E0] last:border-0">
-                                                            <span className="text-[#333333] truncate">{det.nombre}</span>
-                                                            <span className="text-[#E12019] font-semibold">${det.beneficio_asignado}</span>
+                                                        <div key={det.rut} className="flex justify-between items-center py-2 border-b border-[#E0E0E0] last:border-0">
+                                                            <span className="text-[#333333] truncate flex-1">{det.nombre}</span>
+                                                            <span className="text-[#017E49] font-semibold ml-2">${det.beneficio_asignado}</span>
                                                         </div>
                                                     ))}
                                                 </div>
                                             </div>
-                                            <Button
-                                                onClick={handleConfirmarNomina}
-                                                className="w-full bg-[#017E49] hover:bg-[#015A34] text-white text-sm"
-                                            >
-                                                Confirmar Nómina
-                                            </Button>
+                                            <div className="pt-2">
+                                                <Button
+                                                    onClick={handleConfirmarNomina}
+                                                    className="w-full bg-[#017E49] hover:bg-[#015A34] text-white text-sm font-medium py-2 h-auto"
+                                                >
+                                                    Confirmar Nómina
+                                                </Button>
+                                            </div>
                                         </div>
                                     </DialogContent>
                                 </Dialog>

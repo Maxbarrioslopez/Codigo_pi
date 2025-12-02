@@ -673,7 +673,7 @@ function TotemSuccessScreen({ ticket, onFinish }: { ticket: any; onFinish: () =>
   const nombreTrabajador = ticket?.trabajador?.nombre ?? '';
   const rutTrabajador = ticket?.trabajador?.rut ?? '';
   const codigoTicket = ticket?.uuid ?? '';
-  
+
   return (
     <div className="h-full flex flex-col items-center justify-center p-6 md:p-8">
       <div className="w-24 h-24 md:w-32 md:h-32 bg-[#017E49] rounded-full flex items-center justify-center mb-4 md:mb-6">

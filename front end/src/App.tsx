@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import LoginModule from './components/LoginModule';
 import { useState } from 'react';
@@ -8,20 +8,36 @@ import { TotemModule } from './components/TotemModule';
 import { GuardiaModule } from './components/GuardiaModule';
 import { RRHHModuleNew } from './components/RRHHModuleNew';
 import { AdministradorModule } from './components/AdministradorModule';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, LogOut } from 'lucide-react';
 
 // Layout principal con sidebar para usuarios autenticados
 function DashboardLayout() {
-  const [currentSection, setCurrentSection] = useState<'design-system' | 'totem' | 'guardia' | 'rrhh' | 'admin'>('design-system');
+  const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const sections = [
-    { id: 'design-system', label: 'Design System', icon: '🎨' },
-    { id: 'totem', label: 'Tótem Autoservicio', icon: '🖥️' },
-    { id: 'guardia', label: 'Panel Guardia', icon: '👮' },
-    { id: 'rrhh', label: 'Dashboard RRHH', icon: '📊' },
-    { id: 'admin', label: 'Administración', icon: '⚙️' },
-  ] as const;
+  // Determinar qué secciones mostrar según el rol
+  const getSections = () => {
+    const allSections = [
+      { id: 'design-system' as const, label: 'Design System', icon: '🎨', roles: ['admin'] },
+      { id: 'totem' as const, label: 'Tótem Autoservicio', icon: '🖥️', roles: ['admin'] },
+      { id: 'guardia' as const, label: 'Panel Guardia', icon: '👮', roles: ['guardia', 'admin'] },
+      { id: 'rrhh' as const, label: 'Dashboard RRHH', icon: '📊', roles: ['rrhh', 'admin', 'supervisor'] },
+      { id: 'admin' as const, label: 'Administración', icon: '⚙️', roles: ['admin'] },
+    ];
+
+    return allSections.filter(s => s.roles.includes(user?.rol || ''));
+  };
+
+  const sections = getSections();
+
+  // Si el usuario solo tiene acceso a una sección, mostrar directamente esa
+  const [currentSection, setCurrentSection] = useState(
+    sections.length === 1 ? sections[0].id : 'design-system'
+  );
+
+  const handleLogout = () => {
+    logout();
+  };
 
   return (
     <div className="min-h-screen bg-[#F8F8F8]">
@@ -35,44 +51,65 @@ function DashboardLayout() {
               </div>
               <div className="min-w-0">
                 <h1 className="text-sm md:text-base font-bold text-[#333333] truncate">Sistema Retiro Digital</h1>
-                <p className="text-xs text-[#6B6B6B] hidden sm:block">Tres Montes Lucchetti</p>
+                <p className="text-xs text-[#6B6B6B] hidden sm:block">{user?.rol?.toUpperCase()}</p>
               </div>
             </div>
-            <button
-              onClick={() => setMenuOpen(!menuOpen)}
-              className="lg:hidden p-2 hover:bg-[#F8F8F8] rounded-lg"
-            >
-              {menuOpen ? <X className="w-5 h-5 text-[#333333]" /> : <Menu className="w-5 h-5 text-[#333333]" />}
-            </button>
+            <div className="flex items-center gap-2 md:gap-4">
+              <button
+                onClick={handleLogout}
+                className="hidden md:flex items-center gap-2 px-3 md:px-4 py-2 rounded-lg text-sm text-[#E12019] hover:bg-[#FFE5E5] transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                Salir
+              </button>
+              <button
+                onClick={() => setMenuOpen(!menuOpen)}
+                className="lg:hidden p-2 hover:bg-[#F8F8F8] rounded-lg"
+              >
+                {menuOpen ? <X className="w-5 h-5 text-[#333333]" /> : <Menu className="w-5 h-5 text-[#333333]" />}
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
       <div className="flex">
-        {/* Sidebar Navigation - Responsive */}
-        <aside className={`${menuOpen ? 'block' : 'hidden'} lg:block w-48 md:w-64 bg-white border-r-2 border-[#E0E0E0] min-h-[calc(100vh-80px)] sticky top-[80px] overflow-y-auto`}>
-          <nav className="p-2 md:p-4">
-            <ul className="space-y-1 md:space-y-2">
-              {sections.map((section) => (
-                <li key={section.id}>
+        {/* Sidebar Navigation - Solo mostrar si hay múltiples secciones */}
+        {sections.length > 1 && (
+          <aside className={`${menuOpen ? 'block' : 'hidden'} lg:block w-48 md:w-64 bg-white border-r-2 border-[#E0E0E0] min-h-[calc(100vh-80px)] sticky top-[80px] overflow-y-auto`}>
+            <nav className="p-2 md:p-4">
+              <ul className="space-y-1 md:space-y-2">
+                {sections.map((section) => (
+                  <li key={section.id}>
+                    <button
+                      onClick={() => {
+                        setCurrentSection(section.id);
+                        setMenuOpen(false);
+                      }}
+                      className={`w-full text-left px-3 md:px-4 py-2 md:py-3 rounded-lg md:rounded-xl transition-all text-sm md:text-base ${currentSection === section.id
+                          ? 'bg-[#E12019] text-white'
+                          : 'text-[#333333] hover:bg-[#F8F8F8]'
+                        }`}
+                    >
+                      <span className="mr-2">{section.icon}</span>
+                      {section.label}
+                    </button>
+                  </li>
+                ))}
+                {/* Botón de salir en móvil */}
+                <li className="md:hidden mt-4 pt-4 border-t border-[#E0E0E0]">
                   <button
-                    onClick={() => {
-                      setCurrentSection(section.id);
-                      setMenuOpen(false);
-                    }}
-                    className={`w-full text-left px-3 md:px-4 py-2 md:py-3 rounded-lg md:rounded-xl transition-all text-sm md:text-base ${currentSection === section.id
-                      ? 'bg-[#E12019] text-white'
-                      : 'text-[#333333] hover:bg-[#F8F8F8]'
-                      }`}
+                    onClick={handleLogout}
+                    className="w-full text-left px-3 py-2 rounded-lg text-sm text-[#E12019] hover:bg-[#FFE5E5] transition-colors flex items-center gap-2"
                   >
-                    <span className="mr-2">{section.icon}</span>
-                    {section.label}
+                    <LogOut className="w-4 h-4" />
+                    Salir
                   </button>
                 </li>
-              ))}
-            </ul>
-          </nav>
-        </aside>
+              </ul>
+            </nav>
+          </aside>
+        )}
 
         {/* Main Content - Responsive */}
         <main className="flex-1 p-3 md:p-6 lg:p-8">
@@ -85,6 +122,11 @@ function DashboardLayout() {
       </div>
     </div>
   );
+}
+
+// Wrapper para usar el hook de Auth
+function DashboardLayoutWrapper() {
+  return <DashboardLayout />;
 }
 
 export default function App() {
@@ -103,7 +145,7 @@ export default function App() {
             path="/dashboard"
             element={
               <ProtectedRoute allowedRoles={['rrhh', 'guardia', 'admin', 'supervisor']}>
-                <DashboardLayout />
+                <DashboardLayoutWrapper />
               </ProtectedRoute>
             }
           />
@@ -113,7 +155,7 @@ export default function App() {
             path="/guardia"
             element={
               <ProtectedRoute allowedRoles={['guardia', 'admin']}>
-                <DashboardLayout />
+                <DashboardLayoutWrapper />
               </ProtectedRoute>
             }
           />
@@ -122,7 +164,7 @@ export default function App() {
             path="/rrhh"
             element={
               <ProtectedRoute allowedRoles={['rrhh', 'admin', 'supervisor']}>
-                <DashboardLayout />
+                <DashboardLayoutWrapper />
               </ProtectedRoute>
             }
           />
@@ -131,7 +173,7 @@ export default function App() {
             path="/admin"
             element={
               <ProtectedRoute allowedRoles={['admin']}>
-                <DashboardLayout />
+                <DashboardLayoutWrapper />
               </ProtectedRoute>
             }
           />

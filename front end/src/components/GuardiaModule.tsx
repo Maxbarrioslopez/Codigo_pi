@@ -8,13 +8,10 @@ import { ticketsQueryService } from '@/services/tickets.query.service';
 import { useMetricasGuardia } from '../hooks/useMetricasGuardia';
 import { GuardiaQRScanner } from './guardia/GuardiaQRScanner';
 
-type GuardiaScreen = 'login' | 'dashboard';
 type DashboardTab = 'scanner' | 'incidents' | 'metrics';
 
 export function GuardiaModule() {
-  const [currentScreen, setCurrentScreen] = useState<GuardiaScreen>('login');
   const [currentTab, setCurrentTab] = useState<DashboardTab>('scanner');
-  const [showPassword, setShowPassword] = useState(false);
   const [hasScannedTicket, setHasScannedTicket] = useState(false);
   const [isExpiredTicket, setIsExpiredTicket] = useState(false);
   const [ticketUUID, setTicketUUID] = useState('');
@@ -34,14 +31,6 @@ export function GuardiaModule() {
   // Poll métricas cada 15s solo si estamos en dashboard (hook maneja ciclo interno)
   const { metricas } = useMetricasGuardia(15000);
 
-  const handleLogin = () => {
-    setCurrentScreen('dashboard');
-  };
-
-  if (currentScreen === 'login') {
-    return <GuardiaLogin onLogin={handleLogin} showPassword={showPassword} setShowPassword={setShowPassword} />;
-  }
-
   return (
     <GuardiaDashboard
       currentTab={currentTab}
@@ -59,7 +48,6 @@ export function GuardiaModule() {
       metrics={metricas}
       deliveryHistory={deliveryHistory}
       appendHistory={(item) => setDeliveryHistory(prev => [item, ...prev])}
-      onLogout={() => setCurrentScreen('login')}
     />
   );
 }
@@ -73,91 +61,6 @@ type DeliveryHistoryItem = {
   estado: 'Entregado' | 'Incidencia';
   ticket: string;
 };
-
-function GuardiaLogin({
-  onLogin,
-  showPassword,
-  setShowPassword
-}: {
-  onLogin: () => void;
-  showPassword: boolean;
-  setShowPassword: (show: boolean) => void;
-}) {
-  return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-[#333333] mb-2">Panel de Guardia - Login</h2>
-        <p className="text-[#6B6B6B]">
-          Vista de inicio de sesión para el personal de portería (1440×900)
-        </p>
-      </div>
-
-      {/* Login Screen */}
-      <div className="bg-[#F8F8F8] rounded-xl p-12 min-h-[600px] flex items-center justify-center">
-        <div className="bg-white rounded-xl border-2 border-[#E0E0E0] p-12 w-full max-w-md shadow-lg">
-          {/* Logo */}
-          <div className="w-20 h-20 bg-gradient-to-br from-[#E12019] to-[#B51810] rounded-xl flex items-center justify-center mx-auto mb-8">
-            <span className="text-white" style={{ fontSize: '24px', fontWeight: 700 }}>TML</span>
-          </div>
-
-          <h2 className="text-[#333333] text-center mb-8" style={{ fontSize: '30px', fontWeight: 700 }}>
-            Panel de Guardia
-          </h2>
-
-          {/* Form */}
-          <div className="space-y-6">
-            <div>
-              <label className="block text-[#333333] mb-2" style={{ fontSize: '16px', fontWeight: 500 }}>
-                Usuario
-              </label>
-              <input
-                type="text"
-                placeholder="Ingrese su usuario"
-                className="w-full px-4 py-3 bg-white border-2 border-[#E0E0E0] rounded-xl text-[#333333] placeholder:text-[#6B6B6B] focus:border-[#E12019] focus:outline-none"
-                style={{ fontSize: '16px' }}
-              />
-            </div>
-
-            <div>
-              <label className="block text-[#333333] mb-2" style={{ fontSize: '16px', fontWeight: 500 }}>
-                Contraseña
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Ingrese su contraseña"
-                  className="w-full px-4 py-3 bg-white border-2 border-[#E0E0E0] rounded-xl text-[#333333] placeholder:text-[#6B6B6B] focus:border-[#E12019] focus:outline-none pr-12"
-                  style={{ fontSize: '16px' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6B6B6B] hover:text-[#333333]"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            <button
-              onClick={onLogin}
-              className="w-full px-8 py-4 bg-[#E12019] text-white rounded-xl hover:bg-[#B51810] transition-colors"
-              style={{ fontSize: '18px', fontWeight: 700, minHeight: '56px' }}
-            >
-              Iniciar sesión
-            </button>
-
-            <div className="text-center">
-              <a href="#" className="text-[#E12019] hover:text-[#B51810]" style={{ fontSize: '14px' }}>
-                ¿Olvidaste tu contraseña?
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function GuardiaDashboard({
   currentTab,
@@ -174,8 +77,7 @@ function GuardiaDashboard({
   setValidating,
   metrics,
   deliveryHistory,
-  appendHistory,
-  onLogout
+  appendHistory
 }: {
   currentTab: DashboardTab;
   setCurrentTab: (tab: DashboardTab) => void;
@@ -192,7 +94,6 @@ function GuardiaDashboard({
   metrics: MetricasGuardiaDTO | null;
   deliveryHistory: DeliveryHistoryItem[];
   appendHistory: (item: DeliveryHistoryItem) => void;
-  onLogout: () => void;
 }) {
   const tabs = [
     { id: 'scanner', label: 'Escanear Ticket', icon: Scan },
@@ -231,126 +132,119 @@ function GuardiaDashboard({
                   Juan Pérez (Guardia)
                 </span>
               </div>
-              <button
-                onClick={onLogout}
-                className="px-4 py-2 text-[#E12019] hover:bg-[#F8F8F8] rounded-lg transition-colors"
-                style={{ fontSize: '14px' }}
-              >
-                Cerrar sesión
-              </button>
             </div>
           </div>
-        </div>
 
-        {/* Tabs */}
-        <div className="bg-[#F8F8F8] border-b-2 border-[#E0E0E0]">
-          <div className="flex px-8">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = currentTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setCurrentTab(tab.id)}
-                  className={`flex items-center gap-3 px-6 py-4 border-b-4 transition-all ${isActive
-                    ? 'border-[#E12019] bg-white text-[#333333]'
-                    : 'border-transparent text-[#6B6B6B] hover:text-[#333333] hover:bg-white/50'
-                    }`}
-                  style={{ fontSize: '16px', fontWeight: isActive ? 500 : 400 }}
-                >
-                  <Icon className={`w-5 h-5 ${isActive ? 'text-[#E12019]' : 'text-[#6B6B6B]'}`} />
-                  {tab.label}
-                </button>
-              );
-            })}
+          {/* Tabs */}
+          <div className="bg-[#F8F8F8] border-b-2 border-[#E0E0E0]">
+            <div className="flex px-8">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = currentTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setCurrentTab(tab.id)}
+                    className={`flex items-center gap-3 px-6 py-4 border-b-4 transition-all ${isActive
+                      ? 'border-[#E12019] bg-white text-[#333333]'
+                      : 'border-transparent text-[#6B6B6B] hover:text-[#333333] hover:bg-white/50'
+                      }`}
+                    style={{ fontSize: '16px', fontWeight: isActive ? 500 : 400 }}
+                  >
+                    <Icon className={`w-5 h-5 ${isActive ? 'text-[#E12019]' : 'text-[#6B6B6B]'}`} />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
 
-        {/* Main Content */}
-        <main className="p-8 min-h-[600px]">
-          {currentTab === 'scanner' && (
-            <ScannerView
-              hasScannedTicket={hasScannedTicket}
-              isExpiredTicket={isExpiredTicket}
-              ticketUUID={ticketUUID}
-              setTicketUUID={setTicketUUID}
-              ticketData={ticketData}
-              setTicketData={setTicketData}
-              setHasScannedTicket={setHasScannedTicket}
-              setIsExpiredTicket={setIsExpiredTicket}
-              validating={validating}
-              onValidate={async () => {
-                if (!ticketUUID) return;
-                setValidating(true);
-                try {
-                  const data = await ticketService.validarGuardia(ticketUUID);
-                  setTicketData(data);
-                  setHasScannedTicket(true);
-                  setIsExpiredTicket(false);
-                } catch (e: any) {
-                  if (e.detail?.includes('expirado')) {
-                    setIsExpiredTicket(true);
+          {/* Main Content */}
+          <main className="p-8 min-h-[600px]">
+            {currentTab === 'scanner' && (
+              <ScannerView
+                hasScannedTicket={hasScannedTicket}
+                isExpiredTicket={isExpiredTicket}
+                ticketUUID={ticketUUID}
+                setTicketUUID={setTicketUUID}
+                ticketData={ticketData}
+                setTicketData={setTicketData}
+                setHasScannedTicket={setHasScannedTicket}
+                setIsExpiredTicket={setIsExpiredTicket}
+                validating={validating}
+                onValidate={async () => {
+                  if (!ticketUUID) return;
+                  setValidating(true);
+                  try {
+                    const data = await ticketService.validarGuardia(ticketUUID);
+                    setTicketData(data);
+                    setHasScannedTicket(true);
+                    setIsExpiredTicket(false);
+                  } catch (e: any) {
+                    if (e.detail?.includes('expirado')) {
+                      setIsExpiredTicket(true);
+                    }
+                  } finally {
+                    setValidating(false);
                   }
-                } finally {
-                  setValidating(false);
-                }
-              }}
-              onFetchEstado={async () => {
-                if (!ticketUUID) return;
-                try {
-                  const data = await ticketService.getEstado(ticketUUID);
-                  setTicketData(data);
-                  setHasScannedTicket(true);
-                  if (data.estado === 'expirado') setIsExpiredTicket(true);
-                } catch {
+                }}
+                onFetchEstado={async () => {
+                  if (!ticketUUID) return;
+                  try {
+                    const data = await ticketService.getEstado(ticketUUID);
+                    setTicketData(data);
+                    setHasScannedTicket(true);
+                    if (data.estado === 'expirado') setIsExpiredTicket(true);
+                  } catch {
+                    setTicketData(null);
+                  }
+                }}
+                onReset={() => {
+                  setHasScannedTicket(false);
+                  setIsExpiredTicket(false);
+                  setTicketUUID('');
                   setTicketData(null);
-                }
-              }}
-              onReset={() => {
-                setHasScannedTicket(false);
-                setIsExpiredTicket(false);
-                setTicketUUID('');
-                setTicketData(null);
-              }}
-              onRegisterDelivery={(cajaCodigo) => {
-                if (!ticketData) return;
-                appendHistory({
-                  timestamp: new Date().toISOString(),
-                  rut: ticketData.trabajador?.rut || '—',
-                  nombre: ticketData.trabajador?.nombre || '—',
-                  beneficio: ticketData.data?.beneficio || '—',
-                  caja: cajaCodigo,
-                  estado: 'Entregado',
-                  ticket: ticketUUID
-                });
-              }}
-              onRegisterIncidencia={async (cajaCodigo, descripcionExtra) => {
-                if (!ticketData) return;
-                appendHistory({
-                  timestamp: new Date().toISOString(),
-                  rut: ticketData.trabajador?.rut || '—',
-                  nombre: ticketData.trabajador?.nombre || '—',
-                  beneficio: ticketData.data?.beneficio || '—',
-                  caja: cajaCodigo,
-                  estado: 'Incidencia',
-                  ticket: ticketUUID
-                });
-                try {
-                  await incidentService.crearIncidencia({
-                    tipo: 'Caja incorrecta',
-                    descripcion: descripcionExtra || `Caja escaneada (${cajaCodigo}) no coincide con beneficio asignado (${ticketData.data?.beneficio || 'N/A'})`,
-                    trabajador_rut: ticketData.trabajador?.rut || '',
-                    metadata: { ticket: ticketUUID, caja_codigo: cajaCodigo }
-                  } as any);
-                } catch {
-                  // Silenciar error de incidencia para no bloquear flujo
-                }
-              }}
-            />
-          )}
-          {currentTab === 'incidents' && <IncidentReportView />}
-          {currentTab === 'metrics' && <MetricsPanel history={deliveryHistory} />}
-        </main>
+                }}
+                onRegisterDelivery={(cajaCodigo) => {
+                  if (!ticketData) return;
+                  appendHistory({
+                    timestamp: new Date().toISOString(),
+                    rut: ticketData.trabajador?.rut || '—',
+                    nombre: ticketData.trabajador?.nombre || '—',
+                    beneficio: ticketData.data?.beneficio || '—',
+                    caja: cajaCodigo,
+                    estado: 'Entregado',
+                    ticket: ticketUUID
+                  });
+                }}
+                onRegisterIncidencia={async (cajaCodigo, descripcionExtra) => {
+                  if (!ticketData) return;
+                  appendHistory({
+                    timestamp: new Date().toISOString(),
+                    rut: ticketData.trabajador?.rut || '—',
+                    nombre: ticketData.trabajador?.nombre || '—',
+                    beneficio: ticketData.data?.beneficio || '—',
+                    caja: cajaCodigo,
+                    estado: 'Incidencia',
+                    ticket: ticketUUID
+                  });
+                  try {
+                    await incidentService.crearIncidencia({
+                      tipo: 'Caja incorrecta',
+                      descripcion: descripcionExtra || `Caja escaneada (${cajaCodigo}) no coincide con beneficio asignado (${ticketData.data?.beneficio || 'N/A'})`,
+                      trabajador_rut: ticketData.trabajador?.rut || '',
+                      metadata: { ticket: ticketUUID, caja_codigo: cajaCodigo }
+                    } as any);
+                  } catch {
+                    // Silenciar error de incidencia para no bloquear flujo
+                  }
+                }}
+              />
+            )}
+            {currentTab === 'incidents' && <IncidentReportView />}
+            {currentTab === 'metrics' && <MetricsPanel history={deliveryHistory} />}
+          </main>
+        </div>
       </div>
     </div>
   );

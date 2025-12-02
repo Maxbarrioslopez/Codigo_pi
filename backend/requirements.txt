@@ -2,6 +2,7 @@ Django>=4.2
 djangorestframework
 djangorestframework-simplejwt
 django-cors-headers
+django-ratelimit
 python-decouple
 psycopg2-binary
 qrcode
@@ -10,3 +11,5 @@ pytest
 pytest-django
 requests
 drf-spectacular
+python-json-logger
+structlog

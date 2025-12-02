@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { QrCode, Package, Search, Plus, Eye, Download, CheckCircle, Clock, XCircle, AlertCircle, User, Calendar } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -7,19 +7,32 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { ticketService } from '../services/ticket.service';
 
 export function TrazabilidadModule() {
-  description: 'Trabajador elegible para retiro',
-    user: 'Sistema Tótem',
-  },
-];
-
-export function TrazabilidadModule() {
+  const [qrCodes, setQrCodes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'list' | 'detail'>('list');
   const [selectedQR, setSelectedQR] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [showGenerateModal, setShowGenerateModal] = useState(false);
+
+  useEffect(() => {
+    const loadQRCodes = async () => {
+      try {
+        setLoading(true);
+        const tickets = await ticketService.listar();
+        setQrCodes(tickets || []);
+      } catch (error) {
+        console.error('Error loading QR codes:', error);
+        setQrCodes([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadQRCodes();
+  }, []);
 
   const getStatusBadge = (status: string) => {
     const styles = {
@@ -314,7 +327,15 @@ export function TrazabilidadModule() {
               </tr>
             </thead>
             <tbody>
-              {mockQRCodes.map((qr) => (
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="p-4 text-center text-[#6B6B6B]">Cargando QR codes...</td>
+                </tr>
+              ) : qrCodes.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="p-4 text-center text-[#6B6B6B]">No hay QR codes disponibles</td>
+                </tr>
+              ) : qrCodes.map((qr) => (
                 <tr key={qr.id} className="border-b border-[#E0E0E0] hover:bg-[#F8F8F8]">
                   <td className="p-4">
                     <div className="flex items-center gap-2">

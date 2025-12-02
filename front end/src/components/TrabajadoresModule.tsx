@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Filter, Plus, Edit, History, Eye, Download, Calendar, Package, QrCode, AlertCircle, CheckCircle, Clock, XCircle, User, Briefcase, MapPin, Building } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -7,43 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Label } from './ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { trabajadorService } from '../services/trabajador.service';
 
 export function TrabajadoresModule() {
   const [workers, setWorkers] = useState<any[]>([]);
-  type: 'scheduled',
-    title: 'Retiro Agendado',
-      description: 'Agendado para 12-Nov-2024 - Sin stock disponible',
-        status: 'completed',
-  },
-{
-  id: 6,
-    date: '2024-10-20 11:20',
-      type: 'payroll',
-        title: 'Carga de Nómina',
-          description: 'Trabajador incluido en nómina mensual - Contrato: Indefinido',
-            status: 'completed',
-  },
-{
-  id: 7,
-    date: '2024-09-15 15:10',
-      type: 'benefit',
-        title: 'Cambio de Beneficio',
-          description: 'Beneficio actualizado: Estándar → Premium',
-            admin: 'Laura Méndez (RRHH)',
-              status: 'completed',
-  },
-{
-  id: 8,
-    date: '2024-09-10 12:30',
-      type: 'incident',
-        title: 'Incidencia Reportada',
-          description: 'Producto dañado - Resuelto: Reposición autorizada',
-            guard: 'Pedro Soto',
-              status: 'resolved',
-  },
-];
-
-export function TrabajadoresModule() {
+  const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'list' | 'detail'>('list');
   const [selectedWorker, setSelectedWorker] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -51,6 +19,22 @@ export function TrabajadoresModule() {
   const [filterContract, setFilterContract] = useState('all');
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+
+  useEffect(() => {
+    const loadWorkers = async () => {
+      try {
+        setLoading(true);
+        const workersList = await trabajadorService.getAll();
+        setWorkers(workersList || []);
+      } catch (error) {
+        console.error('Error loading workers:', error);
+        setWorkers([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadWorkers();
+  }, []);
 
   const getStatusBadge = (status: string) => {
     const styles = {
@@ -294,7 +278,15 @@ export function TrabajadoresModule() {
               </tr>
             </thead>
             <tbody>
-              {mockWorkers.map((worker) => (
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="p-4 text-center text-[#6B6B6B]">Cargando trabajadores...</td>
+                </tr>
+              ) : workers.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="p-4 text-center text-[#6B6B6B]">No hay trabajadores registrados</td>
+                </tr>
+              ) : workers.map((worker) => (
                 <tr key={worker.id} className="border-b border-[#E0E0E0] hover:bg-[#F8F8F8]">
                   <td className="p-4 text-[#333333]">{worker.rut}</td>
                   <td className="p-4 text-[#333333]">{worker.name}</td>

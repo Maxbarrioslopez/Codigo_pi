@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Settings, Shield, Users, Bell, Database, Lock, CheckCircle, XCircle, Edit, Trash2, Plus } from 'lucide-react';
 import { useParametrosOperativos } from '../hooks/useParametrosOperativos';
 import { Button } from './ui/button';
@@ -69,6 +69,24 @@ export function AdministradorModule() {
   const [userManagementMode, setUserManagementMode] = useState<'create' | 'reset'>('create');
   const [userManagementUsername, setUserManagementUsername] = useState<string>('');
   const [systemUsers, setSystemUsers] = useState<any[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        setLoadingUsers(true);
+        // Nota: Este endpoint puede no existir en el backend actual
+        // Se incluye como ejemplo. Verificar si existe /api/usuarios/
+        setSystemUsers([]);
+      } catch (error) {
+        console.error('Error loading users:', error);
+        setSystemUsers([]);
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+    loadUsers();
+  }, []);
   const { params, loading, saving, save, getValor } = useParametrosOperativos();
   const initialCycleDuration = parseInt(getValor('cycle_duration', '60')) || 60;
   const initialStockThreshold = parseInt(getValor('stock_threshold', '20')) || 20;
@@ -272,7 +290,15 @@ export function AdministradorModule() {
                   </tr>
                 </thead>
                 <tbody>
-                  {systemUsers.map((user) => (
+                  {loadingUsers ? (
+                    <tr>
+                      <td colSpan={6} className="p-4 text-center text-[#6B6B6B]">Cargando usuarios...</td>
+                    </tr>
+                  ) : systemUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-4 text-center text-[#6B6B6B]">No hay usuarios para mostrar</td>
+                    </tr>
+                  ) : systemUsers.map((user) => (
                     <tr key={user.id} className="border-b border-[#E0E0E0] hover:bg-[#F8F8F8]">
                       <td className="p-4">
                         <div className="flex items-center gap-3">

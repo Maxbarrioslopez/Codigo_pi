@@ -63,19 +63,12 @@ const permissions = [
   },
 ];
 
-const systemUsers = [
-  { id: 1, name: 'Laura Méndez', email: 'laura.mendez@tml.cl', role: 'RRHH', status: 'Activo', lastAccess: '2025-01-14 16:30' },
-  { id: 2, name: 'Carlos Ruiz', email: 'carlos.ruiz@tml.cl', role: 'RRHH', status: 'Activo', lastAccess: '2025-01-14 14:20' },
-  { id: 3, name: 'Pedro Soto', email: 'pedro.soto@tml.cl', role: 'Guardia', status: 'Activo', lastAccess: '2025-01-14 17:00' },
-  { id: 4, name: 'María Castro', email: 'maria.castro@tml.cl', role: 'Guardia', status: 'Activo', lastAccess: '2025-01-14 16:45' },
-  { id: 5, name: 'Ana Torres', email: 'ana.torres@tml.cl', role: 'Administrador', status: 'Activo', lastAccess: '2025-01-14 17:15' },
-];
-
 export function AdministradorModule() {
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
   const [userManagementMode, setUserManagementMode] = useState<'create' | 'reset'>('create');
   const [userManagementUsername, setUserManagementUsername] = useState<string>('');
+  const [systemUsers, setSystemUsers] = useState<any[]>([]);
   const { params, loading, saving, save, getValor } = useParametrosOperativos();
   const initialCycleDuration = parseInt(getValor('cycle_duration', '60')) || 60;
   const initialStockThreshold = parseInt(getValor('stock_threshold', '20')) || 20;

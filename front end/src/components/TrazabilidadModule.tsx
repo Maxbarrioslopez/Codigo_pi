@@ -8,118 +8,8 @@ import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 
-// Mock data para QR codes
-const mockQRCodes = [
-  {
-    id: 1,
-    qrCode: 'QR-2025-001234',
-    boxId: 'BOX-PRM-4567',
-    workerRut: '12.345.678-9',
-    workerName: 'María González Pérez',
-    guardName: 'Pedro Soto',
-    generatedDate: '2025-01-14 10:30',
-    deliveredDate: '2025-01-14 14:23',
-    status: 'Entregado',
-    benefitType: 'Premium',
-    branch: 'Planta Santiago',
-  },
-  {
-    id: 2,
-    qrCode: 'QR-2025-001235',
-    boxId: 'BOX-STD-4568',
-    workerRut: '23.456.789-0',
-    workerName: 'Carlos Rodríguez Silva',
-    guardName: null,
-    generatedDate: '2025-01-14 15:00',
-    deliveredDate: null,
-    status: 'Agendado',
-    benefitType: 'Estándar',
-    branch: 'Planta Rancagua',
-    scheduledDate: '2025-01-17 10:00',
-  },
-  {
-    id: 3,
-    qrCode: 'QR-2025-001236',
-    boxId: 'BOX-PRM-4569',
-    workerRut: '34.567.890-1',
-    workerName: 'Ana Martínez López',
-    guardName: null,
-    generatedDate: '2025-01-14 16:15',
-    deliveredDate: null,
-    status: 'Pendiente',
-    benefitType: 'Premium',
-    branch: 'Planta Santiago',
-  },
-  {
-    id: 4,
-    qrCode: 'QR-2025-001200',
-    boxId: 'BOX-STD-4550',
-    workerRut: '45.678.901-2',
-    workerName: 'José Fernández Torres',
-    guardName: 'María Castro',
-    generatedDate: '2025-01-13 09:00',
-    deliveredDate: null,
-    status: 'Vencido',
-    benefitType: 'Estándar',
-    branch: 'Planta Santiago',
-    expiryDate: '2025-01-13 09:30',
-  },
-  {
-    id: 5,
-    qrCode: 'QR-2025-001150',
-    boxId: 'BOX-PRM-4520',
-    workerRut: '12.345.678-9',
-    workerName: 'María González Pérez',
-    guardName: 'Pedro Soto',
-    generatedDate: '2025-01-12 11:00',
-    deliveredDate: null,
-    status: 'Intento Duplicado',
-    benefitType: 'Premium',
-    branch: 'Planta Santiago',
-    attemptDate: '2025-01-13 10:30',
-  },
-];
-
-// Mock data para timeline del QR
-const mockQRTimeline = [
-  {
-    id: 1,
-    date: '2025-01-14 14:23',
-    type: 'delivered',
-    title: 'Caja Entregada',
-    description: 'Entregado por guardia Pedro Soto',
-    user: 'Pedro Soto',
-  },
-  {
-    id: 2,
-    date: '2025-01-14 14:15',
-    type: 'validated',
-    title: 'QR Validado',
-    description: 'Código escaneado en módulo de guardia',
-    user: 'Pedro Soto',
-  },
-  {
-    id: 3,
-    date: '2025-01-14 10:30',
-    type: 'generated',
-    title: 'QR Generado',
-    description: 'Ticket generado en Tótem de Autoservicio',
-    user: 'Sistema Tótem',
-  },
-  {
-    id: 4,
-    date: '2025-01-14 10:29',
-    type: 'assigned',
-    title: 'Caja Asignada',
-    description: 'Caja BOX-PRM-4567 vinculada al ticket',
-    user: 'Sistema',
-  },
-  {
-    id: 5,
-    date: '2025-01-14 10:28',
-    type: 'validated',
-    title: 'Beneficio Validado',
-    description: 'Trabajador elegible para retiro',
+export function TrazabilidadModule() {
+  description: 'Trabajador elegible para retiro',
     user: 'Sistema Tótem',
   },
 ];
@@ -483,7 +373,7 @@ export function TrazabilidadModule() {
               <TabsTrigger value="single">QR Individual</TabsTrigger>
               <TabsTrigger value="batch">QR por Lote</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="single" className="space-y-4">
               <div>
                 <Label htmlFor="box-id" className="text-[#333333]">ID de Caja</Label>

@@ -89,6 +89,58 @@ export class TrabajadorService {
             throw ErrorHandler.handle(error, 'TrabajadorService.desbloquear', false);
         }
     }
+
+    /**
+     * Crear nuevo trabajador
+     * @param data - Datos del trabajador a crear
+     */
+    async create(data: Partial<TrabajadorDTO>): Promise<TrabajadorDTO> {
+        try {
+            const { data: result } = await apiClient.post<TrabajadorDTO>('/trabajadores/', data);
+            return result;
+        } catch (error) {
+            throw ErrorHandler.handle(error, 'TrabajadorService.create', false);
+        }
+    }
+
+    /**
+     * Actualizar trabajador existente
+     * @param rut - RUT del trabajador
+     * @param data - Datos a actualizar
+     */
+    async update(rut: string, data: Partial<TrabajadorDTO>): Promise<TrabajadorDTO> {
+        try {
+            const { data: result } = await apiClient.put<TrabajadorDTO>(`/trabajadores/${rut}/`, data);
+            return result;
+        } catch (error) {
+            throw ErrorHandler.handle(error, 'TrabajadorService.update', false);
+        }
+    }
+
+    /**
+     * Eliminar trabajador
+     * @param rut - RUT del trabajador
+     */
+    async delete(rut: string): Promise<void> {
+        try {
+            await apiClient.delete(`/trabajadores/${rut}/`);
+        } catch (error) {
+            throw ErrorHandler.handle(error, 'TrabajadorService.delete', false);
+        }
+    }
+
+    /**
+     * Obtener timeline del trabajador
+     * @param rut - RUT del trabajador
+     */
+    async getTimeline(rut: string): Promise<any[]> {
+        try {
+            const { data } = await apiClient.get<any[]>(`/trabajadores/${rut}/timeline/`);
+            return data;
+        } catch (error) {
+            throw ErrorHandler.handle(error, 'TrabajadorService.getTimeline', false);
+        }
+    }
 }
 
 // Exportar instancia singleton

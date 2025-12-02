@@ -1,0 +1,508 @@
+import { useState, useEffect } from 'react';
+import { BarChart3, Users, Calendar, FileText, AlertCircle, Package, QrCode, Download, Plus, Edit, Trash2, Eye, Filter, Search, CheckCircle2, Clock, X } from 'lucide-react';
+import { trabajadorService } from '../services/trabajador.service';
+import { cicloService } from '../services/ciclo.service';
+import { nominaService, NominaPreviewResponse } from '../services/nomina.service';
+import { stockService } from '../services/stock.service';
+import { listarIncidencias, reportesRetirosPorDia, TicketDTO, IncidenciaDTO, RetirosDiaDTO } from '../services/api';
+import { useCicloActivo } from '../hooks/useCicloActivo';
+import { TrabajadorDTO, CicloDTO } from '../types';
+import { Input } from './ui/input';
+import { Button } from './ui/button';
+import { Badge } from './ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Label } from './ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+
+type RRHHTab = 'dashboard' | 'trabajadores' | 'ciclo' | 'nomina' | 'trazabilidad' | 'reportes';
+
+export function RRHHModuleNew() {
+    const [currentTab, setCurrentTab] = useState<RRHHTab>('dashboard');
+    const { ciclo } = useCicloActivo();
+    const [loading, setLoading] = useState(false);
+
+    // Estado para trabajadores
+    const [trabajadores, setTrabajadores] = useState<TrabajadorDTO[]>([]);
+    const [trabajadorFilter, setTrabajadorFilter] = useState('');
+    const [showAddTrabajador, setShowAddTrabajador] = useState(false);
+    const [trabajadorForm, setTrabajadorForm] = useState<Partial<TrabajadorDTO>>({});
+
+    // Estado para ciclos
+    const [ciclos, setCiclos] = useState<CicloDTO[]>([]);
+    const [showAddCiclo, setShowAddCiclo] = useState(false);
+    const [cicloForm, setCicloForm] = useState<Partial<CicloDTO>>({});
+
+    // Estado para nómina
+    const [nominaPreview, setNominaPreview] = useState<NominaPreviewResponse | null>(null);
+    const [showNominaPreview, setShowNominaPreview] = useState(false);
+
+    // Estado para otros datos
+    const [incidencias, setIncidencias] = useState<IncidenciaDTO[]>([]);
+    const [tickets, setTickets] = useState<TicketDTO[]>([]);
+    const [retirosDia, setRetirosDia] = useState<RetirosDiaDTO[]>([]);
+
+    // Cargar datos al montar
+    useEffect(() => {
+        loadAllData();
+    }, [currentTab]);
+
+    async function loadAllData() {
+        setLoading(true);
+        try {
+            const [trab, cicl, inc, ret] = await Promise.all([
+                trabajadorService.getAll().catch(() => []),
+                cicloService.getAll().catch(() => []),
+                listarIncidencias().catch(() => []),
+                reportesRetirosPorDia(7).catch(() => []),
+            ]);
+            setTrabajadores(trab);
+            setCiclos(cicl);
+            setIncidencias(inc);
+            setRetirosDia(ret);
+        } catch (error) {
+            console.error('Error loading RRHH data:', error);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    // TRABAJADORES
+    const handleAddTrabajador = async () => {
+        if (!trabajadorForm.rut || !trabajadorForm.nombre) return;
+        try {
+            const newTrabajador = await trabajadorService.create(trabajadorForm);
+            setTrabajadores([...trabajadores, newTrabajador]);
+            setTrabajadorForm({});
+            setShowAddTrabajador(false);
+        } catch (error) {
+            console.error('Error creating trabajador:', error);
+        }
+    };
+
+    const handleDeleteTrabajador = async (rut: string) => {
+        try {
+            await trabajadorService.delete(rut);
+            setTrabajadores(trabajadores.filter(t => t.rut !== rut));
+        } catch (error) {
+            console.error('Error deleting trabajador:', error);
+        }
+    };
+
+    // CICLOS
+    const handleAddCiclo = async () => {
+        if (!cicloForm.nombre) return;
+        try {
+            const newCiclo = await cicloService.create(cicloForm);
+            setCiclos([...ciclos, newCiclo]);
+            setCicloForm({});
+            setShowAddCiclo(false);
+        } catch (error) {
+            console.error('Error creating ciclo:', error);
+        }
+    };
+
+    const handleCerrarCiclo = async (cicloId: number) => {
+        try {
+            const updated = await cicloService.cerrar(cicloId);
+            setCiclos(ciclos.map(c => c.id === cicloId ? updated : c));
+        } catch (error) {
+            console.error('Error closing ciclo:', error);
+        }
+    };
+
+    // NÓMINA
+    const handleNominaPreview = async () => {
+        if (!ciclo?.id) return;
+        try {
+            const preview = await nominaService.preview({ ciclo_id: ciclo.id });
+            setNominaPreview(preview);
+            setShowNominaPreview(true);
+        } catch (error) {
+            console.error('Error generating nomina preview:', error);
+        }
+    };
+
+    const handleConfirmarNomina = async () => {
+        if (!ciclo?.id) return;
+        try {
+            await nominaService.confirmar({ ciclo_id: ciclo.id, confirmado_por: 'RRHH' });
+            setNominaPreview(null);
+            setShowNominaPreview(false);
+            loadAllData();
+        } catch (error) {
+            console.error('Error confirming nomina:', error);
+        }
+    };
+
+    const filteredTrabajadores = trabajadores.filter(t =>
+        t.nombre?.toLowerCase().includes(trabajadorFilter.toLowerCase()) ||
+        t.rut?.includes(trabajadorFilter)
+    );
+
+    return (
+        <div className="w-full h-full bg-[#F8F8F8]">
+            {/* Header responsivo */}
+            <div className="bg-white border-b-2 border-[#E0E0E0] p-3 md:p-6">
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <h2 className="text-lg md:text-2xl font-bold text-[#333333]">Dashboard RRHH</h2>
+                        <p className="text-xs md:text-sm text-[#6B6B6B]">Gestión de trabajadores, ciclos y nómina</p>
+                    </div>
+                    {ciclo && (
+                        <Badge className="w-fit bg-[#017E49] text-white text-xs md:text-sm px-2 md:px-3 py-1 md:py-2">
+                            Ciclo Actual: {ciclo.nombre}
+                        </Badge>
+                    )}
+                </div>
+            </div>
+
+            {/* Tabs responsivos */}
+            <div className="p-3 md:p-6">
+                <Tabs value={currentTab} onValueChange={(v) => setCurrentTab(v as RRHHTab)} className="w-full">
+                    <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 gap-2 mb-6 bg-white border border-[#E0E0E0] p-1 md:p-2">
+                        <TabsTrigger value="dashboard" className="text-xs md:text-sm truncate">
+                            <BarChart3 className="w-3 h-3 md:w-4 md:h-4 mr-1" />
+                            <span className="hidden sm:inline">Dashboard</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="trabajadores" className="text-xs md:text-sm truncate">
+                            <Users className="w-3 h-3 md:w-4 md:h-4 mr-1" />
+                            <span className="hidden sm:inline">Trabajadores</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="ciclo" className="text-xs md:text-sm truncate">
+                            <Calendar className="w-3 h-3 md:w-4 md:h-4 mr-1" />
+                            <span className="hidden sm:inline">Ciclo</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="nomina" className="text-xs md:text-sm truncate">
+                            <FileText className="w-3 h-3 md:w-4 md:h-4 mr-1" />
+                            <span className="hidden sm:inline">Nómina</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="trazabilidad" className="text-xs md:text-sm truncate">
+                            <QrCode className="w-3 h-3 md:w-4 md:h-4 mr-1" />
+                            <span className="hidden sm:inline">Trazab.</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="reportes" className="text-xs md:text-sm truncate">
+                            <Package className="w-3 h-3 md:w-4 md:h-4 mr-1" />
+                            <span className="hidden sm:inline">Reportes</span>
+                        </TabsTrigger>
+                    </TabsList>
+
+                    {/* DASHBOARD TAB */}
+                    <TabsContent value="dashboard" className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <DashboardCard title="Trabajadores Activos" value={trabajadores.length} icon={Users} color="#017E49" />
+                            <DashboardCard title="Ciclos Abiertos" value={ciclos.filter(c => c.estado === 'abierto').length} icon={Calendar} color="#FF9F55" />
+                            <DashboardCard title="Incidencias Pendientes" value={incidencias.filter(i => i.estado === 'pendiente').length} icon={AlertCircle} color="#E12019" />
+                            <DashboardCard title="Retiros Hoy" value={retirosDia[0]?.cantidad || 0} icon={Package} color="#6B6B6B" />
+                        </div>
+
+                        {/* Gráficos y tablas pequeñas - responsive */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            <div className="bg-white rounded-lg border border-[#E0E0E0] p-3 md:p-4">
+                                <h3 className="text-sm md:text-base font-semibold text-[#333333] mb-3">Retiros Últimos 7 Días</h3>
+                                <div className="space-y-2 overflow-x-auto">
+                                    {retirosDia.slice(0, 5).map((dia, i) => (
+                                        <div key={i} className="flex items-center justify-between text-xs md:text-sm">
+                                            <span className="text-[#6B6B6B]">{dia.fecha}</span>
+                                            <span className="font-semibold text-[#E12019]">{dia.cantidad}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="bg-white rounded-lg border border-[#E0E0E0] p-3 md:p-4">
+                                <h3 className="text-sm md:text-base font-semibold text-[#333333] mb-3">Incidencias Recientes</h3>
+                                <div className="space-y-2 max-h-48 overflow-y-auto">
+                                    {incidencias.slice(0, 5).map((inc) => (
+                                        <div key={inc.id} className="flex items-start justify-between text-xs md:text-sm">
+                                            <span className="text-[#6B6B6B] truncate flex-1">{inc.tipo}</span>
+                                            <Badge className="ml-2 text-xs px-2 py-0.5" variant={inc.estado === 'resuelto' ? 'outline' : 'destructive'}>
+                                                {inc.estado}
+                                            </Badge>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </TabsContent>
+
+                    {/* TRABAJADORES TAB */}
+                    <TabsContent value="trabajadores" className="space-y-4">
+                        <div className="bg-white rounded-lg border border-[#E0E0E0] p-3 md:p-6">
+                            <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                                <Input
+                                    placeholder="Buscar por nombre o RUT..."
+                                    value={trabajadorFilter}
+                                    onChange={(e) => setTrabajadorFilter(e.target.value)}
+                                    className="flex-1 text-sm"
+                                />
+                                <Dialog open={showAddTrabajador} onOpenChange={setShowAddTrabajador}>
+                                    <DialogTrigger asChild>
+                                        <Button className="w-full sm:w-auto bg-[#E12019] hover:bg-[#B51810] text-white text-sm md:text-base">
+                                            <Plus className="w-4 h-4 mr-2" />
+                                            Agregar
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="w-full max-w-xs sm:max-w-md md:max-w-lg">
+                                        <DialogHeader>
+                                            <DialogTitle>Agregar Nuevo Trabajador</DialogTitle>
+                                        </DialogHeader>
+                                        <div className="space-y-4">
+                                            <div>
+                                                <Label className="text-sm">RUT</Label>
+                                                <Input
+                                                    placeholder="12.345.678-9"
+                                                    value={trabajadorForm.rut || ''}
+                                                    onChange={(e) => setTrabajadorForm({ ...trabajadorForm, rut: e.target.value })}
+                                                    className="text-sm"
+                                                />
+                                            </div>
+                                            <div>
+                                                <Label className="text-sm">Nombre Completo</Label>
+                                                <Input
+                                                    placeholder="Nombre completo..."
+                                                    value={trabajadorForm.nombre || ''}
+                                                    onChange={(e) => setTrabajadorForm({ ...trabajadorForm, nombre: e.target.value })}
+                                                    className="text-sm"
+                                                />
+                                            </div>
+                                            <div>
+                                                <Label className="text-sm">Sección</Label>
+                                                <Input
+                                                    placeholder="Producción, Logística, etc."
+                                                    value={trabajadorForm.seccion || ''}
+                                                    onChange={(e) => setTrabajadorForm({ ...trabajadorForm, seccion: e.target.value })}
+                                                    className="text-sm"
+                                                />
+                                            </div>
+                                            <Button
+                                                onClick={handleAddTrabajador}
+                                                className="w-full bg-[#017E49] hover:bg-[#015A34] text-white text-sm"
+                                            >
+                                                Crear Trabajador
+                                            </Button>
+                                        </div>
+                                    </DialogContent>
+                                </Dialog>
+                            </div>
+
+                            {/* Tabla responsiva de trabajadores */}
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-xs md:text-sm">
+                                    <thead className="bg-[#F8F8F8] border-b border-[#E0E0E0]">
+                                        <tr>
+                                            <th className="text-left p-2 md:p-3 font-semibold text-[#333333]">RUT</th>
+                                            <th className="text-left p-2 md:p-3 font-semibold text-[#333333]">Nombre</th>
+                                            <th className="text-left p-2 md:p-3 font-semibold text-[#333333]">Sección</th>
+                                            <th className="text-center p-2 md:p-3 font-semibold text-[#333333]">Estado</th>
+                                            <th className="text-right p-2 md:p-3 font-semibold text-[#333333]">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredTrabajadores.map((t) => (
+                                            <tr key={t.rut} className="border-b border-[#E0E0E0] hover:bg-[#F8F8F8]">
+                                                <td className="p-2 md:p-3 text-[#333333]">{t.rut}</td>
+                                                <td className="p-2 md:p-3 text-[#333333]">{t.nombre}</td>
+                                                <td className="p-2 md:p-3 text-[#6B6B6B]">{t.seccion}</td>
+                                                <td className="p-2 md:p-3 text-center">
+                                                    <Badge className="text-xs px-2 py-0.5" variant={t.estado === 'activo' ? 'outline' : 'destructive'}>
+                                                        {t.estado}
+                                                    </Badge>
+                                                </td>
+                                                <td className="p-2 md:p-3 text-right">
+                                                    <button
+                                                        onClick={() => handleDeleteTrabajador(t.rut!)}
+                                                        className="text-[#E12019] hover:text-[#B51810] text-xs md:text-sm"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </TabsContent>
+
+                    {/* CICLO TAB */}
+                    <TabsContent value="ciclo" className="space-y-4">
+                        <div className="bg-white rounded-lg border border-[#E0E0E0] p-3 md:p-6">
+                            <div className="flex justify-end mb-4">
+                                <Dialog open={showAddCiclo} onOpenChange={setShowAddCiclo}>
+                                    <DialogTrigger asChild>
+                                        <Button className="w-full sm:w-auto bg-[#E12019] hover:bg-[#B51810] text-white text-sm md:text-base">
+                                            <Plus className="w-4 h-4 mr-2" />
+                                            Nuevo Ciclo
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="w-full max-w-xs sm:max-w-md">
+                                        <DialogHeader>
+                                            <DialogTitle>Crear Nuevo Ciclo</DialogTitle>
+                                        </DialogHeader>
+                                        <div className="space-y-4">
+                                            <div>
+                                                <Label className="text-sm">Nombre</Label>
+                                                <Input
+                                                    placeholder="Ciclo 2024-01"
+                                                    value={cicloForm.nombre || ''}
+                                                    onChange={(e) => setCicloForm({ ...cicloForm, nombre: e.target.value })}
+                                                    className="text-sm"
+                                                />
+                                            </div>
+                                            <Button
+                                                onClick={handleAddCiclo}
+                                                className="w-full bg-[#017E49] hover:bg-[#015A34] text-white text-sm"
+                                            >
+                                                Crear Ciclo
+                                            </Button>
+                                        </div>
+                                    </DialogContent>
+                                </Dialog>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {ciclos.map((c) => (
+                                    <div key={c.id} className="border-2 border-[#E0E0E0] rounded-lg p-3 md:p-4">
+                                        <div className="flex items-start justify-between mb-2">
+                                            <h3 className="font-semibold text-[#333333] text-sm md:text-base">{c.nombre}</h3>
+                                            <Badge className="text-xs px-2 py-0.5" variant={c.estado === 'abierto' ? 'default' : 'outline'}>
+                                                {c.estado}
+                                            </Badge>
+                                        </div>
+                                        <p className="text-xs text-[#6B6B6B] mb-3">Beneficios: {c.beneficio_total || 0}</p>
+                                        {c.estado === 'abierto' && (
+                                            <Button
+                                                onClick={() => handleCerrarCiclo(c.id!)}
+                                                className="w-full text-xs bg-[#FF9F55] hover:bg-[#E68843] text-white"
+                                            >
+                                                Cerrar Ciclo
+                                            </Button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </TabsContent>
+
+                    {/* NÓMINA TAB */}
+                    <TabsContent value="nomina" className="space-y-4">
+                        <div className="bg-white rounded-lg border border-[#E0E0E0] p-3 md:p-6">
+                            <Button
+                                onClick={handleNominaPreview}
+                                disabled={!ciclo || loading}
+                                className="w-full sm:w-auto bg-[#E12019] hover:bg-[#B51810] text-white text-sm md:text-base mb-4"
+                            >
+                                <Download className="w-4 h-4 mr-2" />
+                                Vista Previa Nómina
+                            </Button>
+
+                            {nominaPreview && showNominaPreview && (
+                                <Dialog open={showNominaPreview} onOpenChange={setShowNominaPreview}>
+                                    <DialogContent className="w-full max-w-xs sm:max-w-md md:max-w-lg max-h-[80vh] overflow-y-auto">
+                                        <DialogHeader>
+                                            <DialogTitle>Preview Nómina - {ciclo?.nombre}</DialogTitle>
+                                        </DialogHeader>
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-2 gap-4 text-xs md:text-sm">
+                                                <div>
+                                                    <span className="text-[#6B6B6B]">Total Trabajadores</span>
+                                                    <p className="font-bold text-[#333333]">{nominaPreview.total_trabajadores}</p>
+                                                </div>
+                                                <div>
+                                                    <span className="text-[#6B6B6B]">Total Beneficios</span>
+                                                    <p className="font-bold text-[#333333]">${nominaPreview.total_beneficios.toLocaleString()}</p>
+                                                </div>
+                                            </div>
+                                            <div className="border-t border-[#E0E0E0] pt-4">
+                                                <h4 className="font-semibold text-[#333333] text-sm mb-2">Detalles</h4>
+                                                <div className="max-h-48 overflow-y-auto text-xs">
+                                                    {nominaPreview.detalles.map((det) => (
+                                                        <div key={det.rut} className="flex justify-between items-center py-1 border-b border-[#E0E0E0] last:border-0">
+                                                            <span className="text-[#333333] truncate">{det.nombre}</span>
+                                                            <span className="text-[#E12019] font-semibold">${det.beneficio_asignado}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <Button
+                                                onClick={handleConfirmarNomina}
+                                                className="w-full bg-[#017E49] hover:bg-[#015A34] text-white text-sm"
+                                            >
+                                                Confirmar Nómina
+                                            </Button>
+                                        </div>
+                                    </DialogContent>
+                                </Dialog>
+                            )}
+                        </div>
+                    </TabsContent>
+
+                    {/* TRAZABILIDAD TAB */}
+                    <TabsContent value="trazabilidad" className="space-y-4">
+                        <div className="bg-white rounded-lg border border-[#E0E0E0] p-3 md:p-6">
+                            <h3 className="text-sm md:text-base font-semibold text-[#333333] mb-4">Incidencias Registradas</h3>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-xs md:text-sm">
+                                    <thead className="bg-[#F8F8F8] border-b border-[#E0E0E0]">
+                                        <tr>
+                                            <th className="text-left p-2 md:p-3">Tipo</th>
+                                            <th className="text-left p-2 md:p-3">RUT</th>
+                                            <th className="text-left p-2 md:p-3">Descripción</th>
+                                            <th className="text-center p-2 md:p-3">Estado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {incidencias.slice(0, 10).map((inc) => (
+                                            <tr key={inc.id} className="border-b border-[#E0E0E0]">
+                                                <td className="p-2 md:p-3">{inc.tipo}</td>
+                                                <td className="p-2 md:p-3">{inc.trabajador_rut}</td>
+                                                <td className="p-2 md:p-3 text-[#6B6B6B] truncate">{inc.descripcion}</td>
+                                                <td className="p-2 md:p-3 text-center">
+                                                    <Badge className="text-xs px-2 py-0.5" variant={inc.estado === 'resuelto' ? 'outline' : 'destructive'}>
+                                                        {inc.estado}
+                                                    </Badge>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </TabsContent>
+
+                    {/* REPORTES TAB */}
+                    <TabsContent value="reportes" className="space-y-4">
+                        <div className="bg-white rounded-lg border border-[#E0E0E0] p-3 md:p-6">
+                            <h3 className="text-sm md:text-base font-semibold text-[#333333] mb-4">Retiros de los Últimos 7 Días</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {retirosDia.map((dia, i) => (
+                                    <div key={i} className="border-2 border-[#E0E0E0] rounded-lg p-3 md:p-4">
+                                        <p className="text-xs md:text-sm text-[#6B6B6B] mb-1">{dia.fecha}</p>
+                                        <p className="text-lg md:text-2xl font-bold text-[#E12019]">{dia.cantidad}</p>
+                                        <p className="text-xs text-[#6B6B6B]">retiros</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </TabsContent>
+                </Tabs>
+            </div>
+        </div>
+    );
+}
+
+// Componente para card del dashboard
+function DashboardCard({ title, value, icon: Icon, color }: { title: string; value: number; icon: any; color: string }) {
+    return (
+        <div className="bg-white rounded-lg border border-[#E0E0E0] p-3 md:p-4 flex items-start gap-3 md:gap-4">
+            <div className="p-2 md:p-3 rounded-lg" style={{ backgroundColor: color + '20' }}>
+                <Icon className="w-5 h-5 md:w-6 md:h-6" style={{ color }} />
+            </div>
+            <div className="flex-1 min-w-0">
+                <p className="text-xs md:text-sm text-[#6B6B6B] truncate">{title}</p>
+                <p className="text-lg md:text-2xl font-bold text-[#333333]">{value}</p>
+            </div>
+        </div>
+    );
+}

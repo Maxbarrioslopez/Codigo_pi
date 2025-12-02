@@ -266,7 +266,7 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
       try {
         if (!videoRef.current || !mounted) return;
 
-        console.log('🎥 Iniciando scanner...');
+        console.log('>> Iniciando scanner...');
 
         // Solicitar cámara: intentar trasera primero (móvil), luego frontal (fallback)
         let stream;
@@ -281,7 +281,7 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
           });
         } catch (e) {
           // Si no hay cámara trasera, usar la frontal
-          console.log('📷 Cámara trasera no disponible, usando frontal...');
+          console.log('>> Cámara trasera no disponible, usando frontal...');
           stream = await navigator.mediaDevices.getUserMedia({
             video: {
               facingMode: 'user',
@@ -297,7 +297,7 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
 
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices.filter(d => d.kind === 'videoinput');
-        console.log(`📷 ${videoDevices.length} cámara(s) disponible(s)`);
+        console.log(`>> ${videoDevices.length} cámara(s) disponible(s)`);
         videoDevices.forEach((d, i) => console.log(`  ${i + 1}. ${d.label}`));
 
         const controls = await codeReader.decodeFromVideoDevice(
@@ -308,7 +308,7 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
             // Silenciar errores NotFoundException salvo cada 50 intentos
             if (error && (error as any)?.name === 'NotFoundException') {
               if (scanCount % 50 === 0) {
-                console.log(`🔍 Buscando código... (${scanCount} intentos)`);
+                console.log(`>> Buscando código... (${scanCount} intentos)`);
               }
               return;
             }
@@ -321,7 +321,7 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
               }
               const text = result.getText().trim();
               const format = result.getBarcodeFormat();
-              console.log(`✅ [Scan #${scanCount}] Código detectado!`, {
+              console.log(`[OK] [Scan #${scanCount}] Código detectado!`, {
                 formato: format,
                 texto: text.substring(0, 50) + (text.length > 50 ? '...' : '')
               });
@@ -333,7 +333,7 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
               const pattern1 = text.match(/(\d{1,2})\.(\d{3})\.(\d{3})[-](\d{1})/);
               if (pattern1) {
                 rut = `${pattern1[1]}.${pattern1[2]}.${pattern1[3]}-${pattern1[4]}`;
-                console.log('📋 Patrón 1 (con puntos):', rut);
+                console.log('  - Patrón 1 (con puntos):', rut);
               } else {
                 // 2. Buscar patrón sin puntos pero con guión: 12345678-9
                 const pattern2 = text.match(/(\d{7,8})[-](\d{1})/);
@@ -345,7 +345,7 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
                   } else {
                     rut = `${num.slice(0, 1)}.${num.slice(1, 4)}.${num.slice(4, 7)}-${dv}`;
                   }
-                  console.log('📋 Patrón 2 (sin puntos):', rut);
+                  console.log('  - Patrón 2 (sin puntos):', rut);
                 } else {
                   // 3. Buscar solo números: 123456789
                   const pattern3 = text.match(/(\d{8,9})/);
@@ -360,7 +360,7 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
                       const dv = numStr.slice(7);
                       rut = `${num.slice(0, 1)}.${num.slice(1, 4)}.${num.slice(4, 7)}-${dv}`;
                     }
-                    console.log('📋 Patrón 3 (solo números):', rut);
+                    console.log('  - Patrón 3 (solo números):', rut);
                   }
                 }
               }
@@ -368,8 +368,8 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
               // Solo aceptar PDF417 o QR_CODE con RUT válido
               const isAcceptedFormat = String(format) === 'PDF_417' || String(format) === 'QR_CODE';
               if (rut && isAcceptedFormat) {
-                console.log('🎯 RUT FINAL formateado:', rut);
-                console.log('📱 Formato aceptado (carnet):', String(format));
+                console.log('>> RUT FINAL formateado:', rut);
+                console.log('>> Formato aceptado (carnet):', String(format));
                 onRutChange(rut);
                 // Reproducir sonido de éxito
                 const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZUQ0PVKzn77BfGAg+ltryxnMpBSh+zPLaizsIGGS57OihUhELTKXh8bllHAU2jdXzzn0vBSF1xe/glEoODlOq5O+zYxoJPJPY88p2KwUme8rx3I0+CRZiturqpVMRC0mi4PK8aB8GM4/T8tGAMQYeb8Lv45ZPDRBWrefwsGIaCT6U2PLJdSsFKH7M8tqLOwgYZLns6KFSEQtMpeHxuWUcBTaN1fPOfS8FIXbF7+CUSg4OU6rk77NjGgk8k9jzynYrBSZ7yvHcjT4JFmK26uqlUxELSaLg8rxoHwYzj9Py0YAxBh5vwu/jlk8NEFat5/CwYhoJPpTY8sl1KwUofszy2os7CBhkuezooVIRC0yl4fG5ZRwFNo3V885+LwUhdsXv4JRKDg5TquTvs2MaCTyT2PPKdisFJnvK8dyNPgkWYrbq6qVTEQtJouDyvGgfBjOP0/LRgDEGHm/C7+OWTw0QVq3n8LBiGgk+lNjyyXUrBSh+zPLaizsIGGS57OihUhELTKXh8bllHAU2jdXzzn4vBSF2xe/glEoODlOq5O+zYxoJPJPY88p2KwUme8rx3I0+CRZiturqpVMRC0mi4PK8aB8GM4/T8tGAMQYeb8Lv45ZPDRBWrefwsGIaCT6U2PLJdSsFKH7M8tqLOwgYZLns6KFSEQtMpeHxuWUcBTaN1fPOfi8FIXbF7+CUSg4OU6rk77NjGgk8k9jzynYrBSZ7yvHcjT4JFmK26uqlUxELSaLg8rxoHwYzj9Py0YAxBh5vwu/jlk8NEFat5/CwYhoJPpTY8sl1KwUofszy2os7CBhkuezooVIRC0yl4fG5ZRwFNo3V885+LwUhdsXv4JRKDg5TquTvs2MaCTyT2PPKdisFJnvK8dyNPgkWYrbq6qVTEQtJouDyvGgfBjOP0/LRgDEGHm/C7+OWTw0Q==');
@@ -381,7 +381,7 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
                   controlsRef.current.stop();
                   controlsRef.current = null;
                   setCameraActive(false);
-                  console.log('✋ Scanner detenido - Carnet capturado exitosamente');
+                  console.log('>> Scanner detenido - Carnet capturado exitosamente');
                 }
 
                 // INICIAR VALIDACIÓN AUTOMÁTICA SIN CLICK
@@ -391,12 +391,12 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
               } else if (isAcceptedFormat && !rut) {
                 // QR o PDF417 detectado pero sin RUT válido
                 if (scanCount % 20 === 0) {
-                  console.log('⚠️ Carnet detectado pero sin RUT válido extraído');
+                  console.log('[WARN] Carnet detectado pero sin RUT válido extraído');
                 }
               } else {
                 // Formato no aceptado (no es carnet)
                 if (scanCount % 30 === 0) {
-                  console.log('⚠️ Ignorando: se espera carnet, formato detectado:', String(format));
+                  console.log('[WARN] Ignorando: se espera carnet, formato detectado:', String(format));
                 }
               }
             }
@@ -405,7 +405,7 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
               if (scanCount % 10 === 0) {
                 const name = (error as any)?.name || 'Error';
                 const msg = (error as any)?.message || String(error);
-                console.error('❌ Error de scanner:', name, msg);
+                console.error('[ERROR] Error de scanner:', name, msg);
               }
             }
           }
@@ -413,7 +413,7 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
 
         if (mounted) {
           controlsRef.current = controls;
-          console.log('✅ Scanner iniciado correctamente');
+          console.log('>> Scanner iniciado correctamente');
         }
       } catch (err: any) {
         if (mounted) {
@@ -429,7 +429,7 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
     }
 
     return () => {
-      console.log('🧹 Limpiando scanner...');
+      console.log('>> Limpiando scanner...');
       mounted = false;
       if (controlsRef.current) {
         controlsRef.current.stop();

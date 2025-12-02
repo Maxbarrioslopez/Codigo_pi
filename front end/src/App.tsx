@@ -22,13 +22,13 @@ function DashboardLayout() {
   // Determinar qué secciones mostrar según el rol
   const getSections = () => {
     const allSections = [
-      { id: 'design-system' as const, label: 'Design System', icon: '🎨', roles: ['admin'] },
-      { id: 'totem' as const, label: 'Tótem Autoservicio', icon: '🖥️', roles: ['admin'] },
-      { id: 'guardia' as const, label: 'Panel Guardia', icon: '👮', roles: ['guardia', 'admin'] },
-      { id: 'rrhh' as const, label: 'Dashboard RRHH', icon: '📊', roles: ['rrhh', 'admin', 'supervisor'] },
-      { id: 'stock' as const, label: 'Gestión de Stock', icon: '📦', roles: ['admin', 'rrhh'] },
-      { id: 'nomina' as const, label: 'Gestión de Nómina', icon: '💰', roles: ['admin', 'rrhh'] },
-      { id: 'admin' as const, label: 'Administración', icon: '⚙️', roles: ['admin'] },
+      { id: 'design-system' as const, label: 'Design System', icon: '▢', roles: ['admin'] },
+      { id: 'totem' as const, label: 'Tótem Autoservicio', icon: '◨', roles: ['admin'] },
+      { id: 'guardia' as const, label: 'Panel Guardia', icon: '◆', roles: ['guardia', 'admin'] },
+      { id: 'rrhh' as const, label: 'Dashboard RRHH', icon: '▲', roles: ['rrhh', 'admin', 'supervisor'] },
+      { id: 'stock' as const, label: 'Gestión de Stock', icon: '◙', roles: ['admin', 'rrhh'] },
+      { id: 'nomina' as const, label: 'Gestión de Nómina', icon: '◉', roles: ['admin', 'rrhh'] },
+      { id: 'admin' as const, label: 'Administración', icon: '⚙', roles: ['admin'] },
     ];
 
     return allSections.filter(s => s.roles.includes(user?.rol || ''));

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Filter, Plus, Edit, History, Eye, Download, Calendar, Package, QrCode, AlertCircle, CheckCircle, Clock, XCircle, User, Briefcase, MapPin, Building } from 'lucide-react';
+import { Search, Filter, Plus, Edit, History, Eye, Download, Calendar, Package, QrCode, AlertCircle, CheckCircle, Clock, XCircle, User, Briefcase, MapPin, Building, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from './ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { trabajadorService } from '../services/trabajador.service';
+import { showSuccess, showError } from '../utils/toast';
 
 export function TrabajadoresModule() {
   const [workers, setWorkers] = useState<any[]>([]);
@@ -19,6 +20,9 @@ export function TrabajadoresModule() {
   const [filterContract, setFilterContract] = useState('all');
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [registerForm, setRegisterForm] = useState({ rut: '', nombre: '', seccion: '', contrato: '', sucursal: '', beneficio: '' });
+  const [editForm, setEditForm] = useState({ nombre: '', estado: '', beneficio: '' });
 
   useEffect(() => {
     const loadWorkers = async () => {
@@ -28,6 +32,7 @@ export function TrabajadoresModule() {
         setWorkers(workersList || []);
       } catch (error) {
         console.error('Error loading workers:', error);
+        showError('Error', 'No se pudieron cargar los trabajadores');
         setWorkers([]);
       } finally {
         setLoading(false);
@@ -35,6 +40,69 @@ export function TrabajadoresModule() {
     };
     loadWorkers();
   }, []);
+
+  const handleRegisterWorker = async () => {
+    if (!registerForm.rut || !registerForm.nombre || !registerForm.seccion || !registerForm.contrato) {
+      showError('Validación', 'Por favor completa todos los campos requeridos');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const newWorker = await trabajadorService.create({
+        rut: registerForm.rut,
+        nombre: registerForm.nombre,
+        seccion: registerForm.seccion,
+        contrato: registerForm.contrato,
+        sucursal: registerForm.sucursal || 'Santiago',
+        beneficio: registerForm.beneficio || 'Estándar',
+      });
+      setWorkers([...workers, newWorker]);
+      showSuccess('Éxito', `Trabajador ${registerForm.nombre} registrado correctamente`);
+      setShowRegisterModal(false);
+      setRegisterForm({ rut: '', nombre: '', seccion: '', contrato: '', sucursal: '', beneficio: '' });
+    } catch (error) {
+      showError('Error', 'No se pudo registrar el trabajador');
+      console.error(error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEditWorker = async () => {
+    if (!selectedWorker) return;
+
+    try {
+      setSaving(true);
+      const updated = await trabajadorService.update(selectedWorker.rut, {
+        nombre: editForm.nombre || selectedWorker.nombre,
+        estado: editForm.estado || selectedWorker.estado,
+        beneficio: editForm.beneficio || selectedWorker.beneficio,
+      });
+      setWorkers(workers.map(w => w.rut === selectedWorker.rut ? updated : w));
+      setSelectedWorker(updated);
+      showSuccess('Éxito', 'Trabajador actualizado correctamente');
+      setShowEditModal(false);
+    } catch (error) {
+      showError('Error', 'No se pudo actualizar el trabajador');
+      console.error(error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteWorker = async (rut: string) => {
+    if (!confirm('¿Está seguro de que desea eliminar este trabajador?')) return;
+
+    try {
+      await trabajadorService.delete(rut);
+      setWorkers(workers.filter(w => w.rut !== rut));
+      showSuccess('Éxito', 'Trabajador eliminado correctamente');
+    } catch (error) {
+      showError('Error', 'No se pudo eliminar el trabajador');
+      console.error(error);
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     const styles = {
@@ -317,11 +385,20 @@ export function TrabajadoresModule() {
                         variant="outline"
                         onClick={() => {
                           setSelectedWorker(worker);
+                          setEditForm({ nombre: '', estado: '', beneficio: '' });
                           setShowEditModal(true);
                         }}
                         className="h-9 px-3 rounded-lg border-2 border-[#E0E0E0]"
                       >
                         <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDeleteWorker(worker.rut)}
+                        className="h-9 px-3 rounded-lg border-2 border-[#E0E0E0] text-[#E12019] hover:bg-[#FFE5E5]"
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
                   </td>
@@ -345,6 +422,8 @@ export function TrabajadoresModule() {
                 <Input
                   id="rut"
                   placeholder="12.345.678-9"
+                  value={registerForm.rut}
+                  onChange={(e) => setRegisterForm({ ...registerForm, rut: e.target.value })}
                   className="h-11 border-2 border-[#E0E0E0] rounded-xl mt-2"
                 />
               </div>
@@ -353,6 +432,8 @@ export function TrabajadoresModule() {
                 <Input
                   id="name"
                   placeholder="María González Pérez"
+                  value={registerForm.nombre}
+                  onChange={(e) => setRegisterForm({ ...registerForm, nombre: e.target.value })}
                   className="h-11 border-2 border-[#E0E0E0] rounded-xl mt-2"
                 />
               </div>
@@ -360,30 +441,30 @@ export function TrabajadoresModule() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="section" className="text-[#333333]">Área/Sección</Label>
-                <Select>
+                <Select value={registerForm.seccion} onValueChange={(val) => setRegisterForm({ ...registerForm, seccion: val })}>
                   <SelectTrigger className="h-11 border-2 border-[#E0E0E0] rounded-xl mt-2">
                     <SelectValue placeholder="Seleccionar sección" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="produccion">Producción</SelectItem>
-                    <SelectItem value="logistica">Logística</SelectItem>
-                    <SelectItem value="administracion">Administración</SelectItem>
-                    <SelectItem value="mantenimiento">Mantenimiento</SelectItem>
+                    <SelectItem value="Producción">Producción</SelectItem>
+                    <SelectItem value="Logística">Logística</SelectItem>
+                    <SelectItem value="Administración">Administración</SelectItem>
+                    <SelectItem value="Mantenimiento">Mantenimiento</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label htmlFor="contract" className="text-[#333333]">Tipo de Contrato</Label>
-                <Select>
+                <Select value={registerForm.contrato} onValueChange={(val) => setRegisterForm({ ...registerForm, contrato: val })}>
                   <SelectTrigger className="h-11 border-2 border-[#E0E0E0] rounded-xl mt-2">
                     <SelectValue placeholder="Seleccionar contrato" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="indefinido">Indefinido</SelectItem>
-                    <SelectItem value="plazo-fijo">Plazo fijo</SelectItem>
-                    <SelectItem value="part-time">Part time</SelectItem>
-                    <SelectItem value="honorarios">Honorarios</SelectItem>
-                    <SelectItem value="practicante">Practicante</SelectItem>
+                    <SelectItem value="Indefinido">Indefinido</SelectItem>
+                    <SelectItem value="Plazo fijo">Plazo fijo</SelectItem>
+                    <SelectItem value="Part time">Part time</SelectItem>
+                    <SelectItem value="Honorarios">Honorarios</SelectItem>
+                    <SelectItem value="Practicante">Practicante</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -391,26 +472,26 @@ export function TrabajadoresModule() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="branch" className="text-[#333333]">Sucursal</Label>
-                <Select>
+                <Select value={registerForm.sucursal} onValueChange={(val) => setRegisterForm({ ...registerForm, sucursal: val })}>
                   <SelectTrigger className="h-11 border-2 border-[#E0E0E0] rounded-xl mt-2">
                     <SelectValue placeholder="Seleccionar sucursal" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="santiago">Planta Santiago</SelectItem>
-                    <SelectItem value="rancagua">Planta Rancagua</SelectItem>
+                    <SelectItem value="Santiago">Planta Santiago</SelectItem>
+                    <SelectItem value="Rancagua">Planta Rancagua</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label htmlFor="benefit" className="text-[#333333]">Tipo de Beneficio</Label>
-                <Select>
+                <Select value={registerForm.beneficio} onValueChange={(val) => setRegisterForm({ ...registerForm, beneficio: val })}>
                   <SelectTrigger className="h-11 border-2 border-[#E0E0E0] rounded-xl mt-2">
                     <SelectValue placeholder="Seleccionar beneficio" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="premium">Premium</SelectItem>
-                    <SelectItem value="estandar">Estándar</SelectItem>
-                    <SelectItem value="sin-beneficio">Sin beneficio</SelectItem>
+                    <SelectItem value="Premium">Premium</SelectItem>
+                    <SelectItem value="Estándar">Estándar</SelectItem>
+                    <SelectItem value="Sin beneficio">Sin beneficio</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -424,11 +505,12 @@ export function TrabajadoresModule() {
                 Cancelar
               </Button>
               <Button
-                onClick={() => setShowRegisterModal(false)}
+                onClick={handleRegisterWorker}
+                disabled={saving}
                 className="bg-[#E12019] text-white hover:bg-[#B51810] h-11 px-6 rounded-xl"
               >
                 <Plus className="w-4 h-4 mr-2" />
-                Registrar
+                {saving ? 'Registrando...' : 'Registrar'}
               </Button>
             </div>
           </div>
@@ -452,15 +534,17 @@ export function TrabajadoresModule() {
                   <Label htmlFor="edit-rut" className="text-[#333333]">RUT</Label>
                   <Input
                     id="edit-rut"
-                    defaultValue={selectedWorker?.rut}
-                    className="h-11 border-2 border-[#E0E0E0] rounded-xl mt-2"
+                    disabled
+                    value={selectedWorker?.rut || ''}
+                    className="h-11 border-2 border-[#E0E0E0] rounded-xl mt-2 bg-[#F8F8F8]"
                   />
                 </div>
                 <div>
                   <Label htmlFor="edit-name" className="text-[#333333]">Nombre Completo</Label>
                   <Input
                     id="edit-name"
-                    defaultValue={selectedWorker?.name}
+                    value={editForm.nombre || selectedWorker?.nombre || ''}
+                    onChange={(e) => setEditForm({ ...editForm, nombre: e.target.value })}
                     className="h-11 border-2 border-[#E0E0E0] rounded-xl mt-2"
                   />
                 </div>
@@ -468,7 +552,7 @@ export function TrabajadoresModule() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-[#333333]">Estado de Beneficio</Label>
-                  <Select defaultValue={selectedWorker?.benefitStatus}>
+                  <Select value={editForm.estado || selectedWorker?.estado || 'Activo'} onValueChange={(val) => setEditForm({ ...editForm, estado: val })}>
                     <SelectTrigger className="h-11 border-2 border-[#E0E0E0] rounded-xl mt-2">
                       <SelectValue />
                     </SelectTrigger>
@@ -482,7 +566,7 @@ export function TrabajadoresModule() {
                 </div>
                 <div>
                   <Label className="text-[#333333]">Tipo de Beneficio</Label>
-                  <Select defaultValue={selectedWorker?.benefit}>
+                  <Select value={editForm.beneficio || selectedWorker?.beneficio || 'Estándar'} onValueChange={(val) => setEditForm({ ...editForm, beneficio: val })}>
                     <SelectTrigger className="h-11 border-2 border-[#E0E0E0] rounded-xl mt-2">
                       <SelectValue />
                     </SelectTrigger>
@@ -503,10 +587,11 @@ export function TrabajadoresModule() {
                   Cancelar
                 </Button>
                 <Button
-                  onClick={() => setShowEditModal(false)}
+                  onClick={handleEditWorker}
+                  disabled={saving}
                   className="bg-[#017E49] text-white hover:bg-[#016339] h-11 px-6 rounded-xl"
                 >
-                  Guardar Cambios
+                  {saving ? 'Guardando...' : 'Guardar Cambios'}
                 </Button>
               </div>
             </TabsContent>

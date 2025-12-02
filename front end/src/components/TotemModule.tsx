@@ -249,7 +249,7 @@ function TotemInitialScreen({ onScan, onConsultIncident, onReportIncident, rutIn
       BarcodeFormat.UPC_E
     ]);
     // Configurar tiempo entre intentos de decodificación (ms)
-    const codeReader = new BrowserMultiFormatReader(hints, { timeBetweenScansMillis: 450 });
+    const codeReader = new BrowserMultiFormatReader(hints);
 
     async function startScanner() {
       try {

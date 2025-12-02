@@ -91,7 +91,7 @@ export function RRHHModuleNew() {
 
     // CICLOS
     const handleAddCiclo = async () => {
-        if (!cicloForm.nombre) return;
+        if (!cicloForm.fecha_inicio) return;
         try {
             const newCiclo = await cicloService.create(cicloForm);
             setCiclos([...ciclos, newCiclo]);
@@ -151,7 +151,7 @@ export function RRHHModuleNew() {
                     </div>
                     {ciclo && (
                         <Badge className="w-fit bg-[#017E49] text-white text-xs md:text-sm px-2 md:px-3 py-1 md:py-2">
-                            Ciclo Actual: {ciclo.nombre}
+                            Ciclo Actual: {ciclo?.id || 'Sin ciclo'}
                         </Badge>
                     )}
                 </div>
@@ -191,9 +191,9 @@ export function RRHHModuleNew() {
                     <TabsContent value="dashboard" className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             <DashboardCard title="Trabajadores Activos" value={trabajadores.length} icon={Users} color="#017E49" />
-                            <DashboardCard title="Ciclos Abiertos" value={ciclos.filter(c => c.estado === 'abierto').length} icon={Calendar} color="#FF9F55" />
+                            <DashboardCard title="Ciclos Activos" value={ciclos.filter(c => c.activo).length} icon={Calendar} color="#FF9F55" />
                             <DashboardCard title="Incidencias Pendientes" value={incidencias.filter(i => i.estado === 'pendiente').length} icon={AlertCircle} color="#E12019" />
-                            <DashboardCard title="Retiros Hoy" value={retirosDia[0]?.cantidad || 0} icon={Package} color="#6B6B6B" />
+                            <DashboardCard title="Retiros Hoy" value={retirosDia[0]?.entregados || 0} icon={Package} color="#6B6B6B" />
                         </div>
 
                         {/* Gráficos y tablas pequeñas - responsive */}
@@ -204,7 +204,7 @@ export function RRHHModuleNew() {
                                     {retirosDia.slice(0, 5).map((dia, i) => (
                                         <div key={i} className="flex items-center justify-between text-xs md:text-sm">
                                             <span className="text-[#6B6B6B]">{dia.fecha}</span>
-                                            <span className="font-semibold text-[#E12019]">{dia.cantidad}</span>
+                                            <span className="font-semibold text-[#E12019]">{dia.entregados}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -270,8 +270,8 @@ export function RRHHModuleNew() {
                                                 <Label className="text-sm">Sección</Label>
                                                 <Input
                                                     placeholder="Producción, Logística, etc."
-                                                    value={trabajadorForm.seccion || ''}
-                                                    onChange={(e) => setTrabajadorForm({ ...trabajadorForm, seccion: e.target.value })}
+                                                    value={trabajadorForm.nombre || ''}
+                                                    onChange={(e) => setTrabajadorForm({ ...trabajadorForm, nombre: e.target.value })}
                                                     className="text-sm"
                                                 />
                                             </div>
@@ -303,10 +303,10 @@ export function RRHHModuleNew() {
                                             <tr key={t.rut} className="border-b border-[#E0E0E0] hover:bg-[#F8F8F8]">
                                                 <td className="p-2 md:p-3 text-[#333333]">{t.rut}</td>
                                                 <td className="p-2 md:p-3 text-[#333333]">{t.nombre}</td>
-                                                <td className="p-2 md:p-3 text-[#6B6B6B]">{t.seccion}</td>
-                                                <td className="p-2 md:p-3 text-center">
-                                                    <Badge className="text-xs px-2 py-0.5" variant={t.estado === 'activo' ? 'outline' : 'destructive'}>
-                                                        {t.estado}
+                                                <td className="p-2 md:p-3 text-[#6B6B6B]">{t.rut}</td>
+                                                <td className="p-2 md:p-3">
+                                                    <Badge className="text-xs px-2 py-0.5" variant="default">
+                                                        Activo
                                                     </Badge>
                                                 </td>
                                                 <td className="p-2 md:p-3 text-right">
@@ -345,8 +345,8 @@ export function RRHHModuleNew() {
                                                 <Label className="text-sm">Nombre</Label>
                                                 <Input
                                                     placeholder="Ciclo 2024-01"
-                                                    value={cicloForm.nombre || ''}
-                                                    onChange={(e) => setCicloForm({ ...cicloForm, nombre: e.target.value })}
+                                                    value={cicloForm.fecha_inicio || ''}
+                                                    onChange={(e) => setCicloForm({ ...cicloForm, fecha_inicio: e.target.value })}
                                                     className="text-sm"
                                                 />
                                             </div>
@@ -365,13 +365,13 @@ export function RRHHModuleNew() {
                                 {ciclos.map((c) => (
                                     <div key={c.id} className="border-2 border-[#E0E0E0] rounded-lg p-3 md:p-4">
                                         <div className="flex items-start justify-between mb-2">
-                                            <h3 className="font-semibold text-[#333333] text-sm md:text-base">{c.nombre}</h3>
-                                            <Badge className="text-xs px-2 py-0.5" variant={c.estado === 'abierto' ? 'default' : 'outline'}>
-                                                {c.estado}
+                                            <h3 className="font-semibold text-[#333333] text-sm md:text-base">Ciclo {c.id}</h3>
+                                            <Badge className="text-xs px-2 py-0.5" variant={c.activo ? 'default' : 'outline'}>
+                                                {c.activo ? 'Activo' : 'Cerrado'}
                                             </Badge>
                                         </div>
-                                        <p className="text-xs text-[#6B6B6B] mb-3">Beneficios: {c.beneficio_total || 0}</p>
-                                        {c.estado === 'abierto' && (
+                                        <p className="text-xs text-[#6B6B6B] mb-3">Días restantes: {c.dias_restantes || 0}</p>
+                                        {c.activo && (
                                             <Button
                                                 onClick={() => handleCerrarCiclo(c.id!)}
                                                 className="w-full text-xs bg-[#FF9F55] hover:bg-[#E68843] text-white"
@@ -401,7 +401,7 @@ export function RRHHModuleNew() {
                                 <Dialog open={showNominaPreview} onOpenChange={setShowNominaPreview}>
                                     <DialogContent className="w-full max-w-xs sm:max-w-md md:max-w-lg max-h-[80vh] overflow-y-auto">
                                         <DialogHeader>
-                                            <DialogTitle>Preview Nómina - {ciclo?.nombre}</DialogTitle>
+                                            <DialogTitle>Preview Nómina - Ciclo {ciclo?.id}</DialogTitle>
                                         </DialogHeader>
                                         <div className="space-y-4">
                                             <div className="grid grid-cols-2 gap-4 text-xs md:text-sm">
@@ -456,7 +456,7 @@ export function RRHHModuleNew() {
                                         {incidencias.slice(0, 10).map((inc) => (
                                             <tr key={inc.id} className="border-b border-[#E0E0E0]">
                                                 <td className="p-2 md:p-3">{inc.tipo}</td>
-                                                <td className="p-2 md:p-3">{inc.trabajador_rut}</td>
+                                                <td className="p-2 md:p-3">{inc.trabajador || 'N/A'}</td>
                                                 <td className="p-2 md:p-3 text-[#6B6B6B] truncate">{inc.descripcion}</td>
                                                 <td className="p-2 md:p-3 text-center">
                                                     <Badge className="text-xs px-2 py-0.5" variant={inc.estado === 'resuelto' ? 'outline' : 'destructive'}>
@@ -479,7 +479,7 @@ export function RRHHModuleNew() {
                                 {retirosDia.map((dia, i) => (
                                     <div key={i} className="border-2 border-[#E0E0E0] rounded-lg p-3 md:p-4">
                                         <p className="text-xs md:text-sm text-[#6B6B6B] mb-1">{dia.fecha}</p>
-                                        <p className="text-lg md:text-2xl font-bold text-[#E12019]">{dia.cantidad}</p>
+                                        <p className="text-lg md:text-2xl font-bold text-[#E12019]">{dia.entregados}</p>
                                         <p className="text-xs text-[#6B6B6B]">retiros</p>
                                     </div>
                                 ))}

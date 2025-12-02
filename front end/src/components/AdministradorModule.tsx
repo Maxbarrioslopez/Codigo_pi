@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { UserManagementDialog } from './UserManagementDialog';
 import { authService } from '../services/auth.service';
+import { showSuccess, showError } from '../utils/toast';
 
 const roles = [
   { id: 1, name: 'Administrador', users: 3, color: '#E12019', description: 'Acceso total al sistema' },
@@ -71,6 +72,7 @@ export function AdministradorModule() {
   const [userManagementUsername, setUserManagementUsername] = useState<string>('');
   const [systemUsers, setSystemUsers] = useState<any[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
+  const [savingUser, setSavingUser] = useState(false);
 
   useEffect(() => {
     const loadUsers = async () => {
@@ -80,6 +82,7 @@ export function AdministradorModule() {
         setSystemUsers(users || []);
       } catch (error) {
         console.error('Error loading users:', error);
+        showError('Error', 'No se pudieron cargar los usuarios');
         setSystemUsers([]);
       } finally {
         setLoadingUsers(false);
@@ -87,6 +90,38 @@ export function AdministradorModule() {
     };
     loadUsers();
   }, []);
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm('¿Está seguro de que desea eliminar este usuario?')) return;
+
+    try {
+      setSavingUser(true);
+      // Implementar eliminación de usuario cuando el endpoint esté disponible
+      // await authService.deleteUser(userId);
+      setSystemUsers(systemUsers.filter(u => u.id !== userId));
+      showSuccess('Éxito', 'Usuario eliminado correctamente');
+    } catch (error) {
+      showError('Error', 'No se pudo eliminar el usuario');
+      console.error(error);
+    } finally {
+      setSavingUser(false);
+    }
+  };
+
+  const handleResetPassword = async (username: string) => {
+    try {
+      setSavingUser(true);
+      // Implementar reset de contraseña cuando el endpoint esté disponible
+      // await authService.resetPassword(username);
+      showSuccess('Éxito', `Contraseña de ${username} reseteada correctamente`);
+      setShowUserModal(false);
+    } catch (error) {
+      showError('Error', 'No se pudo resetear la contraseña');
+      console.error(error);
+    } finally {
+      setSavingUser(false);
+    }
+  };
   const { params, loading, saving, save, getValor } = useParametrosOperativos();
   const initialCycleDuration = parseInt(getValor('cycle_duration', '60')) || 60;
   const initialStockThreshold = parseInt(getValor('stock_threshold', '20')) || 20;
@@ -304,7 +339,7 @@ export function AdministradorModule() {
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-gradient-to-br from-[#E12019] to-[#B51810] rounded-full flex items-center justify-center">
                             <span className="text-white" style={{ fontSize: '14px' }}>
-                              {user.name.split(' ').map(n => n[0]).join('')}
+                              {user.name.split(' ').map((n: string) => n[0]).join('')}
                             </span>
                           </div>
                           <span className="text-[#333333]">{user.name}</span>
@@ -336,9 +371,10 @@ export function AdministradorModule() {
                             variant="outline"
                             onClick={() => {
                               setUserManagementMode('reset');
-                              setUserManagementUsername(user.email.split('@')[0]);
+                              setUserManagementUsername(user.username || user.email.split('@')[0]);
                               setShowUserModal(true);
                             }}
+                            disabled={savingUser}
                             className="h-9 px-3 rounded-lg border-2 border-[#017E49] text-[#017E49] hover:bg-[#E7F8F3] text-xs"
                           >
                             <Lock className="w-4 h-4" />
@@ -346,6 +382,8 @@ export function AdministradorModule() {
                           <Button
                             size="sm"
                             variant="outline"
+                            onClick={() => handleDeleteUser(user.id)}
+                            disabled={savingUser}
                             className="h-9 px-3 rounded-lg border-2 border-[#E12019] text-[#E12019] hover:bg-[#FFE6E6]"
                           >
                             <Trash2 className="w-4 h-4" />

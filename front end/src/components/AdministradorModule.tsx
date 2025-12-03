@@ -13,60 +13,7 @@ import { UserManagementDialog } from './UserManagementDialog';
 import { authService } from '../services/auth.service';
 import { showSuccess, showError } from '../utils/toast';
 
-const roles = [
-  { id: 1, name: 'Administrador', users: 3, color: '#E12019', description: 'Acceso total al sistema' },
-  { id: 2, name: 'RRHH', users: 5, color: '#017E49', description: 'Gestión de nómina y beneficios' },
-  { id: 3, name: 'Guardia', users: 12, color: '#FF9F55', description: 'Validación de tickets y entregas' },
-  { id: 4, name: 'Supervisor', users: 4, color: '#6B6B6B', description: 'Solo lectura y reportes' },
-];
-
-const permissions = [
-  {
-    module: 'Trabajadores',
-    admin: { create: true, read: true, update: true, delete: true },
-    rrhh: { create: true, read: true, update: true, delete: false },
-    guardia: { create: false, read: true, update: false, delete: false },
-    supervisor: { create: false, read: true, update: false, delete: false },
-  },
-  {
-    module: 'Ciclo Bimensual',
-    admin: { create: true, read: true, update: true, delete: true },
-    rrhh: { create: true, read: true, update: true, delete: false },
-    guardia: { create: false, read: true, update: false, delete: false },
-    supervisor: { create: false, read: true, update: false, delete: false },
-  },
-  {
-    module: 'Trazabilidad QR',
-    admin: { create: true, read: true, update: true, delete: true },
-    rrhh: { create: true, read: true, update: false, delete: false },
-    guardia: { create: false, read: true, update: true, delete: false },
-    supervisor: { create: false, read: true, update: false, delete: false },
-  },
-  {
-    module: 'Nómina',
-    admin: { create: true, read: true, update: true, delete: true },
-    rrhh: { create: true, read: true, update: true, delete: false },
-    guardia: { create: false, read: false, update: false, delete: false },
-    supervisor: { create: false, read: true, update: false, delete: false },
-  },
-  {
-    module: 'Reportes',
-    admin: { create: true, read: true, update: true, delete: true },
-    rrhh: { create: false, read: true, update: false, delete: false },
-    guardia: { create: false, read: true, update: false, delete: false },
-    supervisor: { create: false, read: true, update: false, delete: false },
-  },
-  {
-    module: 'Configuración',
-    admin: { create: true, read: true, update: true, delete: true },
-    rrhh: { create: false, read: true, update: false, delete: false },
-    guardia: { create: false, read: false, update: false, delete: false },
-    supervisor: { create: false, read: false, update: false, delete: false },
-  },
-];
-
 export function AdministradorModule() {
-  const [showRoleModal, setShowRoleModal] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
   const [userManagementMode, setUserManagementMode] = useState<'create' | 'reset'>('create');
   const [userManagementUsername, setUserManagementUsername] = useState<string>('');
@@ -74,20 +21,21 @@ export function AdministradorModule() {
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [savingUser, setSavingUser] = useState(false);
 
+  const loadUsers = async () => {
+    try {
+      setLoadingUsers(true);
+      const users = await authService.listUsers();
+      setSystemUsers(users || []);
+    } catch (error) {
+      console.error('Error loading users:', error);
+      showError('Error', 'No se pudieron cargar los usuarios. Asegúrate de estar autenticado.');
+      setSystemUsers([]);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
   useEffect(() => {
-    const loadUsers = async () => {
-      try {
-        setLoadingUsers(true);
-        const users = await authService.listUsers();
-        setSystemUsers(users || []);
-      } catch (error) {
-        console.error('Error loading users:', error);
-        showError('Error', 'No se pudieron cargar los usuarios');
-        setSystemUsers([]);
-      } finally {
-        setLoadingUsers(false);
-      }
-    };
     loadUsers();
   }, []);
 
@@ -140,17 +88,15 @@ export function AdministradorModule() {
     ]);
   }
 
-  const getStatusBadge = (status: string) => {
-    return status === 'Activo' ? 'bg-[#017E49] text-white' : 'bg-[#6B6B6B] text-white';
-  };
-
-  const PermissionCell = ({ allowed }: { allowed: boolean }) => (
-    <div className="flex justify-center">
-      {allowed ? (
-        <CheckCircle className="w-5 h-5 text-[#017E49]" />
-      ) : (
-        <XCircle className="w-5 h-5 text-[#E0E0E0]" />
-      )}
+  const MetricCard = ({ title, value, icon: Icon, color }: { title: string; value: number; icon: any; color: string }) => (
+    <div className="bg-white border-2 border-[#E0E0E0] rounded-xl p-6">
+      <div className="flex items-center justify-between mb-3">
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${color}15` }}>
+          <Icon className="w-6 h-6" style={{ color }} />
+        </div>
+      </div>
+      <p className="text-[#6B6B6B] text-sm mb-1">{title}</p>
+      <p className="text-[#333333] text-3xl font-bold" style={{ color }}>{value}</p>
     </div>
   );
 
@@ -168,11 +114,11 @@ export function AdministradorModule() {
         </div>
       </div>
 
-      <Tabs defaultValue="roles" className="w-full">
+      <Tabs defaultValue="metrics" className="w-full">
         <TabsList className="grid w-full grid-cols-4 h-auto">
-          <TabsTrigger value="roles" className="py-3">
-            <Shield className="w-4 h-4 mr-2" />
-            Roles y Permisos
+          <TabsTrigger value="metrics" className="py-3">
+            <Database className="w-4 h-4 mr-2" />
+            Métricas
           </TabsTrigger>
           <TabsTrigger value="users" className="py-3">
             <Users className="w-4 h-4 mr-2" />
@@ -188,110 +134,94 @@ export function AdministradorModule() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Roles Tab */}
-        <TabsContent value="roles" className="space-y-6">
-          {/* Roles Cards */}
+        {/* Metrics Tab */}
+        <TabsContent value="metrics" className="space-y-6">
+          {/* KPI Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {roles.map((role) => (
-              <div key={role.id} className="bg-white border-2 border-[#E0E0E0] rounded-xl p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: role.color }}>
-                    <Shield className="w-5 h-5 text-white" />
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 px-2 rounded-lg border-2 border-[#E0E0E0]"
-                  >
-                    <Edit className="w-3 h-3" />
-                  </Button>
-                </div>
-                <h4 className="text-[#333333] mb-1">{role.name}</h4>
-                <p className="text-[#6B6B6B] mb-3" style={{ fontSize: '12px' }}>
-                  {role.description}
-                </p>
-                <div className="flex items-center justify-between">
-                  <span className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>
-                    {role.users} usuarios
-                  </span>
-                  <Badge style={{ backgroundColor: role.color, color: 'white' }}>
-                    Activo
-                  </Badge>
-                </div>
-              </div>
-            ))}
+            <MetricCard
+              title="Trabajadores Activos"
+              value={systemUsers.filter(u => u.is_active).length}
+              icon={Users}
+              color="#017E49"
+            />
+            <MetricCard
+              title="Usuarios del Sistema"
+              value={systemUsers.length}
+              icon={Shield}
+              color="#FF9F55"
+            />
+            <MetricCard
+              title="Sesiones Activas"
+              value={systemUsers.filter(u => u.last_login).length}
+              icon={Lock}
+              color="#E12019"
+            />
+            <MetricCard
+              title="Usuarios RRHH"
+              value={systemUsers.filter(u => u.rol === 'rrhh').length}
+              icon={Users}
+              color="#6B6B6B"
+            />
           </div>
 
-          {/* Permission Matrix */}
-          <div className="bg-white border-2 border-[#E0E0E0] rounded-xl p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-[#333333]">Matriz de Permisos (CRUD)</h3>
-              <Button
-                onClick={() => setShowRoleModal(true)}
-                className="bg-[#E12019] text-white hover:bg-[#B51810] h-10 px-4 rounded-xl"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Nuevo Rol
-              </Button>
+          {/* Métricas Detalladas */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white border-2 border-[#E0E0E0] rounded-xl p-6">
+              <h3 className="text-[#333333] mb-4">Distribución por Roles</h3>
+              <div className="space-y-3">
+                {[
+                  { rol: 'admin', label: 'Administradores', color: '#E12019' },
+                  { rol: 'rrhh', label: 'RRHH', color: '#017E49' },
+                  { rol: 'guardia', label: 'Guardia', color: '#FF9F55' },
+                  { rol: 'supervisor', label: 'Supervisores', color: '#6B6B6B' },
+                ].map(({ rol, label, color }) => {
+                  const count = systemUsers.filter(u => u.rol === rol).length;
+                  const percentage = systemUsers.length > 0 ? (count / systemUsers.length) * 100 : 0;
+                  return (
+                    <div key={rol} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[#333333] text-sm">{label}</span>
+                        <span className="text-[#6B6B6B] text-sm">{count} usuarios</span>
+                      </div>
+                      <div className="w-full bg-[#E0E0E0] rounded-full h-2">
+                        <div
+                          className="h-2 rounded-full transition-all"
+                          style={{ width: `${percentage}%`, backgroundColor: color }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-[#F8F8F8] border-b-2 border-[#E0E0E0]">
-                    <th className="text-left p-4 text-[#333333]">Módulo</th>
-                    <th className="text-center p-4 text-[#333333]" colSpan={4}>Administrador</th>
-                    <th className="text-center p-4 text-[#333333]" colSpan={4}>RRHH</th>
-                    <th className="text-center p-4 text-[#333333]" colSpan={4}>Guardia</th>
-                    <th className="text-center p-4 text-[#333333]" colSpan={4}>Supervisor</th>
-                  </tr>
-                  <tr className="bg-[#F8F8F8] border-b-2 border-[#E0E0E0]">
-                    <th></th>
-                    <th className="text-center p-2 text-[#6B6B6B]" style={{ fontSize: '12px' }}>C</th>
-                    <th className="text-center p-2 text-[#6B6B6B]" style={{ fontSize: '12px' }}>R</th>
-                    <th className="text-center p-2 text-[#6B6B6B]" style={{ fontSize: '12px' }}>U</th>
-                    <th className="text-center p-2 text-[#6B6B6B]" style={{ fontSize: '12px' }}>D</th>
-                    <th className="text-center p-2 text-[#6B6B6B]" style={{ fontSize: '12px' }}>C</th>
-                    <th className="text-center p-2 text-[#6B6B6B]" style={{ fontSize: '12px' }}>R</th>
-                    <th className="text-center p-2 text-[#6B6B6B]" style={{ fontSize: '12px' }}>U</th>
-                    <th className="text-center p-2 text-[#6B6B6B]" style={{ fontSize: '12px' }}>D</th>
-                    <th className="text-center p-2 text-[#6B6B6B]" style={{ fontSize: '12px' }}>C</th>
-                    <th className="text-center p-2 text-[#6B6B6B]" style={{ fontSize: '12px' }}>R</th>
-                    <th className="text-center p-2 text-[#6B6B6B]" style={{ fontSize: '12px' }}>U</th>
-                    <th className="text-center p-2 text-[#6B6B6B]" style={{ fontSize: '12px' }}>D</th>
-                    <th className="text-center p-2 text-[#6B6B6B]" style={{ fontSize: '12px' }}>C</th>
-                    <th className="text-center p-2 text-[#6B6B6B]" style={{ fontSize: '12px' }}>R</th>
-                    <th className="text-center p-2 text-[#6B6B6B]" style={{ fontSize: '12px' }}>U</th>
-                    <th className="text-center p-2 text-[#6B6B6B]" style={{ fontSize: '12px' }}>D</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {permissions.map((perm, index) => (
-                    <tr key={index} className="border-b border-[#E0E0E0] hover:bg-[#F8F8F8]">
-                      <td className="p-4 text-[#333333]">{perm.module}</td>
-                      <td className="p-2"><PermissionCell allowed={perm.admin.create} /></td>
-                      <td className="p-2"><PermissionCell allowed={perm.admin.read} /></td>
-                      <td className="p-2"><PermissionCell allowed={perm.admin.update} /></td>
-                      <td className="p-2"><PermissionCell allowed={perm.admin.delete} /></td>
-                      <td className="p-2"><PermissionCell allowed={perm.rrhh.create} /></td>
-                      <td className="p-2"><PermissionCell allowed={perm.rrhh.read} /></td>
-                      <td className="p-2"><PermissionCell allowed={perm.rrhh.update} /></td>
-                      <td className="p-2"><PermissionCell allowed={perm.rrhh.delete} /></td>
-                      <td className="p-2"><PermissionCell allowed={perm.guardia.create} /></td>
-                      <td className="p-2"><PermissionCell allowed={perm.guardia.read} /></td>
-                      <td className="p-2"><PermissionCell allowed={perm.guardia.update} /></td>
-                      <td className="p-2"><PermissionCell allowed={perm.guardia.delete} /></td>
-                      <td className="p-2"><PermissionCell allowed={perm.supervisor.create} /></td>
-                      <td className="p-2"><PermissionCell allowed={perm.supervisor.read} /></td>
-                      <td className="p-2"><PermissionCell allowed={perm.supervisor.update} /></td>
-                      <td className="p-2"><PermissionCell allowed={perm.supervisor.delete} /></td>
-                    </tr>
+
+            <div className="bg-white border-2 border-[#E0E0E0] rounded-xl p-6">
+              <h3 className="text-[#333333] mb-4">Últimos Accesos</h3>
+              <div className="space-y-3">
+                {systemUsers
+                  .filter(u => u.last_login)
+                  .sort((a, b) => new Date(b.last_login!).getTime() - new Date(a.last_login!).getTime())
+                  .slice(0, 5)
+                  .map((user) => (
+                    <div key={user.id} className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-gradient-to-br from-[#E12019] to-[#B51810] rounded-full flex items-center justify-center">
+                          <span className="text-white text-xs">
+                            {user.first_name?.[0]}{user.last_name?.[0]}
+                          </span>
+                        </div>
+                        <span className="text-[#333333] text-sm">{user.username}</span>
+                      </div>
+                      <span className="text-[#6B6B6B] text-xs">
+                        {new Date(user.last_login!).toLocaleDateString('es-CL')}
+                      </span>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                {systemUsers.filter(u => u.last_login).length === 0 && (
+                  <p className="text-[#6B6B6B] text-sm text-center py-4">No hay accesos recientes</p>
+                )}
+              </div>
             </div>
-            <p className="text-[#6B6B6B] mt-4" style={{ fontSize: '12px' }}>
-              C = Crear | R = Leer | U = Actualizar | D = Eliminar
-            </p>
           </div>
         </TabsContent>
 
@@ -339,30 +269,36 @@ export function AdministradorModule() {
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-gradient-to-br from-[#E12019] to-[#B51810] rounded-full flex items-center justify-center">
                             <span className="text-white" style={{ fontSize: '14px' }}>
-                              {user.name.split(' ').map((n: string) => n[0]).join('')}
+                              {user.first_name?.[0] || user.username[0]}{user.last_name?.[0] || user.username[1] || ''}
                             </span>
                           </div>
-                          <span className="text-[#333333]">{user.name}</span>
+                          <span className="text-[#333333]">{user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.username}</span>
                         </div>
                       </td>
                       <td className="p-4 text-[#6B6B6B]">{user.email}</td>
                       <td className="p-4">
                         <Badge className={
-                          user.role === 'Administrador' ? 'bg-[#E12019] text-white' :
-                            user.role === 'RRHH' ? 'bg-[#017E49] text-white' :
-                              user.role === 'Guardia' ? 'bg-[#FF9F55] text-white' :
+                          user.rol === 'admin' ? 'bg-[#E12019] text-white' :
+                            user.rol === 'rrhh' ? 'bg-[#017E49] text-white' :
+                              user.rol === 'guardia' ? 'bg-[#FF9F55] text-white' :
                                 'bg-[#6B6B6B] text-white'
                         }>
-                          {user.role}
+                          {user.rol.toUpperCase()}
                         </Badge>
                       </td>
                       <td className="p-4">
-                        <Badge className={getStatusBadge(user.status)}>
-                          {user.status}
+                        <Badge className={user.is_active ? 'bg-[#017E49] text-white' : 'bg-[#6B6B6B] text-white'}>
+                          {user.is_active ? 'Activo' : 'Inactivo'}
                         </Badge>
                       </td>
                       <td className="p-4 text-[#6B6B6B]" style={{ fontSize: '14px' }}>
-                        {user.lastAccess}
+                        {user.last_login ? new Date(user.last_login).toLocaleDateString('es-CL', {
+                          year: 'numeric',
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        }) : 'Nunca'}
                       </td>
                       <td className="p-4">
                         <div className="flex gap-2">
@@ -597,71 +533,17 @@ export function AdministradorModule() {
         </TabsContent>
       </Tabs>
 
-      {/* Create Role Modal */}
-      <Dialog open={showRoleModal} onOpenChange={setShowRoleModal}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-[#333333]">Crear Nuevo Rol</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="role-name" className="text-[#333333]">Nombre del Rol</Label>
-              <Input
-                id="role-name"
-                placeholder="Ej: Supervisor de Planta"
-                className="h-11 border-2 border-[#E0E0E0] rounded-xl mt-2"
-              />
-            </div>
-            <div>
-              <Label htmlFor="role-description" className="text-[#333333]">Descripción</Label>
-              <Input
-                id="role-description"
-                placeholder="Breve descripción del rol"
-                className="h-11 border-2 border-[#E0E0E0] rounded-xl mt-2"
-              />
-            </div>
-            <div>
-              <Label className="text-[#333333]">Color Identificador</Label>
-              <Select>
-                <SelectTrigger className="h-11 border-2 border-[#E0E0E0] rounded-xl mt-2">
-                  <SelectValue placeholder="Seleccionar color" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="red">Rojo (#E12019)</SelectItem>
-                  <SelectItem value="green">Verde (#017E49)</SelectItem>
-                  <SelectItem value="orange">Naranja (#FF9F55)</SelectItem>
-                  <SelectItem value="gray">Gris (#6B6B6B)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end gap-3 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => setShowRoleModal(false)}
-                className="h-11 px-6 rounded-xl border-2 border-[#E0E0E0]"
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={() => setShowRoleModal(false)}
-                className="bg-[#E12019] text-white hover:bg-[#B51810] h-11 px-6 rounded-xl"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Crear Rol
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* Create/Reset User Modal */}
       <UserManagementDialog
         type={userManagementMode}
         existingUsername={userManagementUsername}
-        trigger={showUserModal}
-        onSuccess={() => {
-          setShowUserModal(false);
-          // Aquí podrías refrescar la lista de usuarios
+        open={showUserModal}
+        onOpenChange={(open) => {
+          setShowUserModal(open);
+          // Si se cierra el modal, recargar usuarios
+          if (!open) {
+            loadUsers();
+          }
         }}
       />
     </div>

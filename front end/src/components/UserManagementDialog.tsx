@@ -7,17 +7,22 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { AlertCircle, CheckCircle2, Copy, Eye, EyeOff, Lock, Plus, RefreshCw } from 'lucide-react';
 import { authService, CreateUserRequest, CreateUserResponse, ResetPasswordResponse } from '@/services/auth.service';
+import { formatRut, isValidRut } from '@/utils/parseChileanID';
 
 interface UserManagementDialogProps {
     type: 'create' | 'reset'; // create: nuevo usuario | reset: cambiar contraseña existente
     existingUsername?: string; // Requerido si type === 'reset'
     onSuccess?: (user?: CreateUserResponse | ResetPasswordResponse) => void;
     trigger?: React.ReactNode; // Elemento trigger personalizado
+    open?: boolean; // Control externo del estado
+    onOpenChange?: (open: boolean) => void; // Callback para cambio de estado
 }
 
-export function UserManagementDialog({ type, existingUsername, onSuccess, trigger }: UserManagementDialogProps) {
-    const [open, setOpen] = useState(false);
+export function UserManagementDialog({ type, existingUsername, onSuccess, trigger, open: controlledOpen, onOpenChange }: UserManagementDialogProps) {
+    const [internalOpen, setInternalOpen] = useState(false);
+    const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
     const [username, setUsername] = useState(existingUsername || '');
+    const [rut, setRut] = useState('');
     const [email, setEmail] = useState('');
     const [rol, setRol] = useState<'rrhh' | 'guardia' | 'supervisor'>('guardia');
     const [firstName, setFirstName] = useState('');
@@ -36,36 +41,51 @@ export function UserManagementDialog({ type, existingUsername, onSuccess, trigge
         setSuccess(false);
 
         // Validaciones
-        if (!username.trim()) {
-            setError('El usuario es requerido');
-            return;
-        }
-        if (type === 'create' && !email.trim()) {
-            setError('El email es requerido');
-            return;
-        }
-        if (type === 'create' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            setError('Email inválido');
-            return;
+        if (type === 'create') {
+            if (!rut.trim()) {
+                setError('El RUT es requerido');
+                return;
+            }
+            if (!isValidRut(rut)) {
+                setError('RUT inválido. Debe tener formato 12345678-9');
+                return;
+            }
+            if (!email.trim()) {
+                setError('El email es requerido');
+                return;
+            }
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                setError('Email inválido');
+                return;
+            }
+        } else {
+            if (!username.trim()) {
+                setError('El usuario es requerido');
+                return;
+            }
         }
 
         setLoading(true);
         try {
             if (type === 'create') {
+                // Usar RUT sin guión como username
+                const rutClean = rut.replace(/[.-]/g, '').toLowerCase();
                 const createRequest: CreateUserRequest = {
-                    username,
+                    username: rutClean,
                     email,
                     rol: rol as 'rrhh' | 'guardia' | 'supervisor',
                     first_name: firstName,
                     last_name: lastName
                 };
 
+                console.log('Enviando petición de crear usuario:', createRequest);
                 const user = await authService.createUser(createRequest);
+                console.log('Usuario creado exitosamente:', user);
                 setResult(user);
                 setSuccess(true);
 
                 // Limpiar formulario
-                setUsername('');
+                setRut('');
                 setEmail('');
                 setRol('guardia');
                 setFirstName('');
@@ -86,12 +106,10 @@ export function UserManagementDialog({ type, existingUsername, onSuccess, trigge
                 setSuccess(true);
                 setNewPassword('');
             }
-
-            if (onSuccess && result) {
-                setTimeout(() => onSuccess(result), 1500);
-            }
         } catch (err: any) {
-            console.error('Error:', err);
+            console.error('Error completo al crear/resetear usuario:', err);
+            console.error('Error response:', err.response);
+            console.error('Error data:', err.response?.data);
             if (err.response?.data?.username) {
                 setError('El usuario ya existe');
             } else if (err.response?.data?.email) {
@@ -113,26 +131,36 @@ export function UserManagementDialog({ type, existingUsername, onSuccess, trigge
     };
 
     const handleOpenChange = (newOpen: boolean) => {
-        if (newOpen) {
-            setOpen(true);
-        } else if (!success) {
-            setOpen(false);
+        if (onOpenChange) {
+            onOpenChange(newOpen);
+        } else {
+            setInternalOpen(newOpen);
         }
-        // Si success es true, el usuario debe cerrar el modal manualmente
+
+        // Resetear estado al cerrar
+        if (!newOpen) {
+            setError(null);
+            setSuccess(false);
+            setResult(null);
+            setUsername(existingUsername || '');
+            setRut('');
+            setEmail('');
+            setRol('guardia');
+            setFirstName('');
+            setLastName('');
+            setNewPassword('');
+            setShowPassword(false);
+            setCopiedPassword(false);
+        }
     };
 
     const defaultTrigger =
-        type === 'create' ? (
-            <Button className="bg-[#017E49] hover:bg-[#015A34] text-white">
-                <Plus className="w-4 h-4 mr-2" />
-                Crear Usuario
-            </Button>
-        ) : (
+        type === 'reset' ? (
             <Button variant="outline" className="border-[#FF9F55] text-[#FF9F55] hover:bg-[#FFF5E8]">
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Resetear Contraseña
             </Button>
-        );
+        ) : null;
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -144,7 +172,7 @@ export function UserManagementDialog({ type, existingUsername, onSuccess, trigge
                     </DialogTitle>
                     <DialogDescription className="text-[#6B6B6B]">
                         {type === 'create'
-                            ? 'Crea un nuevo usuario RRHH o Guardia con contraseña temporal'
+                            ? 'Crea un nuevo usuario RRHH o Guardia usando su RUT. Se generará una contraseña temporal.'
                             : 'Asigna una nueva contraseña temporal al usuario'}
                     </DialogDescription>
                 </DialogHeader>
@@ -210,17 +238,7 @@ export function UserManagementDialog({ type, existingUsername, onSuccess, trigge
                         </div>
 
                         <Button
-                            onClick={() => {
-                                setOpen(false);
-                                setSuccess(false);
-                                setError(null);
-                                setUsername('');
-                                setEmail('');
-                                setRol('guardia');
-                                setFirstName('');
-                                setLastName('');
-                                setNewPassword('');
-                            }}
+                            onClick={() => handleOpenChange(false)}
                             className="w-full bg-[#017E49] hover:bg-[#015A34] text-white"
                         >
                             Aceptar
@@ -238,18 +256,23 @@ export function UserManagementDialog({ type, existingUsername, onSuccess, trigge
                         {type === 'create' ? (
                             <>
                                 <div className="space-y-2">
-                                    <Label htmlFor="username" className="text-sm font-medium text-[#333333]">
-                                        Usuario (Nombre de Usuario)
+                                    <Label htmlFor="rut" className="text-sm font-medium text-[#333333]">
+                                        RUT (sin puntos, con guión)
                                     </Label>
                                     <Input
-                                        id="username"
+                                        id="rut"
                                         type="text"
-                                        placeholder="ej: juan.perez"
-                                        value={username}
-                                        onChange={(e) => setUsername(e.target.value)}
+                                        placeholder="ej: 12345678-9"
+                                        value={rut}
+                                        onChange={(e) => {
+                                            const formatted = formatRut(e.target.value);
+                                            setRut(formatted);
+                                        }}
                                         className="border-2 border-[#E0E0E0] rounded-lg"
                                         disabled={loading}
+                                        maxLength={12}
                                     />
+                                    <p className="text-xs text-[#6B6B6B]">El RUT se usará como nombre de usuario</p>
                                 </div>
 
                                 <div className="space-y-2">
@@ -365,7 +388,7 @@ export function UserManagementDialog({ type, existingUsername, onSuccess, trigge
                                 variant="outline"
                                 className="flex-1 border-2 border-[#E0E0E0] text-[#333333] hover:bg-[#F8F8F8]"
                                 disabled={loading}
-                                onClick={() => setOpen(false)}
+                                onClick={() => handleOpenChange(false)}
                             >
                                 Cancelar
                             </Button>
@@ -374,15 +397,14 @@ export function UserManagementDialog({ type, existingUsername, onSuccess, trigge
                                 className="flex-1 bg-[#E12019] hover:bg-[#B51810] text-white"
                                 disabled={
                                     loading ||
-                                    !username.trim() ||
-                                    (type === 'create' && !email.trim()) ||
-                                    (type === 'reset' && !newPassword.trim())
+                                    (type === 'create' && (!rut.trim() || !email.trim())) ||
+                                    (type === 'reset' && (!username.trim() || !newPassword.trim()))
                                 }
                             >
                                 {loading
                                     ? 'Procesando...'
                                     : type === 'create'
-                                        ? 'Crear Usuario'
+                                        ? 'Guardar'
                                         : 'Resetear Contraseña'}
                             </Button>
                         </div>

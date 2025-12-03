@@ -47,9 +47,10 @@ const LoginModule: React.FC = () => {
         return 'Usuario debe contener solo letras, números, guiones o guiones bajos';
     };
 
-    // Normalizar RUT para enviar al backend
+    // Normalizar username/RUT para enviar al backend
     const normalizeUsername = (input: string): string => {
-        return input.replace(/\./g, '').toUpperCase();
+        // Solo eliminar puntos (para RUT), mantener lowercase para usernames
+        return input.replace(/\./g, '').toLowerCase().trim();
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -150,10 +151,10 @@ const LoginModule: React.FC = () => {
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
                                     className={`pl-10 border-2 ${usernameHint && usernameHint.includes('incorrecto')
-                                            ? 'border-[#E12019]'
-                                            : username.length > 0
-                                                ? 'border-[#017E49]'
-                                                : 'border-[#E0E0E0]'
+                                        ? 'border-[#E12019]'
+                                        : username.length > 0
+                                            ? 'border-[#017E49]'
+                                            : 'border-[#E0E0E0]'
                                         } rounded-lg`}
                                     required
                                     disabled={loading}

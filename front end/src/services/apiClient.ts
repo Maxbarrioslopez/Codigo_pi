@@ -7,11 +7,11 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosError, AxiosRequestConfig } from 'axios';
 
 // Configuración base de la API
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace(/\/$/, '');
 
 // Crear instancia de axios con configuración por defecto
 const apiClient: AxiosInstance = axios.create({
-    baseURL: API_BASE_URL.replace(/\/$/, ''), // Remover trailing slash
+    baseURL: API_BASE_URL, // Normalizado sin trailing slash
     timeout: 30000, // 30 segundos
     headers: {
         'Content-Type': 'application/json',
@@ -43,8 +43,12 @@ apiClient.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
         const accessToken = localStorage.getItem('access_token');
 
-        if (accessToken && config.headers) {
+        // Evitar enviar "Bearer undefined/null" o tokens vacíos/mal formados
+        if (accessToken && accessToken !== 'undefined' && accessToken !== 'null' && accessToken.trim() !== '' && config.headers) {
             config.headers.Authorization = `Bearer ${accessToken}`;
+        } else if (config.headers && 'Authorization' in config.headers) {
+            // Limpia cualquier Authorization previo inválido
+            delete (config.headers as any).Authorization;
         }
 
         return config;
@@ -99,7 +103,10 @@ apiClient.interceptors.response.use(
 
                 const { access } = response.data;
 
-                // Guardar nuevo token de acceso
+                // Guardar nuevo token de acceso de forma segura
+                if (!access || access === 'undefined' || access === 'null') {
+                    throw new Error('Invalid access token received during refresh');
+                }
                 localStorage.setItem('access_token', access);
 
                 // Actualizar el header de la solicitud original
@@ -122,7 +129,12 @@ apiClient.interceptors.response.use(
                 localStorage.removeItem('access_token');
                 localStorage.removeItem('refresh_token');
                 localStorage.removeItem('user');
-
+                // Señal a la app para forzar re-autenticación
+                try {
+                    if (typeof window !== 'undefined') {
+                        window.location.href = '/login';
+                    }
+                } catch { }
                 return Promise.reject(refreshError);
             }
         }

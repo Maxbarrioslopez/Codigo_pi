@@ -118,93 +118,6 @@ def generate_temporary_password(length=12):
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
-def usuarios_create(request):
-    """
-    Crear nuevo usuario (solo admin)
-    ENDPOINT: POST /api/usuarios/
-    PERMISOS: Admin (JWT)
-    
-    BODY:
-    {
-        "username": "nuevo.usuario",
-        "email": "usuario@tmluc.cl",
-        "rol": "guardia|rrhh|supervisor",
-        "first_name": "Juan",
-        "last_name": "Pérez",
-        "password": "Temporal123!" // Opcional, se genera si no se proporciona
-    }
-    """
-    try:
-        # Verificar que el usuario es admin
-        if request.user.rol != 'admin' and not request.user.is_superuser:
-            return Response({'detail': 'Solo administradores pueden crear usuarios'}, status=status.HTTP_403_FORBIDDEN)
-
-        username = request.data.get('username', '').lower().strip()
-        email = request.data.get('email', '').lower().strip()
-        rol = request.data.get('rol', 'guardia')
-        first_name = request.data.get('first_name', '')
-        last_name = request.data.get('last_name', '')
-        password = request.data.get('password')
-
-        # Validaciones
-        if not username:
-            return Response({'username': 'El usuario es requerido'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if not email:
-            return Response({'email': 'El email es requerido'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if '@' not in email or '.' not in email:
-            return Response({'email': 'Email inválido'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if rol not in ['admin', 'rrhh', 'guardia', 'supervisor']:
-            return Response({'rol': 'Rol inválido'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Verificar si el usuario ya existe
-        if Usuario.objects.filter(username=username).exists():
-            return Response({'username': 'El usuario ya existe'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if Usuario.objects.filter(email=email).exists():
-            return Response({'email': 'El email ya está registrado'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Generar contraseña temporal si no se proporciona
-        if not password:
-            password = generate_temporary_password()
-
-        # Crear usuario
-        usuario = Usuario.objects.create_user(
-            username=username,
-            email=email,
-            first_name=first_name,
-            last_name=last_name,
-            password=password,
-            rol=rol,
-            activo=True
-        )
-
-        # Marcar que debe cambiar contraseña en primer ingreso (para guardia/rrhh)
-        if rol in ['guardia', 'rrhh']:
-            usuario.debe_cambiar_contraseña = True
-            usuario.save()
-
-        return Response({
-            'id': usuario.id,
-            'username': usuario.username,
-            'email': usuario.email,
-            'first_name': usuario.first_name,
-            'last_name': usuario.last_name,
-            'rol': usuario.rol,
-            'password': password,  # Solo se retorna en creación
-            'debe_cambiar_contraseña': usuario.debe_cambiar_contraseña
-        }, status=status.HTTP_201_CREATED)
-
-    except Exception as e:
-        logger.error(f"Error en usuarios_create: {e}")
-        return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(['POST'])
-@authentication_classes([JWTAuthentication])
-@permission_classes([IsAuthenticated])
 def usuarios_reset_password(request):
     """
     Resetear contraseña de un usuario (solo admin)
@@ -255,50 +168,89 @@ def usuarios_reset_password(request):
         return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(['GET'])
+@api_view(['GET', 'POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
-def usuarios_list(request):
+def usuarios_view(request):
     """
-    Lista todos los usuarios del sistema (solo admin)
-    ENDPOINT: GET /api/usuarios/
+    Vista combinada para listar (GET) y crear (POST) usuarios
+    ENDPOINT: GET/POST /api/usuarios/
     PERMISOS: Admin (JWT)
-    
-    RESPUESTA (200):
-    [
-        {
-            "id": 1,
-            "username": "admin.usuario",
-            "email": "admin@example.com",
-            "first_name": "Admin",
-            "last_name": "Usuario",
-            "rol": "admin",
-            "is_active": true,
-            "last_login": "2025-01-15T10:00:00Z",
-            "date_joined": "2025-01-01T08:00:00Z"
-        },
-        ...
-    ]
-    
-    ERRORES:
-        401: No autenticado
-        403: Sin permisos de administrador
-        500: Error interno del servidor
     """
     try:
         # Verificar que el usuario es admin
         if request.user.rol != 'admin' and not request.user.is_superuser:
-            return Response({'detail': 'Solo administradores pueden listar usuarios'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'detail': 'Solo administradores pueden gestionar usuarios'}, status=status.HTTP_403_FORBIDDEN)
 
-        # Obtener todos los usuarios
-        usuarios = Usuario.objects.all().values(
-            'id', 'username', 'email', 'first_name', 'last_name', 
-            'rol', 'is_active', 'last_login', 'date_joined'
-        )
+        if request.method == 'GET':
+            # Listar usuarios
+            usuarios = Usuario.objects.all().values(
+                'id', 'username', 'email', 'first_name', 'last_name', 
+                'rol', 'is_active', 'last_login', 'date_joined'
+            )
+            usuarios_list = list(usuarios)
+            return Response(usuarios_list, status=status.HTTP_200_OK)
         
-        usuarios_list = list(usuarios)
-        return Response(usuarios_list, status=status.HTTP_200_OK)
+        elif request.method == 'POST':
+            # Crear usuario
+            username = request.data.get('username', '').lower().strip()
+            email = request.data.get('email', '').lower().strip()
+            rol = request.data.get('rol', 'guardia')
+            first_name = request.data.get('first_name', '')
+            last_name = request.data.get('last_name', '')
+            password = request.data.get('password')
+
+            # Validaciones
+            if not username:
+                return Response({'username': 'El usuario es requerido'}, status=status.HTTP_400_BAD_REQUEST)
+
+            if not email:
+                return Response({'email': 'El email es requerido'}, status=status.HTTP_400_BAD_REQUEST)
+
+            if '@' not in email or '.' not in email:
+                return Response({'email': 'Email inválido'}, status=status.HTTP_400_BAD_REQUEST)
+
+            if rol not in ['admin', 'rrhh', 'guardia', 'supervisor']:
+                return Response({'rol': 'Rol inválido'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Verificar si el usuario ya existe
+            if Usuario.objects.filter(username=username).exists():
+                return Response({'username': 'El usuario ya existe'}, status=status.HTTP_400_BAD_REQUEST)
+
+            if Usuario.objects.filter(email=email).exists():
+                return Response({'email': 'El email ya está registrado'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Generar contraseña temporal si no se proporciona
+            if not password:
+                password = generate_temporary_password()
+
+            # Crear usuario
+            usuario = Usuario.objects.create_user(
+                username=username,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+                password=password,
+                rol=rol,
+                activo=True
+            )
+
+            # Marcar que debe cambiar contraseña en primer ingreso (para guardia/rrhh)
+            if rol in ['guardia', 'rrhh']:
+                usuario.debe_cambiar_contraseña = True
+                usuario.save()
+
+            return Response({
+                'id': usuario.id,
+                'username': usuario.username,
+                'email': usuario.email,
+                'first_name': usuario.first_name,
+                'last_name': usuario.last_name,
+                'rol': usuario.rol,
+                'password': password,  # Solo se retorna en creación
+                'debe_cambiar_contraseña': usuario.debe_cambiar_contraseña
+            }, status=status.HTTP_201_CREATED)
 
     except Exception as e:
-        logger.error(f"Error en usuarios_list: {e}")
+        logger.error(f"Error en usuarios_view: {e}")
         return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

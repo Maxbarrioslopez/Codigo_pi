@@ -4,7 +4,10 @@ import { apiClient, ApiClientWrapper } from '@/services/apiClient';
 /**
  * Sistema de Autenticación con JWT
  * Maneja login, logout, almacenamiento de tokens y verificación de roles
- * Integrado con apiClient para manejo centralizado de tokens
+ * Integrado con apiClient (Axios) para manejo centralizado de tokens
+ * 
+ * TOKENS: Usa SOLO access_token y refresh_token en localStorage
+ * CLIENTE: Usa SOLO apiClient (Axios) con interceptors automáticos
  */
 
 // Tipos
@@ -65,84 +68,38 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     }, [accessToken, refreshToken]);
 
-    // Base de la API para endpoints de auth (coincide con api.ts)
-    const API_BASE =
-        (import.meta as any)?.env?.VITE_API_URL?.replace(/\/$/, '') ||
-        (import.meta as any)?.env?.VITE_API_PREFIX?.replace(/\/$/, '') ||
-        '/api';
-
     const login = async (username: string, password: string) => {
         setLoading(true);
         try {
-            // Usuarios mock para desarrollo independiente
-            const mockUsers: Record<string, { password: string; user: User }> = {
-                admin: {
-                    password: 'admin123',
-                    user: { id: 1, username: 'admin', rol: 'admin', email: 'admin@tmluc.cl' }
-                },
-                guardia: {
-                    password: 'guardia123',
-                    user: { id: 2, username: 'guardia', rol: 'guardia', email: 'guardia@tmluc.cl' }
-                },
-                rrhh: {
-                    password: 'rrhh123',
-                    user: { id: 3, username: 'rrhh', rol: 'rrhh', email: 'rrhh@tmluc.cl' }
-                }
+            // Intentar login con backend real usando apiClient
+            const { data } = await apiClient.post('/auth/login/', { username, password });
+
+            // Decodificar el token para obtener información del usuario
+            const tokenPayload = JSON.parse(atob(data.access.split('.')[1]));
+
+            const userData: User = {
+                id: tokenPayload.user_id,
+                username: tokenPayload.username || username,
+                rol: tokenPayload.rol || 'guardia',
+                email: tokenPayload.email,
+                debe_cambiar_contraseña: tokenPayload.debe_cambiar_contraseña || false,
             };
 
-            // Intentar login con backend real usando apiClient
-            try {
-                const { data } = await apiClient.post('/auth/login/', { username, password });
+            // Guardar en estado y localStorage
+            setUser(userData);
+            setAccessToken(data.access);
+            setRefreshToken(data.refresh);
 
-                // Decodificar el token para obtener información del usuario
-                const tokenPayload = JSON.parse(atob(data.access.split('.')[1]));
+            localStorage.setItem('user', JSON.stringify(userData));
+            localStorage.setItem('access_token', data.access);
+            localStorage.setItem('refresh_token', data.refresh);
 
-                const userData: User = {
-                    id: tokenPayload.user_id,
-                    username: tokenPayload.username || username,
-                    rol: tokenPayload.rol || 'guardia',
-                    email: tokenPayload.email,
-                    debe_cambiar_contraseña: tokenPayload.debe_cambiar_contraseña || false,
-                };
+            // Inyectar tokens en apiClient
+            ApiClientWrapper.setAuthTokens(data.access, data.refresh);
 
-                // Guardar en estado y localStorage
-                setUser(userData);
-                setAccessToken(data.access);
-                setRefreshToken(data.refresh);
-
-                localStorage.setItem('user', JSON.stringify(userData));
-                localStorage.setItem('access_token', data.access);
-                localStorage.setItem('refresh_token', data.refresh);
-                localStorage.setItem('mock_mode', 'false');
-
-                // Inyectar tokens en apiClient
-                ApiClientWrapper.setAuthTokens(data.access, data.refresh);
-                return;
-            } catch (backendError) {
-                console.warn('Backend no disponible, usando modo mock:', backendError);
-            }
-
-            // Fallback a usuarios mock si backend no está disponible
-            const mockUser = mockUsers[username.toLowerCase()];
-            if (mockUser && mockUser.password === password) {
-                const mockToken = `mock.${btoa(JSON.stringify({ user_id: mockUser.user.id, username: mockUser.user.username, rol: mockUser.user.rol }))}.mock`;
-
-                setUser(mockUser.user);
-                setAccessToken(mockToken);
-                setRefreshToken(mockToken);
-
-                localStorage.setItem('user', JSON.stringify(mockUser.user));
-                localStorage.setItem('access_token', mockToken);
-                localStorage.setItem('refresh_token', mockToken);
-                localStorage.setItem('mock_mode', 'true');
-                ApiClientWrapper.setAuthTokens(mockToken, mockToken);
-                return;
-            }
-
-            throw new Error('Credenciales inválidas');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error de login:', error);
-            throw error;
+            throw new Error(error.response?.data?.detail || 'Credenciales inválidas');
         } finally {
             setLoading(false);
         }

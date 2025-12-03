@@ -12,6 +12,7 @@ import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { Toaster } from './components/ui/toaster';
 import { StockModule } from './components/StockModule';
 import { NominaModule } from './components/NominaModule';
+import { BackendStatusBanner } from './components/BackendStatusBanner';
 import { Menu, X, LogOut } from 'lucide-react';
 
 // Layout principal con sidebar para usuarios autenticados
@@ -161,6 +162,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        {/* Banner de estado del backend - se muestra solo si está caído */}
+        <BackendStatusBanner />
+
         <Routes>
           {/* Ruta pública de Login */}
           <Route path="/login" element={<LoginModule />} />

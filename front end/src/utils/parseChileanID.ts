@@ -69,6 +69,9 @@ function isValidRut(rut: string): boolean {
     return dv === expected;
 }
 
+// Exportar para uso externo
+export { isValidRut };
+
 function modulo11(numStr: string): string {
     let sum = 0;
     let mul = 2;
@@ -83,9 +86,20 @@ function modulo11(numStr: string): string {
 }
 
 function formatRut(rut: string): string {
-    // Mantiene formato NN.NNN.NNN-DV opcionalmente
-    const clean = rut.replace(/\./g, '');
-    const [numStr, dv] = clean.split('-');
-    // Simple format without thousands separator to avoid locale issues
-    return `${numStr}-${dv}`;
+    // Formatea RUT limpiando y aplicando formato XX-XX (sin puntos)
+    let clean = rut.replace(/[^\dkK]/g, '').toUpperCase();
+
+    if (clean.length === 0) return '';
+
+    // Si ya tiene el dígito verificador
+    if (clean.length > 1) {
+        const body = clean.slice(0, -1);
+        const dv = clean.slice(-1);
+        return `${body}-${dv}`;
+    }
+
+    return clean;
 }
+
+// Exportar para uso externo
+export { formatRut };

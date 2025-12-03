@@ -94,9 +94,34 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Custom User Model
 AUTH_USER_MODEL = 'totem.Usuario'
 
-# CORS Configuration
+# CORS Configuration (Development - permissive for debugging)
+CORS_ALLOW_ALL_ORIGINS = True  # Temporal para debugging
 CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000,http://localhost:5173', cast=Csv())
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+# Debug - Verify CORS is configured
+print(f"[SETTINGS] CORS_ALLOW_ALL_ORIGINS: {CORS_ALLOW_ALL_ORIGINS}")
+print(f"[SETTINGS] CORS_ALLOWED_ORIGINS: {CORS_ALLOWED_ORIGINS}")
+print(f"[SETTINGS] CORS middleware in MIDDLEWARE: {'corsheaders.middleware.CorsMiddleware' in MIDDLEWARE}")
 
 # Rest Framework configuration
 REST_FRAMEWORK = {

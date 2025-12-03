@@ -93,6 +93,10 @@ export class AuthService {
     async login(credentials: LoginRequest): Promise<LoginResponse> {
         try {
             const { data } = await apiClient.post<LoginResponse>('auth/login/', credentials);
+            // Guardar tokens y usuario en localStorage para que apiClient adjunte Authorization
+            localStorage.setItem('access_token', data.access);
+            localStorage.setItem('refresh_token', data.refresh);
+            localStorage.setItem('user', JSON.stringify(data.user));
             return data;
         } catch (error) {
             throw ErrorHandler.handle(error, 'AuthService.login', false);

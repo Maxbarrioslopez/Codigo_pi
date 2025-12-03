@@ -1,15 +1,12 @@
 /**
  * Capa de servicios centralizada para consumir la API DRF.
- * Incluye stub de autenticación con token en memoria/localStorage.
- * Soporta modo mock para desarrollo independiente del backend.
+ * DEPRECADO: Este archivo está siendo migrado a usar apiClient (Axios).
+ * Las funciones aquí delegan a apiClient para mantener compatibilidad.
+ * Modo mock solo se activa explícitamente, NUNCA por errores de red.
  */
 
+import { apiClient } from './apiClient';
 import { mockData } from './mockData';
-
-// Detectar si estamos en modo mock
-function isMockMode(): boolean {
-    return localStorage.getItem('mock_mode') === 'true';
-}
 
 // ===================== Tipos de datos (interfaces) =====================
 export interface TrabajadorDTO { id: number; rut: string; nombre: string; beneficio_disponible: any; }
@@ -33,202 +30,171 @@ export interface ApiError {
     detail: string;
 }
 
-// Prefijo/base para la API. Usar VITE_API_URL si apunta a host completo o VITE_API_PREFIX si es relativo (e.g. "/api").
-const API_BASE =
-    (import.meta as any)?.env?.VITE_API_URL?.replace(/\/$/, '') ||
-    (import.meta as any)?.env?.VITE_API_PREFIX?.replace(/\/$/, '') ||
-    '/api';
-
-let authToken: string | null = null; // token en memoria
-
-export function setAuthToken(token: string | null) {
-    authToken = token;
-    if (token) {
-        try { localStorage.setItem('authToken', token); } catch { /* ignore */ }
-    } else {
-        try { localStorage.removeItem('authToken'); } catch { /* ignore */ }
-    }
+// Detectar si estamos en modo mock (solo por flag explícito en dev)
+function isMockMode(): boolean {
+    return import.meta.env.VITE_MOCK_MODE === 'true' || localStorage.getItem('explicit_mock_mode') === 'true';
 }
 
-function getStoredToken(): string | null {
-    if (authToken) return authToken;
-    try { return localStorage.getItem('authToken'); } catch { return null; }
-}
-
-async function refreshAccessToken(): Promise<string | null> {
-    try {
-        const refreshToken = localStorage.getItem('refresh_token');
-        if (!refreshToken) return null;
-        const resp = await fetch(`${API_BASE}/auth/refresh/`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refresh: refreshToken })
-        });
-        if (!resp.ok) return null;
-        const data = await resp.json();
-        setAuthToken(data.access);
-        return data.access;
-    } catch {
-        return null;
-    }
-}
-
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-    // Si estamos en modo mock, no hacer peticiones reales
+/**
+ * Wrapper interno que delega a apiClient (Axios) en vez de fetch
+ */
+async function request<T>(path: string, method: 'GET' | 'POST' | 'PATCH' | 'DELETE' = 'GET', body?: any): Promise<T> {
     if (isMockMode()) {
-        // Simular delay de red
         await new Promise(resolve => setTimeout(resolve, 300));
         throw { status: 503, detail: 'Mock mode active - use mock functions' } as ApiError;
     }
 
-    // Normalizar path para evitar duplicar "/api" si viene incluido por error.
-    const normalizedPath = path.startsWith('/api/') ? path.slice(4) : path;
-    const token = getStoredToken();
-
     try {
-        const resp = await fetch(`${API_BASE}${normalizedPath}`, {
-            headers: {
-                'Content-Type': 'application/json',
-                ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-                ...(options.headers || {})
-            },
-            ...options,
-        });
-        if (!resp.ok) {
-            // Auto-refresh en caso de 401 Unauthorized
-            if (resp.status === 401 && !path.includes('/auth/')) {
-                const newToken = await refreshAccessToken();
-                if (newToken) {
-                    // Reintentar request con nuevo token
-                    return request<T>(path, options);
-                }
-            }
-            let detail = 'Error desconocido';
-            try { const js = await resp.json(); detail = js.detail || JSON.stringify(js); } catch { }
-            throw { status: resp.status, detail } as ApiError;
+        let response;
+
+        switch (method) {
+            case 'POST':
+                response = await apiClient.post<T>(path, body);
+                break;
+            case 'PATCH':
+                response = await apiClient.patch<T>(path, body);
+                break;
+            case 'DELETE':
+                response = await apiClient.delete<T>(path);
+                break;
+            default:
+                response = await apiClient.get<T>(path);
         }
-        if (resp.status === 204) return {} as T;
-        return resp.json() as Promise<T>;
+
+        return response.data;
     } catch (error: any) {
-        // Si el backend no está disponible y no estamos en modo mock, activar modo mock
-        if (error.message?.includes('fetch') || error.message?.includes('NetworkError')) {
-            console.warn('Backend no disponible, activando modo mock');
-            localStorage.setItem('mock_mode', 'true');
-            throw { status: 503, detail: 'Backend no disponible. Usar modo mock.' } as ApiError;
-        }
-        throw error;
+        // Transformar error de Axios a formato ApiError
+        const status = error.response?.status || 500;
+        const detail = error.response?.data?.detail || error.message || 'Error desconocido';
+        throw { status, detail } as ApiError;
     }
 }
 
 // Beneficio
 export async function getBeneficio(rut: string) {
     if (isMockMode()) return mockData.getBeneficio(rut);
-    return request<BeneficioResponse>(`/beneficios/${rut}/`);
+    return request<BeneficioResponse>(`/beneficios/${rut}/`, 'GET');
 }
 
 // Tickets
 export async function crearTicket(trabajador_rut: string, data: Record<string, any>) {
     if (isMockMode()) return mockData.crearTicket(trabajador_rut);
-    return request<TicketDTO>('/tickets/', { method: 'POST', body: JSON.stringify({ trabajador_rut, data }) });
+    return request<TicketDTO>('/tickets/', 'POST', { trabajador_rut, data });
 }
+
 export async function estadoTicket(uuid: string) {
     if (isMockMode()) return mockData.estadoTicket(uuid);
-    return request<TicketDTO>(`/tickets/${uuid}/estado/`);
+    return request<TicketDTO>(`/tickets/${uuid}/estado/`, 'GET');
 }
+
 export async function validarTicketGuardia(uuid: string, codigo_caja?: string) {
     if (isMockMode()) return mockData.validarTicketGuardia(uuid);
-    return request<TicketDTO>(`/tickets/${uuid}/validar_guardia/`, { method: 'POST', body: JSON.stringify({ codigo_caja }) });
+    return request<TicketDTO>(`/tickets/${uuid}/validar_guardia/`, 'POST', { codigo_caja });
 }
+
 export async function anularTicket(uuid: string, motivo?: string) {
-    if (isMockMode()) return mockData.estadoTicket(uuid); // Mock simple
-    return request<TicketDTO>(`/tickets/${uuid}/anular/`, { method: 'POST', body: JSON.stringify({ motivo }) });
+    if (isMockMode()) return mockData.estadoTicket(uuid);
+    return request<TicketDTO>(`/tickets/${uuid}/anular/`, 'POST', { motivo });
 }
+
 export async function reimprimirTicket(uuid: string) {
-    if (isMockMode()) return mockData.estadoTicket(uuid); // Mock simple
-    return request<TicketDTO>(`/tickets/${uuid}/reimprimir/`, { method: 'POST' });
+    if (isMockMode()) return mockData.estadoTicket(uuid);
+    return request<TicketDTO>(`/tickets/${uuid}/reimprimir/`, 'POST');
 }
 
 // Listar tickets (RRHH) opcional filtro por rut
 export async function listarTickets(rut?: string) {
     if (isMockMode()) return mockData.listarTickets(rut);
     const q = rut ? `?rut=${encodeURIComponent(rut)}` : '';
-    return request<TicketDTO[]>(`/tickets/listar/${q}`);
+    return request<TicketDTO[]>(`/tickets/listar/${q}`, 'GET');
 }
 
 // Agendamientos
 export async function crearAgendamiento(trabajador_rut: string, fecha_retiro: string) {
     if (isMockMode()) return mockData.crearAgendamiento(trabajador_rut, fecha_retiro);
-    return request<AgendamientoDTO>('/agendamientos/', { method: 'POST', body: JSON.stringify({ trabajador_rut, fecha_retiro }) });
+    return request<AgendamientoDTO>('/agendamientos/', 'POST', { trabajador_rut, fecha_retiro });
 }
+
 export async function listarAgendamientos(rut: string) {
     if (isMockMode()) return mockData.listarAgendamientos(rut);
-    return request<AgendamientoDTO[]>(`/agendamientos/${rut}/`);
+    return request<AgendamientoDTO[]>(`/agendamientos/${rut}/`, 'GET');
 }
+
 // Alias explícito para semántica RRHH
 export const listarAgendamientosPorRut = listarAgendamientos;
 
 // Incidencias
 export async function crearIncidencia(payload: { trabajador_rut?: string; tipo: string; descripcion?: string; origen?: string }) {
     if (isMockMode()) return mockData.crearIncidencia(payload);
-    return request<IncidenciaDTO>('/incidencias/', { method: 'POST', body: JSON.stringify(payload) });
+    return request<IncidenciaDTO>('/incidencias/', 'POST', payload);
 }
+
 export async function obtenerIncidencia(codigo: string) {
     if (isMockMode()) return mockData.obtenerIncidencia(codigo);
-    return request<IncidenciaDTO>(`/incidencias/${codigo}/`);
+    return request<IncidenciaDTO>(`/incidencias/${codigo}/`, 'GET');
 }
 export async function listarIncidencias(estado?: string) {
     if (isMockMode()) return mockData.listarIncidencias(estado);
     const q = estado ? `?estado=${encodeURIComponent(estado)}` : '';
-    return request<IncidenciaDTO[]>(`/incidencias/listar/${q}`);
+    return request<IncidenciaDTO[]>(`/incidencias/listar/${q}`, 'GET');
 }
+
 export async function resolverIncidencia(codigo: string, resolucion: string) {
     if (isMockMode()) return mockData.resolverIncidencia(codigo, resolucion);
-    return request<IncidenciaDTO>(`/incidencias/${codigo}/resolver/`, { method: 'POST', body: JSON.stringify({ resolucion }) });
+    return request<IncidenciaDTO>(`/incidencias/${codigo}/resolver/`, 'POST', { resolucion });
 }
+
 export async function cambiarEstadoIncidencia(codigo: string, estado: 'pendiente' | 'en_proceso' | 'resuelta') {
     if (isMockMode()) return mockData.cambiarEstadoIncidencia(codigo, estado);
-    return request<IncidenciaDTO>(`/incidencias/${codigo}/estado/`, { method: 'PATCH', body: JSON.stringify({ estado }) });
+    return request<IncidenciaDTO>(`/incidencias/${codigo}/estado/`, 'PATCH', { estado });
 }
 
 // Ciclo y métricas
 export async function cicloActivo() {
     if (isMockMode()) return mockData.cicloActivo();
-    return request<CicloDTO>('/ciclo/activo/');
+    return request<CicloDTO>('/ciclo/activo/', 'GET');
 }
+
 export async function metricasGuardia() {
     if (isMockMode()) return mockData.metricasGuardia();
-    return request<MetricasGuardiaDTO>('/metricas/guardia/');
+    return request<MetricasGuardiaDTO>('/metricas/guardia/', 'GET');
 }
+
 export async function listarParametros() {
     if (isMockMode()) return mockData.listarParametros();
-    return request<ParametroOperativoDTO[]>('/parametros/');
+    return request<ParametroOperativoDTO[]>('/parametros/', 'GET');
 }
+
 export async function upsertParametro(clave: string, valor: string, descripcion?: string) {
     if (isMockMode()) return mockData.upsertParametro(clave, valor, descripcion);
-    return request<ParametroOperativoDTO>('/parametros/', { method: 'POST', body: JSON.stringify({ clave, valor, descripcion }) });
+    return request<ParametroOperativoDTO>('/parametros/', 'POST', { clave, valor, descripcion });
 }
 
 // Reportes RRHH
 export interface RetirosDiaDTO { fecha: string; entregados: number; pendientes: number; expirados: number; }
+
 export async function reportesRetirosPorDia(dias: number = 7) {
     if (isMockMode()) return mockData.reportesRetirosPorDia(dias);
-    return request<RetirosDiaDTO[]>(`/reportes/retiros_por_dia/?dias=${dias}`);
+    return request<RetirosDiaDTO[]>(`/reportes/retiros_por_dia/?dias=${dias}`, 'GET');
 }
 
-// Stock endpoints (si backend los soporta)
+// Stock endpoints
 export async function stockResumen() {
     if (isMockMode()) return mockData.stockResumen();
-    return request<StockResumenDTO>('/stock/resumen/');
-}
-export async function stockMovimientos() {
-    if (isMockMode()) return mockData.stockMovimientos();
-    return request<StockMovimientoDTO[]>('/stock/movimientos/');
-}
-export async function registrarMovimientoStock(accion: 'agregar' | 'retirar', tipo_caja: 'Estándar' | 'Premium', cantidad: number, motivo: string) {
-    if (isMockMode()) return { success: true }; // Mock simple
-    return request<any>('/stock/movimiento/', { method: 'POST', body: JSON.stringify({ accion, tipo_caja, cantidad, motivo }) });
+    return request<StockResumenDTO>('/stock/resumen/', 'GET');
 }
 
+export async function stockMovimientos() {
+    if (isMockMode()) return mockData.stockMovimientos();
+    return request<StockMovimientoDTO[]>('/stock/movimientos/', 'GET');
+}
+
+export async function registrarMovimientoStock(accion: 'agregar' | 'retirar', tipo_caja: 'Estándar' | 'Premium', cantidad: number, motivo: string) {
+    if (isMockMode()) return { success: true };
+    return request<any>('/stock/movimiento/', 'POST', { accion, tipo_caja, cantidad, motivo });
+}
+
+// Exportar API object para compatibilidad con código existente
 export const api = {
     getBeneficio,
     crearTicket,
@@ -253,5 +219,4 @@ export const api = {
     stockResumen,
     stockMovimientos,
     registrarMovimientoStock,
-    setAuthToken,
 };

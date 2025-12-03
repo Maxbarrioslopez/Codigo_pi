@@ -261,8 +261,8 @@ export function RRHHModuleNew() {
                     <TabsContent value="trabajadores" className="space-y-4">
                         <div className="bg-white rounded-lg border border-[#E0E0E0] p-3 md:p-6">
                             <div className="mb-3">
-                                <h3 className="text-[#333333] text-sm md:text-base font-semibold">Gestión de Trabajadores</h3>
-                                <p className="text-[#6B6B6B] text-xs">Crea, busca y administra trabajadores y su estado de beneficio</p>
+                                <h3 className="text-[#333333] text-sm md:text-base font-semibold">Trabajadores y Nómina</h3>
+                                <p className="text-[#6B6B6B] text-xs">Agrega trabajadores a la nómina (crear) o quítalos si fue un error (bloquear/eliminar).</p>
                             </div>
                             <div className="flex flex-col sm:flex-row gap-3 mb-4">
                                 <Input
@@ -365,7 +365,7 @@ export function RRHHModuleNew() {
                                                         <button
                                                             onClick={() => handleDeleteTrabajador(t.rut!)}
                                                             className="text-[#E12019] hover:text-[#B51810] text-xs md:text-sm"
-                                                            title="Eliminar"
+                                                            title="Quitar de nómina"
                                                         >
                                                             <Trash2 className="w-4 h-4" />
                                                         </button>
@@ -649,7 +649,7 @@ function DashboardCard({ title, value, icon: Icon, color }: { title: string; val
 // Integra endpoints basados en archivo: preview y confirmar
 export function RRHHNominaWizard({ open, onOpenChange, cycleId, onConfirmed }: { open: boolean; onOpenChange: (o: boolean) => void; cycleId: number | null; onConfirmed?: () => void }) {
     const [file, setFile] = useState<File | null>(null);
-    const [preview, setPreview] = useState<any[] | null>(null);
+    const [preview, setPreview] = useState<any | null>(null);
     const [loading, setLoading] = useState(false);
 
     const doPreview = async () => {
@@ -665,9 +665,11 @@ export function RRHHNominaWizard({ open, onOpenChange, cycleId, onConfirmed }: {
         }
         setLoading(true);
         try {
-            const items = await nominaService.previewFile(file, cycleId ?? undefined);
-            setPreview(items);
-            showSuccess('Vista previa generada', `${items.length || 0} registros analizados`);
+            const result = await nominaService.previewFile(file, cycleId ?? undefined);
+            setPreview(result);
+            // Backend retorna { detail, resumen? }; si no hay resumen mostramos mensaje básico
+            const total = result?.resumen?.total_registros;
+            showSuccess('Vista previa generada', typeof total === 'number' ? `${total} registros analizados` : result?.detail || 'Validación OK');
         } finally {
             setLoading(false);
         }
@@ -701,14 +703,18 @@ export function RRHHNominaWizard({ open, onOpenChange, cycleId, onConfirmed }: {
                         <Button onClick={() => onOpenChange(false)} variant="outline" className="border-[#E0E0E0]">Cancelar</Button>
                     </div>
                     {preview && (
-                        <div className="max-h-40 overflow-y-auto border border-[#E0E0E0] rounded p-2">
-                            {preview.slice(0, 10).map((row: any, idx: number) => (
-                                <div key={idx} className="text-xs text-[#333333] flex justify-between">
-                                    <span className="truncate">{row?.nombre || row?.rut}</span>
-                                    <span className="text-[#6B6B6B]">{row?.beneficio || ''}</span>
+                        <div className="border border-[#E0E0E0] rounded p-3 bg-[#F8F8F8]">
+                            <p className="text-xs text-[#333333]">{preview.detail || 'Validación realizada.'}</p>
+                            {preview.resumen && (
+                                <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
+                                    <div><span className="text-[#6B6B6B]">Total:</span> <strong>{preview.resumen.total_registros}</strong></div>
+                                    <div><span className="text-[#6B6B6B]">Válidos:</span> <strong>{preview.resumen.validos}</strong></div>
+                                    <div><span className="text-[#6B6B6B]">Inválidos:</span> <strong>{preview.resumen.invalidos}</strong></div>
+                                    <div><span className="text-[#6B6B6B]">A crear:</span> <strong>{preview.resumen.a_crear}</strong></div>
+                                    <div><span className="text-[#6B6B6B]">A actualizar:</span> <strong>{preview.resumen.a_actualizar}</strong></div>
+                                    <div><span className="text-[#6B6B6B]">Sin beneficio:</span> <strong>{preview.resumen.sin_beneficio}</strong></div>
                                 </div>
-                            ))}
-                            {preview.length > 10 && <p className="text-xs text-[#6B6B6B] mt-2">Mostrando 10 de {preview.length} registros…</p>}
+                            )}
                         </div>
                     )}
                 </div>

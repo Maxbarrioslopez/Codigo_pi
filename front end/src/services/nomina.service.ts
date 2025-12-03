@@ -89,12 +89,13 @@ export class NominaService {
      * Vista previa basada en archivo (CSV/XLSX)
      * Envía FormData con archivo y opcionalmente ciclo_id
      */
-    async previewFile(file: File, ciclo_id?: number): Promise<any[]> {
+    async previewFile(file: File, ciclo_id?: number): Promise<any> {
         try {
             const form = new FormData();
-            form.append('file', file);
+            // Backend espera el campo 'archivo'
+            form.append('archivo', file);
             if (typeof ciclo_id === 'number') form.append('ciclo_id', String(ciclo_id));
-            const { data } = await apiClient.post<any[]>('/nomina/preview/', form, {
+            const { data } = await apiClient.post<any>('/nomina/preview/', form, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
             return data;
@@ -110,7 +111,8 @@ export class NominaService {
     async confirmarFile(file: File, ciclo_id?: number): Promise<any> {
         try {
             const form = new FormData();
-            form.append('file', file);
+            // Backend espera el campo 'archivo'
+            form.append('archivo', file);
             if (typeof ciclo_id === 'number') form.append('ciclo_id', String(ciclo_id));
             const { data } = await apiClient.post<any>('/nomina/confirmar/', form, {
                 headers: { 'Content-Type': 'multipart/form-data' },

@@ -1,5 +1,19 @@
-import { useState } from 'react';
-import { Upload, FileText, Download, History, AlertCircle, CheckCircle, XCircle, ArrowUp, ArrowDown, UserPlus, UserMinus, Edit } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import * as XLSX from 'xlsx';
+import {
+  Upload,
+  FileText,
+  Download,
+  History,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+  ArrowUp,
+  ArrowDown,
+  UserPlus,
+  UserMinus,
+  Edit,
+} from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
@@ -47,21 +61,40 @@ const payrollHistory = [
 
 const mockComparison = {
   added: [
-    { rut: '12.345.678-9', name: 'María González Pérez', section: 'Producción', contract: 'Indefinido', benefit: 'Premium' },
-    { rut: '23.456.789-0', name: 'Carlos Rodríguez Silva', section: 'Logística', contract: 'Plazo fijo', benefit: 'Estándar' },
+    {
+      rut: '12.345.678-9',
+      name: 'María González Pérez',
+      section: 'Producción',
+      contract: 'Indefinido',
+      benefit: 'Premium',
+    },
+    {
+      rut: '23.456.789-0',
+      name: 'Carlos Rodríguez Silva',
+      section: 'Logística',
+      contract: 'Plazo fijo',
+      benefit: 'Estándar',
+    },
   ],
   removed: [
-    { rut: '34.567.890-1', name: 'Pedro Martínez López', section: 'Administración', contract: 'Indefinido', benefit: 'Premium', reason: 'Término de contrato' },
+    {
+      rut: '34.567.890-1',
+      name: 'Pedro Martínez López',
+      section: 'Administración',
+      contract: 'Indefinido',
+      benefit: 'Premium',
+      reason: 'Término de contrato',
+    },
   ],
   updated: [
-    { 
-      rut: '45.678.901-2', 
-      name: 'Ana Torres Silva', 
-      section: 'Producción', 
+    {
+      rut: '45.678.901-2',
+      name: 'Ana Torres Silva',
+      section: 'Producción',
       changes: [
         { field: 'Contrato', old: 'Plazo fijo', new: 'Indefinido' },
         { field: 'Beneficio', old: 'Estándar', new: 'Premium' },
-      ]
+      ],
     },
   ],
 };
@@ -69,14 +102,83 @@ const mockComparison = {
 export function NominaModule() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showComparisonModal, setShowComparisonModal] = useState(false);
-  const [uploadStep, setUploadStep] = useState<'upload' | 'preview' | 'processing' | 'complete'>('upload');
+  const [uploadStep, setUploadStep] = useState<'upload' | 'preview' | 'processing' | 'complete'>(
+    'upload'
+  );
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewRows, setPreviewRows] = useState<any[]>([]);
+  const [previewCount, setPreviewCount] = useState<number>(0);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+
+  const handleSelectFileClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const resetUploadState = () => {
+    setSelectedFile(null);
+    setPreviewRows([]);
+    setPreviewCount(0);
+    setUploadStep('upload');
+    setUploadProgress(0);
+  };
+
+  const handleDragOver: React.DragEventHandler<HTMLDivElement> = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const parseFileToPreview = async (file: File) => {
+    const isCSV = file.name.toLowerCase().endsWith('.csv');
+    const arrayBuffer = await file.arrayBuffer();
+    const data = isCSV ? new TextDecoder('utf-8').decode(new Uint8Array(arrayBuffer)) : arrayBuffer;
+    const workbook = XLSX.read(data, { type: isCSV ? 'binary' : 'array' });
+    const firstSheetName = workbook.SheetNames[0];
+    const firstSheet = workbook.Sheets[firstSheetName];
+    const json = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+    setPreviewCount(json.length);
+    setPreviewRows(json.slice(0, 5));
+  };
+
+  const validateFile = (file: File) => {
+    const name = file.name.toLowerCase();
+    const validExt = name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.csv');
+    const validSize = file.size <= MAX_FILE_SIZE_BYTES;
+    return validExt && validSize;
+  };
+
+  const handleFileChange: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
+    const file = e.target.files?.[0] || null;
+    if (!file) return;
+    if (!validateFile(file)) {
+      return; // You could surface a toast here if available
+    }
+    setSelectedFile(file);
+    await parseFileToPreview(file);
+    setUploadStep('preview');
+  };
+
+  const handleDrop: React.DragEventHandler<HTMLDivElement> = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    if (!validateFile(file)) {
+      return;
+    }
+    setSelectedFile(file);
+    await parseFileToPreview(file);
+    setUploadStep('preview');
+  };
 
   const getStatusBadge = (status: string) => {
     const styles = {
-      'Procesado': 'bg-[#017E49] text-white',
-      'Procesando': 'bg-[#FF9F55] text-white',
-      'Error': 'bg-[#E12019] text-white',
+      Procesado: 'bg-[#017E49] text-white',
+      Procesando: 'bg-[#FF9F55] text-white',
+      Error: 'bg-[#E12019] text-white',
     };
     return styles[status as keyof typeof styles] || 'bg-[#6B6B6B] text-white';
   };
@@ -84,11 +186,14 @@ export function NominaModule() {
   const handleUpload = () => {
     setUploadStep('processing');
     setUploadProgress(0);
-    
-    const interval = setInterval(() => {
+
+    if (uploadIntervalRef.current) {
+      clearInterval(uploadIntervalRef.current);
+    }
+    uploadIntervalRef.current = setInterval(() => {
       setUploadProgress((prev) => {
         if (prev >= 100) {
-          clearInterval(interval);
+          if (uploadIntervalRef.current) clearInterval(uploadIntervalRef.current);
           setUploadStep('complete');
           return 100;
         }
@@ -96,6 +201,14 @@ export function NominaModule() {
       });
     }, 300);
   };
+
+  useEffect(() => {
+    return () => {
+      if (uploadIntervalRef.current) {
+        clearInterval(uploadIntervalRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -132,40 +245,56 @@ export function NominaModule() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white border-2 border-[#E0E0E0] rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>Total Trabajadores</p>
+            <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>
+              Total Trabajadores
+            </p>
             <FileText className="w-5 h-5 text-[#6B6B6B]" />
           </div>
-          <p className="text-[#333333]" style={{ fontSize: '24px', fontWeight: 500 }}>245</p>
+          <p className="text-[#333333]" style={{ fontSize: '24px', fontWeight: 500 }}>
+            245
+          </p>
           <p className="text-[#017E49]" style={{ fontSize: '12px' }}>
             +12 desde última carga
           </p>
         </div>
         <div className="bg-white border-2 border-[#017E49] rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>Con Beneficio</p>
+            <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>
+              Con Beneficio
+            </p>
             <CheckCircle className="w-5 h-5 text-[#017E49]" />
           </div>
-          <p className="text-[#017E49]" style={{ fontSize: '24px', fontWeight: 500 }}>231</p>
+          <p className="text-[#017E49]" style={{ fontSize: '24px', fontWeight: 500 }}>
+            231
+          </p>
           <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>
             94.3% del total
           </p>
         </div>
         <div className="bg-white border-2 border-[#FF9F55] rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>Sin Beneficio</p>
+            <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>
+              Sin Beneficio
+            </p>
             <XCircle className="w-5 h-5 text-[#FF9F55]" />
           </div>
-          <p className="text-[#FF9F55]" style={{ fontSize: '24px', fontWeight: 500 }}>14</p>
+          <p className="text-[#FF9F55]" style={{ fontSize: '24px', fontWeight: 500 }}>
+            14
+          </p>
           <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>
             5.7% del total
           </p>
         </div>
         <div className="bg-white border-2 border-[#E0E0E0] rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>Última Carga</p>
+            <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>
+              Última Carga
+            </p>
             <History className="w-5 h-5 text-[#6B6B6B]" />
           </div>
-          <p className="text-[#333333]" style={{ fontSize: '16px', fontWeight: 500 }}>01-Ene-2025</p>
+          <p className="text-[#333333]" style={{ fontSize: '16px', fontWeight: 500 }}>
+            01-Ene-2025
+          </p>
           <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>
             CYCLE-2025-01
           </p>
@@ -226,9 +355,7 @@ export function NominaModule() {
                   </td>
                   <td className="p-4 text-[#6B6B6B]">{record.uploadedBy}</td>
                   <td className="p-4">
-                    <Badge className={getStatusBadge(record.status)}>
-                      {record.status}
-                    </Badge>
+                    <Badge className={getStatusBadge(record.status)}>{record.status}</Badge>
                   </td>
                   <td className="p-4">
                     <Button
@@ -255,7 +382,13 @@ export function NominaModule() {
 
           {uploadStep === 'upload' && (
             <div className="space-y-4">
-              <div className="bg-[#F8F8F8] border-2 border-dashed border-[#E0E0E0] rounded-xl p-8 text-center">
+              <div
+                className="bg-[#F8F8F8] border-2 border-dashed border-[#E0E0E0] rounded-xl p-8 text-center"
+                onClick={handleSelectFileClick}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                role="button"
+              >
                 <Upload className="w-12 h-12 text-[#6B6B6B] mx-auto mb-4" />
                 <p className="text-[#333333] mb-2">Arrastra el archivo Excel o CSV aquí</p>
                 <p className="text-[#6B6B6B] mb-4" style={{ fontSize: '14px' }}>
@@ -263,10 +396,17 @@ export function NominaModule() {
                 </p>
                 <Button
                   className="bg-[#E12019] text-white hover:bg-[#B51810] h-11 px-6 rounded-xl"
-                  onClick={() => setUploadStep('preview')}
+                  onClick={handleSelectFileClick}
                 >
                   Seleccionar Archivo
                 </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
               </div>
 
               <div className="bg-[#FFF4E6] border-2 border-[#FF9F55] rounded-xl p-4">
@@ -284,11 +424,14 @@ export function NominaModule() {
               </div>
 
               <Button
+                asChild
                 variant="outline"
                 className="w-full h-11 border-2 border-[#E0E0E0] rounded-xl"
               >
-                <Download className="w-4 h-4 mr-2" />
-                Descargar Plantilla Excel
+                <a href="/plantillas/nomina_ejemplo.csv" download="plantilla_nomina.csv">
+                  <Download className="w-4 h-4 mr-2" />
+                  Descargar Plantilla Excel
+                </a>
               </Button>
             </div>
           )}
@@ -300,8 +443,13 @@ export function NominaModule() {
                   <div className="flex items-center gap-3">
                     <FileText className="w-8 h-8 text-[#E12019]" />
                     <div>
-                      <p className="text-[#333333]">nomina_enero_2025.xlsx</p>
-                      <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>2.4 MB • 245 registros</p>
+                      <p className="text-[#333333]">{selectedFile?.name || 'Sin archivo'}</p>
+                      <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>
+                        {selectedFile
+                          ? `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB`
+                          : '0 MB'}{' '}
+                        • {previewCount} registros
+                      </p>
                     </div>
                   </div>
                   <CheckCircle className="w-6 h-6 text-[#017E49]" />
@@ -321,18 +469,22 @@ export function NominaModule() {
                       </tr>
                     </thead>
                     <tbody>
-                      <tr className="border-b border-[#E0E0E0]">
-                        <td className="p-2 text-[#6B6B6B]">12.345.678-9</td>
-                        <td className="p-2 text-[#6B6B6B]">María González</td>
-                        <td className="p-2 text-[#6B6B6B]">Producción</td>
-                        <td className="p-2 text-[#6B6B6B]">Indefinido</td>
-                      </tr>
-                      <tr className="border-b border-[#E0E0E0]">
-                        <td className="p-2 text-[#6B6B6B]">23.456.789-0</td>
-                        <td className="p-2 text-[#6B6B6B]">Carlos Rodríguez</td>
-                        <td className="p-2 text-[#6B6B6B]">Logística</td>
-                        <td className="p-2 text-[#6B6B6B]">Plazo fijo</td>
-                      </tr>
+                      {previewRows.map((row, idx) => (
+                        <tr key={idx} className="border-b border-[#E0E0E0]">
+                          <td className="p-2 text-[#6B6B6B]">
+                            {row['RUT'] ?? row['Rut'] ?? row['rut'] ?? ''}
+                          </td>
+                          <td className="p-2 text-[#6B6B6B]">
+                            {row['Nombre'] ?? row['name'] ?? ''}
+                          </td>
+                          <td className="p-2 text-[#6B6B6B]">
+                            {row['Sección'] ?? row['Seccion'] ?? row['section'] ?? ''}
+                          </td>
+                          <td className="p-2 text-[#6B6B6B]">
+                            {row['Tipo Contrato'] ?? row['Contrato'] ?? row['contract'] ?? ''}
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -341,7 +493,7 @@ export function NominaModule() {
               <div className="flex justify-end gap-3">
                 <Button
                   variant="outline"
-                  onClick={() => setUploadStep('upload')}
+                  onClick={resetUploadState}
                   className="h-11 px-6 rounded-xl border-2 border-[#E0E0E0]"
                 >
                   Cancelar
@@ -378,30 +530,42 @@ export function NominaModule() {
                   <CheckCircle className="w-8 h-8 text-white" />
                 </div>
                 <h3 className="text-[#333333] mb-2">Nómina Procesada Exitosamente</h3>
-                <p className="text-[#6B6B6B]">245 registros procesados correctamente</p>
+                <p className="text-[#6B6B6B]">{previewCount} registros procesados correctamente</p>
               </div>
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="bg-[#F8F8F8] rounded-xl p-4 text-center">
                   <div className="flex items-center justify-center gap-2 mb-2">
                     <UserPlus className="w-4 h-4 text-[#017E49]" />
-                    <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>Agregados</p>
+                    <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>
+                      Agregados
+                    </p>
                   </div>
-                  <p className="text-[#017E49]" style={{ fontSize: '24px', fontWeight: 500 }}>12</p>
+                  <p className="text-[#017E49]" style={{ fontSize: '24px', fontWeight: 500 }}>
+                    12
+                  </p>
                 </div>
                 <div className="bg-[#F8F8F8] rounded-xl p-4 text-center">
                   <div className="flex items-center justify-center gap-2 mb-2">
                     <UserMinus className="w-4 h-4 text-[#E12019]" />
-                    <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>Removidos</p>
+                    <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>
+                      Removidos
+                    </p>
                   </div>
-                  <p className="text-[#E12019]" style={{ fontSize: '24px', fontWeight: 500 }}>5</p>
+                  <p className="text-[#E12019]" style={{ fontSize: '24px', fontWeight: 500 }}>
+                    5
+                  </p>
                 </div>
                 <div className="bg-[#F8F8F8] rounded-xl p-4 text-center">
                   <div className="flex items-center justify-center gap-2 mb-2">
                     <Edit className="w-4 h-4 text-[#FF9F55]" />
-                    <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>Actualizados</p>
+                    <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>
+                      Actualizados
+                    </p>
                   </div>
-                  <p className="text-[#FF9F55]" style={{ fontSize: '24px', fontWeight: 500 }}>8</p>
+                  <p className="text-[#FF9F55]" style={{ fontSize: '24px', fontWeight: 500 }}>
+                    8
+                  </p>
                 </div>
               </div>
 
@@ -416,8 +580,7 @@ export function NominaModule() {
                 <Button
                   onClick={() => {
                     setShowUploadModal(false);
-                    setUploadStep('upload');
-                    setUploadProgress(0);
+                    resetUploadState();
                   }}
                   className="bg-[#017E49] text-white hover:bg-[#016339] h-11 px-6 rounded-xl"
                 >
@@ -438,12 +601,8 @@ export function NominaModule() {
 
           <Tabs defaultValue="added" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="added">
-                Agregados ({mockComparison.added.length})
-              </TabsTrigger>
-              <TabsTrigger value="removed">
-                Removidos ({mockComparison.removed.length})
-              </TabsTrigger>
+              <TabsTrigger value="added">Agregados ({mockComparison.added.length})</TabsTrigger>
+              <TabsTrigger value="removed">Removidos ({mockComparison.removed.length})</TabsTrigger>
               <TabsTrigger value="updated">
                 Actualizados ({mockComparison.updated.length})
               </TabsTrigger>
@@ -458,22 +617,36 @@ export function NominaModule() {
                       <div className="flex items-start justify-between mb-2">
                         <div>
                           <p className="text-[#333333]">{worker.name}</p>
-                          <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>{worker.rut}</p>
+                          <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>
+                            {worker.rut}
+                          </p>
                         </div>
                         <Badge className="bg-[#017E49] text-white">NUEVO</Badge>
                       </div>
                       <div className="grid grid-cols-3 gap-4 mt-3">
                         <div>
-                          <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>Sección</p>
-                          <p className="text-[#333333]" style={{ fontSize: '14px' }}>{worker.section}</p>
+                          <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>
+                            Sección
+                          </p>
+                          <p className="text-[#333333]" style={{ fontSize: '14px' }}>
+                            {worker.section}
+                          </p>
                         </div>
                         <div>
-                          <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>Contrato</p>
-                          <p className="text-[#333333]" style={{ fontSize: '14px' }}>{worker.contract}</p>
+                          <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>
+                            Contrato
+                          </p>
+                          <p className="text-[#333333]" style={{ fontSize: '14px' }}>
+                            {worker.contract}
+                          </p>
                         </div>
                         <div>
-                          <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>Beneficio</p>
-                          <p className="text-[#017E49]" style={{ fontSize: '14px' }}>{worker.benefit}</p>
+                          <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>
+                            Beneficio
+                          </p>
+                          <p className="text-[#017E49]" style={{ fontSize: '14px' }}>
+                            {worker.benefit}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -491,7 +664,9 @@ export function NominaModule() {
                       <div className="flex items-start justify-between mb-2">
                         <div>
                           <p className="text-[#333333]">{worker.name}</p>
-                          <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>{worker.rut}</p>
+                          <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>
+                            {worker.rut}
+                          </p>
                         </div>
                         <Badge className="bg-[#E12019] text-white">REMOVIDO</Badge>
                       </div>
@@ -513,7 +688,9 @@ export function NominaModule() {
                       <div className="flex items-start justify-between mb-3">
                         <div>
                           <p className="text-[#333333]">{worker.name}</p>
-                          <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>{worker.rut}</p>
+                          <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>
+                            {worker.rut}
+                          </p>
                         </div>
                         <Badge className="bg-[#FF9F55] text-white">ACTUALIZADO</Badge>
                       </div>

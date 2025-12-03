@@ -230,17 +230,30 @@ export function AdministradorModule() {
           <div className="bg-white border-2 border-[#E0E0E0] rounded-xl p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-[#333333]">Usuarios del Sistema</h3>
-              <Button
-                onClick={() => {
-                  setUserManagementMode('create');
-                  setUserManagementUsername('');
-                  setShowUserModal(true);
-                }}
-                className="bg-[#E12019] text-white hover:bg-[#B51810] h-10 px-4 rounded-xl"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Nuevo Usuario
-              </Button>
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => {
+                    setUserManagementMode('reset');
+                    setUserManagementUsername('');
+                    setShowUserModal(true);
+                  }}
+                  className="bg-[#FF9F55] text-white hover:bg-[#E68A40] h-10 px-4 rounded-xl"
+                >
+                  <Lock className="w-4 h-4 mr-2" />
+                  Resetear Contraseña
+                </Button>
+                <Button
+                  onClick={() => {
+                    setUserManagementMode('create');
+                    setUserManagementUsername('');
+                    setShowUserModal(true);
+                  }}
+                  className="bg-[#E12019] text-white hover:bg-[#B51810] h-10 px-4 rounded-xl"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nuevo Usuario
+                </Button>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -302,19 +315,6 @@ export function AdministradorModule() {
                       </td>
                       <td className="p-4">
                         <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setUserManagementMode('reset');
-                              setUserManagementUsername(user.username || user.email.split('@')[0]);
-                              setShowUserModal(true);
-                            }}
-                            disabled={savingUser}
-                            className="h-9 px-3 rounded-lg border-2 border-[#017E49] text-[#017E49] hover:bg-[#E7F8F3] text-xs"
-                          >
-                            <Lock className="w-4 h-4" />
-                          </Button>
                           <Button
                             size="sm"
                             variant="outline"
@@ -537,6 +537,7 @@ export function AdministradorModule() {
       <UserManagementDialog
         type={userManagementMode}
         existingUsername={userManagementUsername}
+        availableUsers={systemUsers.map(u => ({ username: u.username, email: u.email }))}
         open={showUserModal}
         onOpenChange={(open) => {
           setShowUserModal(open);

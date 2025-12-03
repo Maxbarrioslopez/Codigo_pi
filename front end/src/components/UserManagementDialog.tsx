@@ -12,13 +12,14 @@ import { formatRut, isValidRut } from '@/utils/parseChileanID';
 interface UserManagementDialogProps {
     type: 'create' | 'reset'; // create: nuevo usuario | reset: cambiar contraseña existente
     existingUsername?: string; // Requerido si type === 'reset'
+    availableUsers?: Array<{ username: string; email: string }>; // Lista de usuarios existentes para reset
     onSuccess?: (user?: CreateUserResponse | ResetPasswordResponse) => void;
     trigger?: React.ReactNode; // Elemento trigger personalizado
     open?: boolean; // Control externo del estado
     onOpenChange?: (open: boolean) => void; // Callback para cambio de estado
 }
 
-export function UserManagementDialog({ type, existingUsername, onSuccess, trigger, open: controlledOpen, onOpenChange }: UserManagementDialogProps) {
+export function UserManagementDialog({ type, existingUsername, availableUsers = [], onSuccess, trigger, open: controlledOpen, onOpenChange }: UserManagementDialogProps) {
     const [internalOpen, setInternalOpen] = useState(false);
     const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
     const [username, setUsername] = useState(existingUsername || '');
@@ -343,15 +344,18 @@ export function UserManagementDialog({ type, existingUsername, onSuccess, trigge
                                     <Label htmlFor="reset-username" className="text-sm font-medium text-[#333333]">
                                         Usuario
                                     </Label>
-                                    <Input
-                                        id="reset-username"
-                                        type="text"
-                                        value={username}
-                                        onChange={(e) => setUsername(e.target.value)}
-                                        placeholder="ej: juan.perez"
-                                        className="border-2 border-[#E0E0E0] rounded-lg"
-                                        disabled={loading}
-                                    />
+                                    <Select value={username} onValueChange={(value) => setUsername(value)} disabled={loading}>
+                                        <SelectTrigger className="border-2 border-[#E0E0E0] rounded-lg">
+                                            <SelectValue placeholder="Seleccionar usuario..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {availableUsers.map(user => (
+                                                <SelectItem key={user.username} value={user.username}>
+                                                    {user.username} - {user.email}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
 
                                 <div className="space-y-2">

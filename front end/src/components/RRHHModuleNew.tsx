@@ -3,6 +3,7 @@ import { BarChart3, Users, Calendar, FileText, AlertCircle, Package, QrCode, Dow
 import { trabajadorService } from '../services/trabajador.service';
 import { cicloService } from '../services/ciclo.service';
 import { nominaService, NominaPreviewResponse } from '../services/nomina.service';
+import { showError, showSuccess } from '../utils/toast';
 import { stockService } from '../services/stock.service';
 import { listarIncidencias, reportesRetirosPorDia, TicketDTO, IncidenciaDTO, RetirosDiaDTO } from '../services/api';
 import { useCicloActivo } from '../hooks/useCicloActivo';
@@ -31,11 +32,14 @@ export function RRHHModuleNew() {
     // Estado para ciclos
     const [ciclos, setCiclos] = useState<CicloDTO[]>([]);
     const [showAddCiclo, setShowAddCiclo] = useState(false);
-    const [cicloForm, setCicloForm] = useState<Partial<CicloDTO>>({});
+    const [cicloForm, setCicloForm] = useState<{ fecha_inicio?: string; fecha_fin?: string; nombre?: string }>({});
+    const [newCycleId, setNewCycleId] = useState<number | null>(null);
+    const [showNominaWizard, setShowNominaWizard] = useState(false);
 
     // Estado para nómina
     const [nominaPreview, setNominaPreview] = useState<NominaPreviewResponse | null>(null);
     const [showNominaPreview, setShowNominaPreview] = useState(false);
+    const [nominaHistorial, setNominaHistorial] = useState<any[]>([]);
 
     // Estado para otros datos
     const [incidencias, setIncidencias] = useState<IncidenciaDTO[]>([]);
@@ -50,16 +54,18 @@ export function RRHHModuleNew() {
     async function loadAllData() {
         setLoading(true);
         try {
-            const [trab, cicl, inc, ret] = await Promise.all([
+            const [trab, cicl, inc, ret, hist] = await Promise.all([
                 trabajadorService.getAll().catch(() => []),
                 cicloService.getAll().catch(() => []),
                 listarIncidencias().catch(() => []),
                 reportesRetirosPorDia(7).catch(() => []),
+                nominaService.getHistorial().catch(() => []),
             ]);
             setTrabajadores(trab);
             setCiclos(cicl);
             setIncidencias(inc);
             setRetirosDia(ret);
+            setNominaHistorial(hist);
         } catch (error) {
             console.error('Error loading RRHH data:', error);
         } finally {
@@ -91,14 +97,27 @@ export function RRHHModuleNew() {
 
     // CICLOS
     const handleAddCiclo = async () => {
-        if (!cicloForm.fecha_inicio) return;
+        // Validación simple: fechas requeridas y orden
+        if (!cicloForm.fecha_inicio || !cicloForm.fecha_fin) return;
+        const ini = new Date(cicloForm.fecha_inicio);
+        const fin = new Date(cicloForm.fecha_fin);
+        if (isNaN(ini.getTime()) || isNaN(fin.getTime()) || ini >= fin) {
+            showError('Fechas inválidas', 'La fecha de inicio debe ser anterior a la fecha de fin');
+            return;
+        }
         try {
-            const newCiclo = await cicloService.create(cicloForm);
+            const newCiclo = await cicloService.create({ fecha_inicio: cicloForm.fecha_inicio, fecha_fin: cicloForm.fecha_fin });
             setCiclos([...ciclos, newCiclo]);
-            setCicloForm({});
+            setNewCycleId(newCiclo.id);
             setShowAddCiclo(false);
+            // Abrir wizard de nómina para asociar carga inicial
+            setShowNominaWizard(true);
+            const name = cicloForm.nombre || `Ciclo ${new Date(cicloForm.fecha_inicio!).toISOString().slice(0, 7)}`;
+            showSuccess('Ciclo creado', `${name} (#${newCiclo.id}) creado correctamente`);
+            setCicloForm({});
         } catch (error) {
             console.error('Error creating ciclo:', error);
+            showError('Error creando ciclo', 'Revisa los datos e intenta nuevamente');
         }
     };
 
@@ -161,29 +180,41 @@ export function RRHHModuleNew() {
             <div className="p-3 md:p-6">
                 <Tabs value={currentTab} onValueChange={(v) => setCurrentTab(v as RRHHTab)} className="w-full">
                     <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 gap-2 mb-6 bg-white border border-[#E0E0E0] p-1 md:p-2">
-                        <TabsTrigger value="dashboard" className="text-xs md:text-sm truncate">
-                            <BarChart3 className="w-3 h-3 md:w-4 md:h-4 mr-1" />
-                            <span className="hidden sm:inline">Dashboard</span>
+                        <TabsTrigger value="dashboard" className="text-xs md:text-sm">
+                            <span className="inline-flex items-center gap-2">
+                                <BarChart3 className="w-3 h-3 md:w-4 md:h-4" />
+                                <span>Dashboard</span>
+                            </span>
                         </TabsTrigger>
-                        <TabsTrigger value="trabajadores" className="text-xs md:text-sm truncate">
-                            <Users className="w-3 h-3 md:w-4 md:h-4 mr-1" />
-                            <span className="hidden sm:inline">Trabajadores</span>
+                        <TabsTrigger value="trabajadores" className="text-xs md:text-sm">
+                            <span className="inline-flex items-center gap-2">
+                                <Users className="w-3 h-3 md:w-4 md:h-4" />
+                                <span>Trabajadores</span>
+                            </span>
                         </TabsTrigger>
-                        <TabsTrigger value="ciclo" className="text-xs md:text-sm truncate">
-                            <Calendar className="w-3 h-3 md:w-4 md:h-4 mr-1" />
-                            <span className="hidden sm:inline">Ciclo</span>
+                        <TabsTrigger value="ciclo" className="text-xs md:text-sm">
+                            <span className="inline-flex items-center gap-2">
+                                <Calendar className="w-3 h-3 md:w-4 md:h-4" />
+                                <span>Ciclo</span>
+                            </span>
                         </TabsTrigger>
-                        <TabsTrigger value="nomina" className="text-xs md:text-sm truncate">
-                            <FileText className="w-3 h-3 md:w-4 md:h-4 mr-1" />
-                            <span className="hidden sm:inline">Nómina</span>
+                        <TabsTrigger value="nomina" className="text-xs md:text-sm">
+                            <span className="inline-flex items-center gap-2">
+                                <FileText className="w-3 h-3 md:w-4 md:h-4" />
+                                <span>Nómina</span>
+                            </span>
                         </TabsTrigger>
-                        <TabsTrigger value="trazabilidad" className="text-xs md:text-sm truncate">
-                            <QrCode className="w-3 h-3 md:w-4 md:h-4 mr-1" />
-                            <span className="hidden sm:inline">Trazab.</span>
+                        <TabsTrigger value="trazabilidad" className="text-xs md:text-sm">
+                            <span className="inline-flex items-center gap-2">
+                                <QrCode className="w-3 h-3 md:w-4 md:h-4" />
+                                <span>Trazabilidad</span>
+                            </span>
                         </TabsTrigger>
-                        <TabsTrigger value="reportes" className="text-xs md:text-sm truncate">
-                            <Package className="w-3 h-3 md:w-4 md:h-4 mr-1" />
-                            <span className="hidden sm:inline">Reportes</span>
+                        <TabsTrigger value="reportes" className="text-xs md:text-sm">
+                            <span className="inline-flex items-center gap-2">
+                                <Package className="w-3 h-3 md:w-4 md:h-4" />
+                                <span>Reportes</span>
+                            </span>
                         </TabsTrigger>
                     </TabsList>
 
@@ -229,6 +260,10 @@ export function RRHHModuleNew() {
                     {/* TRABAJADORES TAB */}
                     <TabsContent value="trabajadores" className="space-y-4">
                         <div className="bg-white rounded-lg border border-[#E0E0E0] p-3 md:p-6">
+                            <div className="mb-3">
+                                <h3 className="text-[#333333] text-sm md:text-base font-semibold">Gestión de Trabajadores</h3>
+                                <p className="text-[#6B6B6B] text-xs">Crea, busca y administra trabajadores y su estado de beneficio</p>
+                            </div>
                             <div className="flex flex-col sm:flex-row gap-3 mb-4">
                                 <Input
                                     placeholder="Buscar por nombre o RUT..."
@@ -270,8 +305,8 @@ export function RRHHModuleNew() {
                                                 <Label className="text-sm font-medium text-[#333333]">Sección</Label>
                                                 <Input
                                                     placeholder="Producción, Logística, etc."
-                                                    value={trabajadorForm.nombre || ''}
-                                                    onChange={(e) => setTrabajadorForm({ ...trabajadorForm, nombre: e.target.value })}
+                                                    value={trabajadorForm.seccion || ''}
+                                                    onChange={(e) => setTrabajadorForm({ ...trabajadorForm, seccion: e.target.value })}
                                                     className="text-sm h-10 border-2 border-[#E0E0E0] rounded-lg mt-1"
                                                 />
                                             </div>
@@ -305,19 +340,36 @@ export function RRHHModuleNew() {
                                             <tr key={t.rut} className="border-b border-[#E0E0E0] hover:bg-[#F8F8F8]">
                                                 <td className="p-2 md:p-3 text-[#333333]">{t.rut}</td>
                                                 <td className="p-2 md:p-3 text-[#333333]">{t.nombre}</td>
-                                                <td className="p-2 md:p-3 text-[#6B6B6B]">{t.rut}</td>
+                                                <td className="p-2 md:p-3 text-[#6B6B6B]">{t.seccion || '-'}</td>
                                                 <td className="p-2 md:p-3">
                                                     <Badge className="text-xs px-2 py-0.5" variant="default">
                                                         Activo
                                                     </Badge>
                                                 </td>
                                                 <td className="p-2 md:p-3 text-right">
-                                                    <button
-                                                        onClick={() => handleDeleteTrabajador(t.rut!)}
-                                                        className="text-[#E12019] hover:text-[#B51810] text-xs md:text-sm"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
+                                                    <div className="inline-flex gap-2">
+                                                        <button
+                                                            onClick={() => trabajadorService.bloquear(t.rut!)}
+                                                            className="text-[#FF9F55] hover:text-[#E68843] text-xs md:text-sm"
+                                                            title="Bloquear beneficio"
+                                                        >
+                                                            <X className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => trabajadorService.desbloquear(t.rut!)}
+                                                            className="text-[#017E49] hover:text-[#015A34] text-xs md:text-sm"
+                                                            title="Desbloquear beneficio"
+                                                        >
+                                                            <CheckCircle2 className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteTrabajador(t.rut!)}
+                                                            className="text-[#E12019] hover:text-[#B51810] text-xs md:text-sm"
+                                                            title="Eliminar"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}
@@ -330,6 +382,10 @@ export function RRHHModuleNew() {
                     {/* CICLO TAB */}
                     <TabsContent value="ciclo" className="space-y-4">
                         <div className="bg-white rounded-lg border border-[#E0E0E0] p-3 md:p-6">
+                            <div className="mb-3">
+                                <h3 className="text-[#333333] text-sm md:text-base font-semibold">Gestión de Ciclos</h3>
+                                <p className="text-[#6B6B6B] text-xs">Administra ciclos activos, crea nuevos y cierra cuando corresponda</p>
+                            </div>
                             <div className="flex justify-end mb-4">
                                 <Dialog open={showAddCiclo} onOpenChange={setShowAddCiclo}>
                                     <DialogTrigger asChild>
@@ -344,13 +400,34 @@ export function RRHHModuleNew() {
                                         </DialogHeader>
                                         <div className="space-y-4">
                                             <div>
-                                                <Label className="text-sm font-medium text-[#333333]">Nombre</Label>
+                                                <Label className="text-sm font-medium text-[#333333]">Nombre (opcional)</Label>
                                                 <Input
-                                                    placeholder="Ciclo 2024-01"
-                                                    value={cicloForm.fecha_inicio || ''}
-                                                    onChange={(e) => setCicloForm({ ...cicloForm, fecha_inicio: e.target.value })}
+                                                    placeholder="Ciclo 2025-12"
+                                                    value={cicloForm.nombre || ''}
+                                                    onChange={(e) => setCicloForm({ ...cicloForm, nombre: e.target.value })}
                                                     className="text-sm h-10 border-2 border-[#E0E0E0] rounded-lg mt-1"
                                                 />
+                                                <p className="text-xs text-[#6B6B6B] mt-1">Ayuda a identificar este ciclo en reportes y nómina</p>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                <div>
+                                                    <Label className="text-sm font-medium text-[#333333]">Fecha inicio</Label>
+                                                    <Input
+                                                        type="date"
+                                                        value={cicloForm.fecha_inicio || ''}
+                                                        onChange={(e) => setCicloForm({ ...cicloForm, fecha_inicio: e.target.value })}
+                                                        className="text-sm h-10 border-2 border-[#E0E0E0] rounded-lg mt-1"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label className="text-sm font-medium text-[#333333]">Fecha fin</Label>
+                                                    <Input
+                                                        type="date"
+                                                        value={cicloForm.fecha_fin || ''}
+                                                        onChange={(e) => setCicloForm({ ...cicloForm, fecha_fin: e.target.value })}
+                                                        className="text-sm h-10 border-2 border-[#E0E0E0] rounded-lg mt-1"
+                                                    />
+                                                </div>
                                             </div>
                                             <div className="pt-2">
                                                 <Button
@@ -364,6 +441,13 @@ export function RRHHModuleNew() {
                                     </DialogContent>
                                 </Dialog>
                             </div>
+
+                            {newCycleId && (
+                                <div className="mb-4 p-3 border border-[#E0E0E0] rounded-lg bg-[#F8F8F8] flex items-center justify-between">
+                                    <span className="text-xs md:text-sm text-[#333333]">Ciclo creado: #{newCycleId}</span>
+                                    <Button onClick={() => setShowNominaWizard(true)} className="text-xs bg-[#FF9F55] hover:bg-[#E68843] text-white">Subir nómina</Button>
+                                </div>
+                            )}
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {ciclos.map((c) => (
@@ -392,6 +476,10 @@ export function RRHHModuleNew() {
                     {/* NÓMINA TAB */}
                     <TabsContent value="nomina" className="space-y-4">
                         <div className="bg-white rounded-lg border border-[#E0E0E0] p-3 md:p-6">
+                            <div className="mb-3">
+                                <h3 className="text-[#333333] text-sm md:text-base font-semibold">Gestión de Nómina</h3>
+                                <p className="text-[#6B6B6B] text-xs">Genera vista previa, confirma la carga y revisa el historial</p>
+                            </div>
                             <Button
                                 onClick={handleNominaPreview}
                                 disabled={!ciclo || loading}
@@ -441,12 +529,49 @@ export function RRHHModuleNew() {
                                     </DialogContent>
                                 </Dialog>
                             )}
+                            {/* Historial de nómina */}
+                            <div className="mt-4">
+                                <h4 className="text-sm md:text-base font-semibold text-[#333333] mb-3">Historial de cargas</h4>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-xs md:text-sm">
+                                        <thead className="bg-[#F8F8F8] border-b border-[#E0E0E0]">
+                                            <tr>
+                                                <th className="text-left p-2 md:p-3">Archivo</th>
+                                                <th className="text-left p-2 md:p-3">Usuario</th>
+                                                <th className="text-left p-2 md:p-3">Registros</th>
+                                                <th className="text-left p-2 md:p-3">Creado/Actualizado</th>
+                                                <th className="text-left p-2 md:p-3">Fecha</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {nominaHistorial.map((h: any) => (
+                                                <tr key={h.id} className="border-b border-[#E0E0E0]">
+                                                    <td className="p-2 md:p-3 text-[#333333] truncate">{h.archivo_nombre}</td>
+                                                    <td className="p-2 md:p-3 text-[#6B6B6B]">{h.usuario?.username || '-'}</td>
+                                                    <td className="p-2 md:p-3 text-[#6B6B6B]">{h.total_registros}</td>
+                                                    <td className="p-2 md:p-3 text-[#6B6B6B]">{h.creados}/{h.actualizados}</td>
+                                                    <td className="p-2 md:p-3 text-[#6B6B6B]">{new Date(h.fecha_carga).toLocaleString('es-CL')}</td>
+                                                </tr>
+                                            ))}
+                                            {nominaHistorial.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={5} className="p-3 text-center text-[#6B6B6B]">Sin historial disponible</td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </TabsContent>
 
                     {/* TRAZABILIDAD TAB */}
                     <TabsContent value="trazabilidad" className="space-y-4">
                         <div className="bg-white rounded-lg border border-[#E0E0E0] p-3 md:p-6">
+                            <div className="mb-3">
+                                <h3 className="text-[#333333] text-sm md:text-base font-semibold">Trazabilidad</h3>
+                                <p className="text-[#6B6B6B] text-xs">Consulta incidencias y eventos relacionados con retiros y agendamientos</p>
+                            </div>
                             <h3 className="text-sm md:text-base font-semibold text-[#333333] mb-4">Incidencias Registradas</h3>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-xs md:text-sm">
@@ -480,6 +605,10 @@ export function RRHHModuleNew() {
                     {/* REPORTES TAB */}
                     <TabsContent value="reportes" className="space-y-4">
                         <div className="bg-white rounded-lg border border-[#E0E0E0] p-3 md:p-6">
+                            <div className="mb-3">
+                                <h3 className="text-[#333333] text-sm md:text-base font-semibold">Reportes</h3>
+                                <p className="text-[#6B6B6B] text-xs">Retiros por día y otros indicadores operativos</p>
+                            </div>
                             <h3 className="text-sm md:text-base font-semibold text-[#333333] mb-4">Retiros de los Últimos 7 Días</h3>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {retirosDia.map((dia, i) => (
@@ -494,6 +623,8 @@ export function RRHHModuleNew() {
                     </TabsContent>
                 </Tabs>
             </div>
+            {/* Wizard de nómina (aparece tras crear ciclo o CTA) */}
+            <RRHHNominaWizard open={showNominaWizard} onOpenChange={setShowNominaWizard} cycleId={newCycleId} onConfirmed={loadAllData} />
         </div>
     );
 }
@@ -510,5 +641,78 @@ function DashboardCard({ title, value, icon: Icon, color }: { title: string; val
                 <p className="text-lg md:text-2xl font-bold text-[#333333]">{value}</p>
             </div>
         </div>
+    );
+}
+
+// Wizard modal: carga de nómina después de crear ciclo
+// Nota: se monta al final para no interferir con estructura principal
+// Integra endpoints basados en archivo: preview y confirmar
+export function RRHHNominaWizard({ open, onOpenChange, cycleId, onConfirmed }: { open: boolean; onOpenChange: (o: boolean) => void; cycleId: number | null; onConfirmed?: () => void }) {
+    const [file, setFile] = useState<File | null>(null);
+    const [preview, setPreview] = useState<any[] | null>(null);
+    const [loading, setLoading] = useState(false);
+
+    const doPreview = async () => {
+        if (!file) return;
+        const allowed = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+        if (file && !allowed.includes(file.type)) {
+            showError('Archivo inválido', 'Sube un CSV o Excel (.xlsx)');
+            return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+            showError('Archivo muy grande', 'El tamaño máximo es 10MB');
+            return;
+        }
+        setLoading(true);
+        try {
+            const items = await nominaService.previewFile(file, cycleId ?? undefined);
+            setPreview(items);
+            showSuccess('Vista previa generada', `${items.length || 0} registros analizados`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const doConfirm = async () => {
+        if (!file) return;
+        setLoading(true);
+        try {
+            await nominaService.confirmarFile(file, cycleId ?? undefined);
+            showSuccess('Nómina confirmada', 'La carga se ejecutó correctamente');
+            onOpenChange(false);
+            onConfirmed?.();
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="w-full max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="text-[#333333]">Carga inicial de nómina</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                    <p className="text-xs text-[#6B6B6B]">Ciclo creado: {cycleId ?? '-'} — Selecciona el archivo CSV/XLSX de nómina para generar la vista previa y confirmar.</p>
+                    <Input type="file" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+                    <div className="flex gap-2">
+                        <Button onClick={doPreview} disabled={!file || loading} className="bg-[#FF9F55] hover:bg-[#E68843] text-white">Vista Previa</Button>
+                        <Button onClick={doConfirm} disabled={!file || !preview || loading} className="bg-[#017E49] hover:bg-[#015A34] text-white">Confirmar</Button>
+                        <Button onClick={() => onOpenChange(false)} variant="outline" className="border-[#E0E0E0]">Cancelar</Button>
+                    </div>
+                    {preview && (
+                        <div className="max-h-40 overflow-y-auto border border-[#E0E0E0] rounded p-2">
+                            {preview.slice(0, 10).map((row: any, idx: number) => (
+                                <div key={idx} className="text-xs text-[#333333] flex justify-between">
+                                    <span className="truncate">{row?.nombre || row?.rut}</span>
+                                    <span className="text-[#6B6B6B]">{row?.beneficio || ''}</span>
+                                </div>
+                            ))}
+                            {preview.length > 10 && <p className="text-xs text-[#6B6B6B] mt-2">Mostrando 10 de {preview.length} registros…</p>}
+                        </div>
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 }

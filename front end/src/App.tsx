@@ -13,7 +13,7 @@ import { Toaster } from './components/ui/toaster';
 import { StockModule } from './components/StockModule';
 import { NominaModule } from './components/NominaModule';
 import { BackendStatusBanner } from './components/BackendStatusBanner';
-import { Menu, X, LogOut } from 'lucide-react';
+import { Menu, X, LogOut, LayoutGrid, MonitorSmartphone, Shield, BarChart3, Boxes, ClipboardList, Settings } from 'lucide-react';
 
 // Layout principal con sidebar para usuarios autenticados
 function DashboardLayout() {
@@ -23,13 +23,13 @@ function DashboardLayout() {
   // Determinar qué secciones mostrar según el rol
   const getSections = () => {
     const allSections = [
-      { id: 'design-system' as const, label: 'Design System', icon: '▢', roles: ['admin'] },
-      { id: 'totem' as const, label: 'Tótem Autoservicio', icon: '◨', roles: ['admin'] },
-      { id: 'guardia' as const, label: 'Panel Guardia', icon: '◆', roles: ['guardia', 'admin'] },
-      { id: 'rrhh' as const, label: 'Dashboard RRHH', icon: '▲', roles: ['rrhh', 'admin', 'supervisor'] },
-      { id: 'stock' as const, label: 'Gestión de Stock', icon: '◙', roles: ['rrhh', 'guardia'] },
-      { id: 'nomina' as const, label: 'Gestión de Nómina', icon: '◉', roles: ['admin', 'rrhh'] },
-      { id: 'admin' as const, label: 'Administración', icon: '⚙', roles: ['admin'] },
+      { id: 'design-system' as const, label: 'Design System', Icon: LayoutGrid, roles: ['admin'] },
+      { id: 'totem' as const, label: 'Tótem Autoservicio', Icon: MonitorSmartphone, roles: ['admin'] },
+      { id: 'guardia' as const, label: 'Panel Guardia', Icon: Shield, roles: ['guardia', 'admin'] },
+      { id: 'rrhh' as const, label: 'Dashboard RRHH', Icon: BarChart3, roles: ['rrhh', 'admin', 'supervisor'] },
+      { id: 'stock' as const, label: 'Gestión de Stock', Icon: Boxes, roles: ['rrhh', 'guardia'] },
+      { id: 'nomina' as const, label: 'Gestión de Nómina', Icon: ClipboardList, roles: ['admin', 'rrhh'] },
+      { id: 'admin' as const, label: 'Administración', Icon: Settings, roles: ['admin'] },
     ];
 
     return allSections.filter(s => s.roles.includes(user?.rol || ''));
@@ -97,9 +97,12 @@ function DashboardLayout() {
                         ? 'bg-[#E12019] text-white'
                         : 'text-[#333333] hover:bg-[#F8F8F8]'
                         }`}
+                      aria-label={section.label}
                     >
-                      <span className="mr-2">{section.icon}</span>
-                      {section.label}
+                      <span className="inline-flex items-center gap-2">
+                        <section.Icon className={`w-4 h-4 ${currentSection === section.id ? 'text-white' : 'text-[#6B6B6B]'}`} />
+                        <span className="font-medium">{section.label}</span>
+                      </span>
                     </button>
                   </li>
                 ))}

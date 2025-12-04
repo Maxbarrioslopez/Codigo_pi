@@ -396,16 +396,16 @@ function LocalTotemInitialScreen({ onScan, onConsultIncident, onReportIncident, 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <button
             onClick={onConsultIncident}
-            className="px-4 md:px-6 py-3 md:py-4 bg-white text-[#333333] border-2 border-[#E0E0E0] rounded-xl hover:bg-[#F8F8F8] transition-colors flex flex-col items-center justify-center gap-2"
-            style={{ fontSize: '14px', fontWeight: 500, minHeight: '56px' }}
+            className="px-4 md:px-6 py-3 md:py-4 bg-[#0066CC] text-white rounded-xl hover:bg-[#0052A3] transition-colors flex flex-col items-center justify-center gap-2 shadow-md"
+            style={{ fontSize: '14px', fontWeight: 600, minHeight: '56px' }}
           >
             <Search className="w-5 h-5" />
             Consultar Incidencia
           </button>
           <button
             onClick={onReportIncident}
-            className="px-6 py-4 bg-white text-[#333333] border-2 border-[#E0E0E0] rounded-xl hover:bg-[#F8F8F8] transition-colors flex flex-col items-center justify-center gap-2"
-            style={{ fontSize: '14px', fontWeight: 500, minHeight: '64px' }}
+            className="px-6 py-4 bg-[#FF8C00] text-white rounded-xl hover:bg-[#E67E00] transition-colors flex flex-col items-center justify-center gap-2 shadow-md"
+            style={{ fontSize: '14px', fontWeight: 600, minHeight: '56px' }}
           >
             <AlertCircle className="w-5 h-5" />
             Reportar Incidencia

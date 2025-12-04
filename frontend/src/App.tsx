@@ -11,12 +11,8 @@ import { AdministradorModule } from './components/AdministradorModule';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { Toaster } from './components/ui/toaster';
 import { StockModule } from './components/StockModule';
-import { NominaModule } from './components/NominaModule';
-import { GestionCajasModule } from './components/GestionCajasModule';
-import { NominaCajasModule } from './components/NominaCajasModule';
-import { GuardiaValidacionModule } from './components/GuardiaValidacionModule';
 import { BackendStatusBanner } from './components/BackendStatusBanner';
-import { Menu, X, LogOut, LayoutGrid, MonitorSmartphone, Shield, BarChart3, Boxes, ClipboardList, Settings, Package, QrCode } from 'lucide-react';
+import { Menu, X, LogOut, LayoutGrid, MonitorSmartphone, Shield, BarChart3, Boxes, Settings } from 'lucide-react';
 
 // Layout principal con sidebar para usuarios autenticados
 function DashboardLayout() {
@@ -29,12 +25,8 @@ function DashboardLayout() {
       { id: 'design-system' as const, label: 'Design System', Icon: LayoutGrid, roles: ['admin'] },
       { id: 'totem' as const, label: 'Tótem Autoservicio', Icon: MonitorSmartphone, roles: ['admin'] },
       { id: 'guardia' as const, label: 'Panel Guardia', Icon: Shield, roles: ['guardia', 'admin'] },
-      { id: 'validacion-cajas' as const, label: 'Validar Cajas', Icon: QrCode, roles: ['guardia', 'admin'] },
       { id: 'rrhh' as const, label: 'Dashboard RRHH', Icon: BarChart3, roles: ['rrhh', 'admin', 'supervisor'] },
-      { id: 'gestion-cajas' as const, label: 'Gestión de Cajas', Icon: Package, roles: ['rrhh', 'admin'] },
-      { id: 'nomina-cajas' as const, label: 'Nómina con Cajas', Icon: ClipboardList, roles: ['rrhh', 'admin'] },
       { id: 'stock' as const, label: 'Gestión de Stock', Icon: Boxes, roles: ['rrhh', 'guardia'] },
-      { id: 'nomina' as const, label: 'Gestión de Nómina', Icon: ClipboardList, roles: ['admin', 'rrhh'] },
       { id: 'admin' as const, label: 'Administración', Icon: Settings, roles: ['admin'] },
     ];
 
@@ -132,12 +124,8 @@ function DashboardLayout() {
           {currentSection === 'design-system' && <DesignSystem />}
           {currentSection === 'totem' && <TotemModule />}
           {currentSection === 'guardia' && <GuardiaModule />}
-          {currentSection === 'validacion-cajas' && <GuardiaValidacionModule />}
           {currentSection === 'rrhh' && <RRHHModuleNew />}
-          {currentSection === 'gestion-cajas' && <GestionCajasModule />}
-          {currentSection === 'nomina-cajas' && <NominaCajasModule />}
           {currentSection === 'stock' && <StockModule />}
-          {currentSection === 'nomina' && <NominaModule />}
           {currentSection === 'admin' && <AdministradorModule />}
         </main>
       </div>

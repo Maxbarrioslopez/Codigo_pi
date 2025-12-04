@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Switch } from './ui/switch';
 import { cicloService } from '@/services/ciclo.service';
+import { cajasService } from '@/services/cajas.service';
 import { CicloDTO, TipoBeneficioDTO } from '@/types';
 import { toast } from 'sonner';
 
@@ -25,6 +26,7 @@ export function CicloBimensualModule() {
   // Modales
   const [showCreateCicloModal, setShowCreateCicloModal] = useState(false);
   const [showCreateBeneficioModal, setShowCreateBeneficioModal] = useState(false);
+  const [showCreateCajaModal, setShowCreateCajaModal] = useState(false);
   const [showEditBeneficioModal, setShowEditBeneficioModal] = useState(false);
   const [showAgregarBeneficioModal, setShowAgregarBeneficioModal] = useState(false);
   const [showUnlockModal, setShowUnlockModal] = useState(false);
@@ -32,6 +34,7 @@ export function CicloBimensualModule() {
   // Datos de formularios
   const [cicloForm, setCicloForm] = useState({ nombre: '', fecha_inicio: '', fecha_fin: '', descripcion: '' });
   const [beneficioForm, setBeneficioForm] = useState({ nombre: '', descripcion: '', activo: true, tipos_contrato: [] as string[], requiere_validacion_guardia: false });
+  const [cajaForm, setCajaForm] = useState({ beneficio: 0, nombre: '', descripcion: '', codigo_tipo: '' });
   const [selectedBeneficio, setSelectedBeneficio] = useState<TipoBeneficioDTO | null>(null);
   const [selectedCiclo, setSelectedCiclo] = useState<CicloDTO | null>(null);
   const [selectedBeneficiosParaCiclo, setSelectedBeneficiosParaCiclo] = useState<number[]>([]);
@@ -138,12 +141,34 @@ export function CicloBimensualModule() {
     setSelectedBeneficio(beneficio);
     setBeneficioForm({
       nombre: beneficio.nombre,
-      descripcion: beneficio.descripcion,
+      descripcion: beneficio.descripcion || '',
       activo: beneficio.activo,
       tipos_contrato: beneficio.tipos_contrato || [],
       requiere_validacion_guardia: beneficio.requiere_validacion_guardia || false,
     });
     setShowEditBeneficioModal(true);
+  };
+
+  // ==================== CRUD CAJAS ====================
+
+  const handleCreateCaja = async () => {
+    if (!cajaForm.beneficio || !cajaForm.nombre || !cajaForm.codigo_tipo) {
+      toast.error('Completa todos los campos requeridos');
+      return;
+    }
+    try {
+      await cajasService.createCajaBeneficio({
+        ...cajaForm,
+        activo: true,
+      });
+      toast.success('Caja creada exitosamente');
+      setShowCreateCajaModal(false);
+      setCajaForm({ beneficio: 0, nombre: '', descripcion: '', codigo_tipo: '' });
+      loadData();
+    } catch (error) {
+      toast.error('Error al crear caja');
+      console.error(error);
+    }
   };
 
   const handleCerrarCiclo = async (cicloId: number) => {
@@ -188,6 +213,16 @@ export function CicloBimensualModule() {
           >
             <Package className="w-4 h-4 mr-2" />
             Crear Beneficio
+          </Button>
+          <Button
+            onClick={() => setShowCreateCajaModal(true)}
+            className="text-white h-11 px-6 rounded-xl"
+            style={{ backgroundColor: '#FF8C00' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#E67E00'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#FF8C00'}
+          >
+            <Package className="w-4 h-4 mr-2" />
+            Crear Caja
           </Button>
         </div>
       </div>
@@ -490,6 +525,84 @@ export function CicloBimensualModule() {
             </Button>
             <Button onClick={handleCreateBeneficio} className="flex-1 bg-[#017E49] text-white hover:bg-[#016339]">
               Crear Beneficio
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Crear Caja */}
+      <Dialog open={showCreateCajaModal} onOpenChange={setShowCreateCajaModal}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Crear Nueva Caja</DialogTitle>
+            <DialogDescription>
+              Define una variante de caja para un beneficio (ej: Premium, Estándar)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="caja-beneficio">Beneficio *</Label>
+              <Select
+                value={cajaForm.beneficio?.toString() || ''}
+                onValueChange={(value) => setCajaForm({ ...cajaForm, beneficio: parseInt(value) })}
+              >
+                <SelectTrigger className="mt-2">
+                  <SelectValue placeholder="Selecciona un beneficio" />
+                </SelectTrigger>
+                <SelectContent>
+                  {beneficios.map((ben) => (
+                    <SelectItem key={ben.id} value={ben.id.toString()}>
+                      {ben.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="caja-nombre">Nombre de la Caja *</Label>
+              <Input
+                id="caja-nombre"
+                placeholder="ej: Premium, Estándar, VIP"
+                value={cajaForm.nombre}
+                onChange={(e) => setCajaForm({ ...cajaForm, nombre: e.target.value })}
+                className="mt-2"
+              />
+            </div>
+            <div>
+              <Label htmlFor="caja-codigo">Código Tipo *</Label>
+              <Input
+                id="caja-codigo"
+                placeholder="ej: NAV-PREM, NAV-STD"
+                value={cajaForm.codigo_tipo}
+                onChange={(e) => setCajaForm({ ...cajaForm, codigo_tipo: e.target.value })}
+                className="mt-2"
+              />
+            </div>
+            <div>
+              <Label htmlFor="caja-desc">Descripción</Label>
+              <Textarea
+                id="caja-desc"
+                placeholder="Describe esta caja..."
+                value={cajaForm.descripcion}
+                onChange={(e) => setCajaForm({ ...cajaForm, descripcion: e.target.value })}
+                className="mt-2"
+                rows={3}
+              />
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCreateCajaModal(false);
+                setCajaForm({ beneficio: 0, nombre: '', descripcion: '', codigo_tipo: '' });
+              }}
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handleCreateCaja} className="flex-1 bg-[#FF8C00] text-white hover:bg-[#E67E00]">
+              Crear Caja
             </Button>
           </div>
         </DialogContent>

@@ -65,6 +65,17 @@ export default function TotemInitialScreen({ onRutDetected, onManualRut, onConsu
             const cicloActual = localStorage.getItem('ciclo_id');
 
             const cicloId = cicloActual ? parseInt(cicloActual, 10) : undefined;
+
+            // Si no hay ciclo activo, mostrar mensaje específico
+            if (!cicloId) {
+                setBeneficioStatus({
+                    loading: false,
+                    error: 'Sin beneficio momentáneamente. No hay ciclo activo.',
+                    data: null,
+                });
+                return;
+            }
+
             const result = await trabajadorService.getBeneficio(formattedRut, cicloId);
 
             setBeneficioStatus({
@@ -73,9 +84,21 @@ export default function TotemInitialScreen({ onRutDetected, onManualRut, onConsu
                 data: result.beneficio,
             });
         } catch (error: any) {
+            // Analizar el tipo de error
+            const errorMsg = error?.detail || error?.message || '';
+            let customMessage = 'No se pudo verificar el beneficio';
+
+            // Si el error indica que no está en la nómina o no tiene beneficio
+            if (errorMsg.toLowerCase().includes('no encontrado') ||
+                errorMsg.toLowerCase().includes('no está en') ||
+                errorMsg.toLowerCase().includes('no tiene beneficio') ||
+                error?.status === 404) {
+                customMessage = 'No tiene beneficio en este ciclo';
+            }
+
             setBeneficioStatus({
                 loading: false,
-                error: error?.detail || 'No se pudo verificar el beneficio',
+                error: customMessage,
                 data: null,
             });
         }
@@ -89,27 +112,20 @@ export default function TotemInitialScreen({ onRutDetected, onManualRut, onConsu
             </div>
 
             {/* RUT Input Section */}
-            <div className="w-full max-w-lg flex gap-2">
+            <div className="w-full max-w-lg">
                 <input
-                    className="flex-1 border rounded px-3 py-2 font-mono text-lg tracking-wider"
+                    className="w-full border-2 border-gray-300 rounded-lg px-4 py-3 font-mono text-lg tracking-wider focus:border-[#017E49] focus:outline-none focus:ring-2 focus:ring-[#017E49]/20 transition-all"
                     placeholder="12.345.678-9"
                     value={rutInput}
                     onChange={handleRutInputChange}
                     maxLength={12}
                 />
-                <button
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
-                    onClick={() => onManualRut(cleanRut(rutInput))}
-                    disabled={!rutInput || !validateRut(rutInput) || beneficioStatus.loading}
-                >
-                    Validar RUT
-                </button>
             </div>
 
             {/* Benefit Verification Button */}
             <div className="w-full max-w-lg">
                 <button
-                    className="w-full px-4 py-3 bg-emerald-600 text-white rounded font-semibold hover:bg-emerald-700 disabled:bg-gray-400 flex items-center justify-center gap-2 transition"
+                    className="w-full px-6 py-4 bg-[#017E49] text-white rounded-xl font-bold hover:bg-[#015A34] disabled:bg-gray-400 flex items-center justify-center gap-2 transition-colors shadow-md"
                     onClick={handleVerifyBenefit}
                     disabled={!rutInput || !validateRut(rutInput) || beneficioStatus.loading}
                 >

@@ -352,9 +352,7 @@ main() {
 
     case "$MODE" in
         --full)
-            print_header "MODO: ACTUALIZACIÓN COMPLETA"
-            backup_database
-            backup_code
+            print_header "MODO: ACTUALIZACIÓN COMPLETA (SIN BACKUP)"
             update_git
             update_backend
             update_frontend
@@ -362,6 +360,7 @@ main() {
             update_nginx
             health_check
             ;;
+
 
         --backend)
             print_header "MODO: SOLO BACKEND"

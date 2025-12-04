@@ -5,9 +5,9 @@ from decouple import config, Csv
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = config('DJANGO_SECRET_KEY', default='dev-secret-key-change-in-production')
-DEBUG = config('DJANGO_DEBUG', default=True, cast=bool)
+DEBUG = config('DJANGO_DEBUG', default=False, cast=bool)  # ✅ False para producción
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*', cast=Csv())
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='mbarrios.tech,www.mbarrios.tech', cast=Csv())  # ✅ Específico para mbarrios.tech
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -94,9 +94,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Custom User Model
 AUTH_USER_MODEL = 'totem.Usuario'
 
-# CORS Configuration (Development - permissive for debugging)
-CORS_ALLOW_ALL_ORIGINS = True  # Temporal para debugging
-CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000,http://localhost:5173', cast=Csv())
+# CORS Configuration - Restrictivo para producción
+CORS_ALLOW_ALL_ORIGINS = False  # ✅ Restringido a dominios específicos
+CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='https://mbarrios.tech,https://www.mbarrios.tech,http://localhost:3000,http://localhost:5173', cast=Csv())  # ✅ mbarrios.tech + localhost dev
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = [
     'DELETE',

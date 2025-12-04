@@ -6,8 +6,30 @@
 
 import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosError, AxiosRequestConfig } from 'axios';
 
+/**
+ * Obtener URL base de la API según el entorno
+ * 
+ * Desarrollo: Usa VITE_API_URL o fallback a localhost:8000/api
+ * Producción: Usa VITE_API_URL (que debe ser /api para proxy) o fallback a /api
+ */
+const getApiBaseUrl = (): string => {
+    const envUrl = import.meta.env.VITE_API_URL;
+
+    if (envUrl) {
+        return envUrl.replace(/\/$/, '');
+    }
+
+    // En desarrollo, usa localhost
+    if (import.meta.env.DEV) {
+        return 'http://localhost:8000/api';
+    }
+
+    // En producción, usa URL relativa (require nginx/proxy)
+    return '/api';
+};
+
 // Configuración base de la API
-const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace(/\/$/, '');
+const API_BASE_URL = getApiBaseUrl();
 
 // Crear instancia de axios con configuración por defecto
 const apiClient: AxiosInstance = axios.create({

@@ -98,8 +98,40 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             ApiClientWrapper.setAuthTokens(data.access, data.refresh);
 
         } catch (error: any) {
-            console.error('Error de login:', error);
-            throw new Error(error.response?.data?.detail || 'Credenciales inválidas');
+            // Mejor manejo de errores para diferenciar problemas
+            let errorMessage = 'Error al iniciar sesión';
+
+            if (error.code === 'ECONNABORTED') {
+                // Timeout
+                errorMessage = 'Servidor no responde. Por favor, intenta más tarde.';
+            } else if (error.code === 'ERR_NETWORK') {
+                // Error de red (CORS, conexión rechazada, etc)
+                errorMessage = 'Problema de conexión. Verifica que el servidor esté disponible.';
+            } else if (error.response?.status === 401 || error.response?.status === 400) {
+                // Credenciales inválidas o no autenticado
+                errorMessage = error.response?.data?.detail || 'Usuario o contraseña incorrecto';
+            } else if (error.response?.status === 429) {
+                // Rate limiting - demasiados intentos
+                errorMessage = 'Demasiados intentos fallidos. Intenta más tarde.';
+            } else if (error.response?.status === 403) {
+                // Acceso denegado - usuario sin permiso
+                errorMessage = 'No tienes permiso para acceder. Contacta al administrador.';
+            } else if (error.response?.status >= 500) {
+                // Error del servidor
+                errorMessage = 'Error en el servidor. Intenta más tarde.';
+            } else if (error.response?.data?.detail) {
+                // Usar mensaje específico del backend si está disponible
+                errorMessage = error.response.data.detail;
+            }
+
+            console.error('Login error details:', {
+                status: error.response?.status,
+                code: error.code,
+                message: error.message,
+                data: error.response?.data,
+            });
+
+            throw new Error(errorMessage);
         } finally {
             setLoading(false);
         }

@@ -42,13 +42,32 @@ export interface TicketDTO {
     eventos: TicketEventoDTO[];
 }
 
+// ==================== DTOs de Tipos de Beneficio ====================
+export interface TipoBeneficioDTO {
+    id: number;
+    nombre: string;
+    descripcion: string;
+    activo: boolean;
+    tipos_contrato: string[];
+    requiere_validacion_guardia: boolean;
+    created_at: string;
+}
+
 // ==================== DTOs de Ciclos ====================
 export interface CicloDTO {
     id: number;
+    nombre: string;
     fecha_inicio: string;
     fecha_fin: string;
     activo: boolean;
+    beneficios_activos: TipoBeneficioDTO[];
+    beneficios_activos_ids?: number[];
+    descripcion: string;
     dias_restantes: number;
+    duracion_dias: number;
+    progreso_porcentaje: number;
+    created_at: string;
+    updated_at: string;
 }
 
 // ==================== DTOs de Agendamientos ====================

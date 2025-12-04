@@ -7,7 +7,8 @@ from django.db.models.signals import post_save, pre_save, post_delete, pre_delet
 from django.dispatch import receiver, Signal
 from django.utils import timezone
 import structlog
-from .models import Ticket, Trabajador, Ciclo, Incidencia, Agendamiento, StockMovimiento, NominaCarga
+import uuid
+from .models import Ticket, Trabajador, Ciclo, Incidencia, Agendamiento, StockMovimiento, NominaCarga, BeneficioTrabajador
 
 logger = structlog.get_logger(__name__)
 
@@ -328,3 +329,27 @@ def nomina_carga_post_save_handler(sender, instance, created, **kwargs):
                 porcentaje_errores=(instance.errores_count / instance.total_registros * 100) if instance.total_registros > 0 else 0
             )
             # TODO: Notificar a RRHH
+
+
+# === BENEFICIO TRABAJADOR SIGNALS ===
+
+@receiver(post_save, sender=BeneficioTrabajador)
+def beneficio_trabajador_post_save_handler(sender, instance, created, **kwargs):
+    """
+    Post-save signal para BeneficioTrabajador.
+    Genera código de verificación único (QR) automáticamente.
+    """
+    if created and not instance.codigo_verificacion:
+        # Generar código único: BEN-{ciclo_id}-{trabajador_id}-{random}
+        codigo = f"BEN-{instance.ciclo.id:04d}-{instance.trabajador.id:06d}-{str(uuid.uuid4())[:8].upper()}"
+        instance.codigo_verificacion = codigo
+        # Generar datos del QR (formato JSON)
+        instance.qr_data = f"{codigo}|{instance.trabajador.rut}|{instance.tipo_beneficio.nombre}|{instance.caja_beneficio.nombre if instance.caja_beneficio else 'N/A'}"
+        instance.save()
+        
+        logger.info(
+            "beneficio_trabajador_codigo_generado",
+            beneficio_id=instance.id,
+            trabajador_rut=instance.trabajador.rut,
+            codigo=codigo
+        )

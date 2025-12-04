@@ -4,7 +4,7 @@
  */
 
 import { apiClient } from './apiClient';
-import { CicloDTO } from '@/types';
+import { CicloDTO, TipoBeneficioDTO } from '@/types';
 import { ErrorHandler } from '@/utils/errors/errorHandler';
 
 /**
@@ -84,8 +84,8 @@ export class CicloService {
      */
     async cerrar(cicloId: number): Promise<CicloDTO> {
         try {
-            const { data } = await apiClient.post<CicloDTO>(`ciclos/${cicloId}/cerrar/`, {});
-            return data;
+            const { data } = await apiClient.delete<any>(`ciclos/${cicloId}/`);
+            return data.ciclo;
         } catch (error) {
             throw ErrorHandler.handle(error, 'CicloService.cerrar', false);
         }
@@ -101,6 +101,72 @@ export class CicloService {
             return data;
         } catch (error) {
             throw ErrorHandler.handle(error, 'CicloService.getEstadisticas', false);
+        }
+    }
+
+    // ==================== TIPOS DE BENEFICIOS ====================
+
+    /**
+     * Listar todos los tipos de beneficios
+     */
+    async getAllTipos(): Promise<TipoBeneficioDTO[]> {
+        try {
+            const { data } = await apiClient.get<TipoBeneficioDTO[]>('tipos-beneficio/');
+            return data;
+        } catch (error) {
+            throw ErrorHandler.handle(error, 'CicloService.getAllTipos', false);
+        }
+    }
+
+    /**
+     * Obtener tipo de beneficio por ID
+     * @param tipoId - ID del tipo de beneficio
+     */
+    async getTipoById(tipoId: number): Promise<TipoBeneficioDTO> {
+        try {
+            const { data } = await apiClient.get<TipoBeneficioDTO>(`tipos-beneficio/${tipoId}/`);
+            return data;
+        } catch (error) {
+            throw ErrorHandler.handle(error, 'CicloService.getTipoById', false);
+        }
+    }
+
+    /**
+     * Crear nuevo tipo de beneficio
+     * @param data - Datos del tipo de beneficio
+     */
+    async createTipo(data: Partial<TipoBeneficioDTO>): Promise<TipoBeneficioDTO> {
+        try {
+            const { data: result } = await apiClient.post<TipoBeneficioDTO>('tipos-beneficio/', data);
+            return result;
+        } catch (error) {
+            throw ErrorHandler.handle(error, 'CicloService.createTipo', false);
+        }
+    }
+
+    /**
+     * Actualizar tipo de beneficio
+     * @param tipoId - ID del tipo de beneficio
+     * @param data - Datos a actualizar
+     */
+    async updateTipo(tipoId: number, data: Partial<TipoBeneficioDTO>): Promise<TipoBeneficioDTO> {
+        try {
+            const { data: result } = await apiClient.put<TipoBeneficioDTO>(`tipos-beneficio/${tipoId}/`, data);
+            return result;
+        } catch (error) {
+            throw ErrorHandler.handle(error, 'CicloService.updateTipo', false);
+        }
+    }
+
+    /**
+     * Eliminar tipo de beneficio
+     * @param tipoId - ID del tipo de beneficio
+     */
+    async deleteTipo(tipoId: number): Promise<void> {
+        try {
+            await apiClient.delete(`tipos-beneficio/${tipoId}/`);
+        } catch (error) {
+            throw ErrorHandler.handle(error, 'CicloService.deleteTipo', false);
         }
     }
 }

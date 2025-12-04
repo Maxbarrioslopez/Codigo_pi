@@ -8,6 +8,7 @@ from . import views_ciclos as ciclos_views
 from . import views_stock as stock_views
 from . import views_nomina as nomina_views
 from . import views_health as health_views
+from . import views_cajas as cajas_views
 
 urlpatterns = [
     # Health checks (públicos, sin autenticación)
@@ -65,6 +66,10 @@ urlpatterns = [
     path('ciclos/<int:ciclo_id>/', ciclos_views.ciclo_detail_update, name='ciclo_detail_update'),
     path('ciclos/<int:ciclo_id>/cerrar/', ciclos_views.ciclo_cerrar, name='ciclo_cerrar'),
     path('ciclos/<int:ciclo_id>/estadisticas/', ciclos_views.ciclo_estadisticas, name='ciclo_estadisticas'),
+    
+    # Tipos de Beneficios
+    path('tipos-beneficio/', ciclos_views.tipos_beneficio_list_create, name='tipos_beneficio_list_create'),
+    path('tipos-beneficio/<int:tipo_id>/', ciclos_views.tipo_beneficio_detail, name='tipo_beneficio_detail'),
 
     # Stock
     path('stock/resumen/', stock_views.stock_resumen, name='stock_resumen'),
@@ -75,6 +80,19 @@ urlpatterns = [
     path('nomina/preview/', nomina_views.nomina_preview, name='nomina_preview'),
     path('nomina/confirmar/', nomina_views.nomina_confirmar, name='nomina_confirmar'),
     path('nomina/historial/', nomina_views.nomina_historial, name='nomina_historial'),
+
+    # Cajas y Validaciones (RRHH y Guardia)
+    path('cajas-beneficio/', cajas_views.cajas_beneficio_list_create, name='cajas_beneficio_list_create'),
+    path('cajas-beneficio/<int:caja_id>/', cajas_views.caja_beneficio_detail, name='caja_beneficio_detail'),
+    
+    path('beneficios-trabajadores/', cajas_views.beneficio_trabajador_list_create, name='beneficio_trabajador_list_create'),
+    path('beneficios-trabajadores/<int:beneficio_id>/', cajas_views.beneficio_trabajador_detail, name='beneficio_trabajador_detail'),
+    path('beneficios-trabajadores/<int:beneficio_id>/bloquear/', cajas_views.beneficio_trabajador_bloquear, name='beneficio_trabajador_bloquear'),
+    path('beneficios-trabajadores/por-codigo/<str:codigo_verificacion>/', cajas_views.beneficio_trabajador_por_codigo, name='beneficio_trabajador_por_codigo'),
+    
+    path('validaciones-caja/', cajas_views.validacion_caja_crear, name='validacion_caja_crear'),
+    path('validaciones-caja/listar/', cajas_views.validacion_caja_listar, name='validacion_caja_listar'),
+    path('validaciones-caja/estadisticas/', cajas_views.validacion_caja_estadisticas, name='validacion_caja_estadisticas'),
 
     # Debug (removido: views_debug no disponible)
 ]

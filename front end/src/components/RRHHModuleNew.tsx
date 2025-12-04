@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { CicloBimensualModule } from './CicloBimensualModule';
 
 type RRHHTab = 'dashboard' | 'nomina' | 'ciclos' | 'trazabilidad' | 'reportes';
 
@@ -908,113 +909,7 @@ export function RRHHModuleNew() {
 
                     {/* CICLO TAB */}
                     <TabsContent value="ciclos" className="space-y-4">
-                        <div className="bg-white rounded-lg border border-[#E0E0E0] p-3 md:p-6">
-                            <div className="mb-3">
-                                <h3 className="text-[#333333] text-sm md:text-base font-semibold">Gestión de Ciclos</h3>
-                                <p className="text-[#6B6B6B] text-xs">Administra ciclos activos, crea nuevos y cierra cuando corresponda</p>
-                            </div>
-                            <div className="flex justify-end mb-4">
-                                <Dialog open={showAddCiclo} onOpenChange={setShowAddCiclo}>
-                                    <DialogTrigger asChild>
-                                        <Button className="w-full sm:w-auto bg-[#E12019] hover:bg-[#B51810] text-white text-sm md:text-base">
-                                            <Plus className="w-4 h-4 mr-2" />
-                                            Nuevo Ciclo
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="w-full max-w-xs sm:max-w-md">
-                                        <DialogHeader>
-                                            <DialogTitle className="text-[#333333] text-base md:text-lg font-semibold">Crear Nuevo Ciclo</DialogTitle>
-                                        </DialogHeader>
-                                        <div className="space-y-4">
-                                            <div>
-                                                <Label className="text-sm font-medium text-[#333333]">Nombre (opcional)</Label>
-                                                <Input
-                                                    placeholder="Ciclo 2025-12"
-                                                    value={cicloForm.nombre || ''}
-                                                    onChange={(e) => setCicloForm({ ...cicloForm, nombre: e.target.value })}
-                                                    className="text-sm h-10 border-2 border-[#E0E0E0] rounded-lg mt-1"
-                                                />
-                                                <p className="text-xs text-[#6B6B6B] mt-1">Ayuda a identificar este ciclo en reportes y nómina</p>
-                                            </div>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                <div>
-                                                    <Label className="text-sm font-medium text-[#333333]">Fecha inicio</Label>
-                                                    <Input
-                                                        type="date"
-                                                        value={cicloForm.fecha_inicio || ''}
-                                                        onChange={(e) => setCicloForm({ ...cicloForm, fecha_inicio: e.target.value })}
-                                                        className="text-sm h-10 border-2 border-[#E0E0E0] rounded-lg mt-1"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <Label className="text-sm font-medium text-[#333333]">Fecha fin</Label>
-                                                    <Input
-                                                        type="date"
-                                                        value={cicloForm.fecha_fin || ''}
-                                                        onChange={(e) => setCicloForm({ ...cicloForm, fecha_fin: e.target.value })}
-                                                        className="text-sm h-10 border-2 border-[#E0E0E0] rounded-lg mt-1"
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div className="pt-2">
-                                                <Button
-                                                    onClick={handleAddCiclo}
-                                                    className="w-full bg-[#017E49] hover:bg-[#015A34] text-white text-sm font-medium py-2 h-10"
-                                                >
-                                                    Crear Ciclo
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </DialogContent>
-                                </Dialog>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {ciclos.map((c) => {
-                                    // Contar trabajadores en este ciclo
-                                    const trabajadoresEnCiclo = trabajadores.filter(t =>
-                                        t.beneficio_disponible?.ciclo_id === c.id
-                                    ).length;
-
-                                    return (
-                                        <div key={c.id} className="border-2 border-[#E0E0E0] rounded-lg p-3 md:p-4">
-                                            <div className="flex items-start justify-between mb-2">
-                                                <h3 className="font-semibold text-[#333333] text-sm md:text-base">Ciclo {c.id}</h3>
-                                                <Badge className="text-xs px-2 py-0.5" variant={c.activo ? 'default' : 'outline'}>
-                                                    {c.activo ? 'Activo' : 'Cerrado'}
-                                                </Badge>
-                                            </div>
-                                            <div className="space-y-1 mb-3 text-xs text-[#6B6B6B]">
-                                                <p>Inicio: {c.fecha_inicio}</p>
-                                                <p>Fin: {c.fecha_fin}</p>
-                                                <p>Días restantes: {c.dias_restantes || 0}</p>
-                                                <p className="font-semibold text-[#333333]">Trabajadores: {trabajadoresEnCiclo}</p>
-                                            </div>
-                                            <div className="flex gap-2">
-                                                {c.activo && (
-                                                    <Button
-                                                        onClick={() => handleCerrarCiclo(c.id!)}
-                                                        className="flex-1 text-xs bg-[#FF9F55] hover:bg-[#E68843] text-white"
-                                                    >
-                                                        Cerrar Ciclo
-                                                    </Button>
-                                                )}
-                                                <Button
-                                                    onClick={() => {
-                                                        setSelectedCicloId(c.id!);
-                                                        setCurrentTab('nomina');
-                                                    }}
-                                                    variant="outline"
-                                                    className="flex-1 text-xs border-[#E0E0E0]"
-                                                >
-                                                    Ver Trabajadores
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
+                        <CicloBimensualModule />
                     </TabsContent>
 
                     {/* TRAZABILIDAD TAB */}

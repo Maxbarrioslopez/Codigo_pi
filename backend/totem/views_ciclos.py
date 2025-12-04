@@ -2,8 +2,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
 from django.utils import timezone
-from .models import Ciclo, Ticket
-from .serializers import CicloSerializer
+from .models import Ciclo, Ticket, TipoBeneficio
+from .serializers import CicloSerializer, TipoBeneficioSerializer
 from .permissions import IsRRHHOrSupervisor
 
 
@@ -83,7 +83,7 @@ def ciclos_list_create(request):
     return Response(serializer.data, status=201)
 
 
-@api_view(['GET', 'PUT'])
+@api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsRRHHOrSupervisor])
 def ciclo_detail_update(request, ciclo_id):
     """
@@ -144,12 +144,32 @@ def ciclo_detail_update(request, ciclo_id):
         c = Ciclo.objects.get(id=ciclo_id)
     except Ciclo.DoesNotExist:
         return Response({'detail': 'No encontrado'}, status=404)
+    
     if request.method == 'GET':
         return Response(CicloSerializer(c).data)
+    
+    if request.method == 'DELETE':
+        # Cerrar ciclo (desactivar)
+        c.activo = False
+        c.save()
+        return Response({
+            'detail': 'Ciclo cerrado exitosamente',
+            'ciclo': CicloSerializer(c).data
+        })
+    
     # PUT
-    for f in ['fecha_inicio', 'fecha_fin', 'activo']:
+    for f in ['fecha_inicio', 'fecha_fin', 'activo', 'nombre', 'descripcion']:
         if f in request.data:
             setattr(c, f, request.data[f])
+    
+    # Actualizar beneficios si se envían (soporta ambos formatos)
+    if 'beneficios_activos_ids' in request.data:
+        beneficio_ids = request.data['beneficios_activos_ids']
+        c.beneficios_activos.set(beneficio_ids)
+    elif 'beneficios_activos' in request.data:
+        beneficio_ids = request.data['beneficios_activos']
+        c.beneficios_activos.set(beneficio_ids)
+    
     c.save()
     return Response(CicloSerializer(c).data)
 
@@ -267,3 +287,116 @@ def ciclo_estadisticas(request, ciclo_id):
         'pendientes': pendientes,
         'expirados': expirados,
     })
+
+
+# ============================================================================
+# ENDPOINTS DE TIPOS DE BENEFICIOS
+# ============================================================================
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsRRHHOrSupervisor])
+def tipos_beneficio_list_create(request):
+    """
+    GET /api/tipos-beneficio/ - Lista todos los tipos de beneficios
+    POST /api/tipos-beneficio/ - Crea un nuevo tipo de beneficio
+    
+    Gestión de tipos de beneficios disponibles (Cajas, Paseos, etc.).
+    
+    ENDPOINT: GET|POST /api/tipos-beneficio/
+    MÉTODOS: GET, POST
+    PERMISOS: IsRRHHOrSupervisor
+    AUTENTICACIÓN: JWT requerido
+    
+    --- GET ---
+    RESPUESTA (200):
+        [
+            {
+                "id": 1,
+                "nombre": "Caja de Navidad",
+                "descripcion": "Caja premium o estándar",
+                "activo": true,
+                "created_at": "2025-01-01T10:00:00Z"
+            },
+            {
+                "id": 2,
+                "nombre": "Paseo Familiar",
+                "descripcion": "Tickets para paseos con la familia",
+                "activo": true,
+                "created_at": "2025-01-01T10:00:00Z"
+            }
+        ]
+    
+    --- POST ---
+    BODY (JSON):
+        {
+            "nombre": "Bono Escolar",          # REQUERIDO
+            "descripcion": "Bono para útiles", # OPCIONAL
+            "activo": true                     # OPCIONAL (default: true)
+        }
+    
+    RESPUESTA (201):
+        {
+            "id": 3,
+            "nombre": "Bono Escolar",
+            "descripcion": "Bono para útiles",
+            "activo": true,
+            "created_at": "2025-12-04T11:30:00Z"
+        }
+    """
+    if request.method == 'GET':
+        tipos = TipoBeneficio.objects.all()
+        return Response(TipoBeneficioSerializer(tipos, many=True).data)
+    
+    # POST
+    serializer = TipoBeneficioSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=400)
+    serializer.save()
+    return Response(serializer.data, status=201)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsRRHHOrSupervisor])
+def tipo_beneficio_detail(request, tipo_id):
+    """
+    GET /api/tipos-beneficio/{id}/ - Detalle de tipo de beneficio
+    PUT /api/tipos-beneficio/{id}/ - Actualizar tipo de beneficio
+    DELETE /api/tipos-beneficio/{id}/ - Eliminar tipo de beneficio
+    
+    Operaciones sobre un tipo de beneficio específico.
+    
+    ENDPOINT: GET|PUT|DELETE /api/tipos-beneficio/{id}/
+    MÉTODOS: GET, PUT, DELETE
+    PERMISOS: IsRRHHOrSupervisor
+    AUTENTICACIÓN: JWT requerido
+    
+    --- PUT ---
+    BODY (JSON) - Campos opcionales:
+        {
+            "nombre": "Caja de Navidad Premium",
+            "descripcion": "Descripción actualizada",
+            "activo": false
+        }
+    
+    --- DELETE ---
+    Elimina permanentemente el tipo de beneficio.
+    NOTA: Fallará si hay ciclos asociados.
+    """
+    try:
+        tipo = TipoBeneficio.objects.get(id=tipo_id)
+    except TipoBeneficio.DoesNotExist:
+        return Response({'detail': 'No encontrado'}, status=404)
+    
+    if request.method == 'GET':
+        return Response(TipoBeneficioSerializer(tipo).data)
+    
+    elif request.method == 'PUT':
+        serializer = TipoBeneficioSerializer(tipo, data=request.data, partial=True)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+        serializer.save()
+        return Response(serializer.data)
+    
+    elif request.method == 'DELETE':
+        tipo.delete()
+        return Response(status=204)

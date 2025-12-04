@@ -187,18 +187,183 @@ class Sucursal(models.Model):
         return f"{self.codigo} - {self.nombre}"
 
 
+class TipoBeneficio(models.Model):
+    """Tipos de beneficios disponibles en el sistema."""
+    TIPO_CONTRATO_CHOICES = [
+        ('todos', 'Todos los contratos'),
+        ('planta', 'Planta'),
+        ('contrata', 'Contrata'),
+        ('honorarios', 'Honorarios'),
+    ]
+    
+    nombre = models.CharField(max_length=100, unique=True)
+    descripcion = models.TextField(blank=True)
+    activo = models.BooleanField(default=True)
+    tipos_contrato = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Lista de tipos de contrato que reciben este beneficio (ej: ['planta', 'contrata'])"
+    )
+    requiere_validacion_guardia = models.BooleanField(
+        default=False,
+        help_text="Si es True, el guardia debe verificar la entrega de este beneficio con QR. Si es False, es entrega normal sin validación."
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    
+    class Meta:
+        verbose_name = 'Tipo de Beneficio'
+        verbose_name_plural = 'Tipos de Beneficios'
+        ordering = ['nombre']
+    
+    def __str__(self):
+        return self.nombre
+
+
 class Ciclo(models.Model):
     """Representa un ciclo bimensual de beneficios."""
+    nombre = models.CharField(
+        max_length=200,
+        help_text="Nombre descriptivo del ciclo (ej: Navidad 2025, Verano 2026)",
+        blank=True
+    )
     fecha_inicio = models.DateField()
     fecha_fin = models.DateField()
     activo = models.BooleanField(default=True)
+    beneficios_activos = models.ManyToManyField(
+        TipoBeneficio,
+        related_name='ciclos',
+        blank=True,
+        help_text="Beneficios disponibles en este ciclo"
+    )
+    descripcion = models.TextField(blank=True, help_text="Descripción o notas del ciclo")
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Ciclo'
+        verbose_name_plural = 'Ciclos'
+        ordering = ['-fecha_inicio']
 
     def __str__(self):
-        return f"Ciclo {self.id} ({self.fecha_inicio} -> {self.fecha_fin})"
+        if self.nombre:
+            return f"{self.nombre} ({self.fecha_inicio} → {self.fecha_fin})"
+        return f"Ciclo {self.id} ({self.fecha_inicio} → {self.fecha_fin})"
 
     @property
     def dias_restantes(self):
         return (self.fecha_fin - timezone.now().date()).days
+    
+    @property
+    def duracion_dias(self):
+        return (self.fecha_fin - self.fecha_inicio).days
+    
+    @property
+    def progreso_porcentaje(self):
+        if self.fecha_fin < timezone.now().date():
+            return 100
+        duracion = self.duracion_dias
+        transcurrido = (timezone.now().date() - self.fecha_inicio).days
+        return int((transcurrido / duracion) * 100) if duracion > 0 else 0
+
+
+class CajaBeneficio(models.Model):
+    """
+    Define las cajas disponibles dentro de un tipo de beneficio.
+    Ej: Beneficio "Caja de Navidad" puede tener cajas "Premium" y "Estándar"
+    """
+    beneficio = models.ForeignKey(TipoBeneficio, on_delete=models.CASCADE, related_name='cajas')
+    nombre = models.CharField(max_length=100, help_text="Nombre de la caja (ej: Premium, Estándar, Básica)")
+    descripcion = models.TextField(blank=True)
+    codigo_tipo = models.CharField(
+        max_length=50,
+        unique=True,
+        help_text="Código único para identificar este tipo de caja (ej: CAJ-NAV-PREMIUM)"
+    )
+    activo = models.BooleanField(default=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    
+    class Meta:
+        verbose_name = 'Caja de Beneficio'
+        verbose_name_plural = 'Cajas de Beneficios'
+        unique_together = ('beneficio', 'nombre')
+    
+    def __str__(self):
+        return f"{self.beneficio.nombre} - {self.nombre}"
+
+
+class BeneficioTrabajador(models.Model):
+    """
+    Relación entre un trabajador, ciclo y beneficio asignado.
+    Permite asignar beneficios específicos a trabajadores en un ciclo.
+    """
+    ESTADO_CHOICES = [
+        ('pendiente', 'Pendiente'),
+        ('validado', 'Validado'),
+        ('retirado', 'Retirado'),
+        ('cancelado', 'Cancelado'),
+    ]
+    
+    trabajador = models.ForeignKey(Trabajador, on_delete=models.CASCADE, related_name='beneficios')
+    ciclo = models.ForeignKey(Ciclo, on_delete=models.CASCADE, related_name='beneficios_asignados')
+    tipo_beneficio = models.ForeignKey(TipoBeneficio, on_delete=models.CASCADE)
+    caja_beneficio = models.ForeignKey(CajaBeneficio, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    # QR/Código de verificación único para este beneficio
+    codigo_verificacion = models.CharField(max_length=100, unique=True, db_index=True)
+    qr_data = models.TextField(blank=True, help_text="Datos del QR generado")
+    
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='pendiente')
+    bloqueado = models.BooleanField(default=False, help_text="Si está bloqueado, no puede retirar")
+    motivo_bloqueo = models.TextField(blank=True)
+    
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Beneficio Trabajador'
+        verbose_name_plural = 'Beneficios Trabajadores'
+        unique_together = ('trabajador', 'ciclo', 'tipo_beneficio')
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.trabajador.nombre} - {self.tipo_beneficio.nombre} ({self.ciclo})"
+
+
+class ValidacionCaja(models.Model):
+    """
+    Registro de validaciones realizadas por el guardia.
+    Doble autenticación: QR/código + validación manual del guardia
+    """
+    RESULTADO_CHOICES = [
+        ('exitoso', 'Exitoso'),
+        ('rechazado', 'Rechazado'),
+        ('error', 'Error'),
+    ]
+    
+    beneficio_trabajador = models.ForeignKey(BeneficioTrabajador, on_delete=models.CASCADE, related_name='validaciones')
+    guardia = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name='validaciones_cajas')
+    
+    # Datos de validación
+    codigo_escaneado = models.CharField(max_length=100, help_text="Código del QR/manual ingresado")
+    resultado = models.CharField(max_length=20, choices=RESULTADO_CHOICES)
+    
+    # Validación de caja
+    caja_validada = models.CharField(max_length=100, blank=True, help_text="Número/código de caja física entregada")
+    caja_coincide = models.BooleanField(default=False, help_text="¿La caja coincide con la asignada?")
+    
+    # Notas
+    notas = models.TextField(blank=True)
+    
+    # Timestamps
+    fecha_validacion = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = 'Validación de Caja'
+        verbose_name_plural = 'Validaciones de Cajas'
+        ordering = ['-fecha_validacion']
+    
+    def __str__(self):
+        return f"Validación {self.beneficio_trabajador} - {self.resultado}"
 
 
 class CajaFisica(models.Model):

@@ -2,7 +2,8 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import (
     Trabajador, Ticket, StockSucursal, StockMovimiento, Usuario,
-    Ciclo, Sucursal, CajaFisica, Agendamiento, Incidencia, TicketEvent, ParametroOperativo, NominaCarga
+    Ciclo, TipoBeneficio, Sucursal, CajaFisica, Agendamiento, Incidencia, TicketEvent, ParametroOperativo, NominaCarga,
+    CajaBeneficio, BeneficioTrabajador, ValidacionCaja
 )
 
 
@@ -70,11 +71,35 @@ class UsuarioSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'email']
 
 
+class TipoBeneficioSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TipoBeneficio
+        fields = ['id', 'nombre', 'descripcion', 'activo', 'tipos_contrato', 'requiere_validacion_guardia', 'created_at']
+        read_only_fields = ['created_at']
+
+
 class CicloSerializer(serializers.ModelSerializer):
     dias_restantes = serializers.ReadOnlyField()
+    duracion_dias = serializers.ReadOnlyField()
+    progreso_porcentaje = serializers.ReadOnlyField()
+    beneficios_activos = TipoBeneficioSerializer(many=True, read_only=True)
+    beneficios_activos_ids = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=TipoBeneficio.objects.all(),
+        source='beneficios_activos',
+        write_only=True,
+        required=False
+    )
+    
     class Meta:
         model = Ciclo
-        fields = ['id', 'fecha_inicio', 'fecha_fin', 'activo', 'dias_restantes']
+        fields = [
+            'id', 'nombre', 'fecha_inicio', 'fecha_fin', 'activo',
+            'beneficios_activos', 'beneficios_activos_ids',
+            'descripcion', 'dias_restantes', 'duracion_dias',
+            'progreso_porcentaje', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
 
 
 class SucursalSerializer(serializers.ModelSerializer):
@@ -128,3 +153,48 @@ class NominaCargaSerializer(serializers.ModelSerializer):
             'creados', 'actualizados', 'sin_beneficio', 'observaciones', 'fecha_carga'
         ]
         read_only_fields = ['fecha_carga']
+
+
+class CajaBeneficioSerializer(serializers.ModelSerializer):
+    beneficio_nombre = serializers.CharField(source='beneficio.nombre', read_only=True)
+    
+    class Meta:
+        model = CajaBeneficio
+        fields = ['id', 'beneficio', 'beneficio_nombre', 'nombre', 'descripcion', 'codigo_tipo', 'activo', 'created_at']
+        read_only_fields = ['created_at']
+
+
+class BeneficioTrabajadorSerializer(serializers.ModelSerializer):
+    tipo_beneficio_nombre = serializers.CharField(source='tipo_beneficio.nombre', read_only=True)
+    caja_beneficio_nombre = serializers.CharField(source='caja_beneficio.nombre', read_only=True)
+    trabajador_nombre = serializers.CharField(source='trabajador.nombre', read_only=True)
+    
+    class Meta:
+        model = BeneficioTrabajador
+        fields = [
+            'id', 'trabajador', 'trabajador_nombre', 'ciclo', 'tipo_beneficio', 'tipo_beneficio_nombre',
+            'caja_beneficio', 'caja_beneficio_nombre', 'codigo_verificacion', 'qr_data',
+            'estado', 'bloqueado', 'motivo_bloqueo', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['codigo_verificacion', 'qr_data', 'created_at', 'updated_at']
+
+
+class ValidacionCajaSerializer(serializers.ModelSerializer):
+    guardia_nombre = serializers.CharField(source='guardia.get_full_name', read_only=True)
+    beneficio_info = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = ValidacionCaja
+        fields = [
+            'id', 'beneficio_trabajador', 'guardia', 'guardia_nombre',
+            'codigo_escaneado', 'resultado', 'caja_validada', 'caja_coincide',
+            'notas', 'fecha_validacion', 'beneficio_info'
+        ]
+        read_only_fields = ['fecha_validacion']
+    
+    def get_beneficio_info(self, obj):
+        return {
+            'trabajador': obj.beneficio_trabajador.trabajador.nombre,
+            'beneficio': obj.beneficio_trabajador.tipo_beneficio.nombre,
+            'ciclo': obj.beneficio_trabajador.ciclo.nombre
+        }

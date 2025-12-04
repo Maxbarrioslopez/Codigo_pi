@@ -1,168 +1,113 @@
-Plataforma de Beneficios TMLUC — Backend (Django DRF) + Frontend (React + Vite)
+# 🏢 Sistema Retiro Digital TMLUC
 
-## 🟢 STATUS: PRODUCCIÓN LISTA
+Sistema integral de gestión de beneficios para trabajadores con módulos de autoservicio, validación y administración.
 
-**Última actualización:** 2 Diciembre 2025  
-**Commits:** 4 (12f8558, 5a006c0, aa05eeb, 6de5e0c)  
-**Features:** Agregar trabajador, CRUD Ciclos, Nómina Preview, Upload Excel/CSV Funcional, Descarga Plantilla, Responsive Mobile
-
----
-
-## Estructura actual
-
-- **backend/**: proyecto Django con apps de dominio
-
-  - backend_project/: settings, urls, wsgi
-  - totem/: modelos y vistas núcleo (tickets, agendamientos, incidencias, ciclo, parámetros)
-  - guardia/: vistas de validación y métricas de portería
-  - rrhh/: listados administrativos y reportes diarios (18+ endpoints)
-
-- **front end/**: aplicación React + Vite (TypeScript)
-  - src/components/: Totem, Guardia, RRHHModuleNew (6 tabs integrados), Administrador y UI
-  - src/services/: trabajador, ciclo, nomina, stock (singleton pattern)
-  - src/hooks/: useCicloActivo, useMetricasGuardia, useParametrosOperativos
-
----
-
-## ✨ LO QUE FUNCIONA
+## 📁 Estructura del Proyecto
 
 ```
-Agregar Trabajador para Beneficio → POST /api/trabajadores/
-CRUD Ciclos Bimensuales → /api/ciclos/
-Vista Previa Nómina → POST /api/nomina/preview/
-Confirmar Nómina → POST /api/nomina/confirmar/
-Upload Excel/CSV Nómina → Drag&Drop + Click, validación 10MB, SheetJS parsing
-Descarga Plantilla CSV → /plantillas/nomina_ejemplo.csv
-Listar Incidencias/Trazabilidad → /api/incidencias/
-Reportes por período → /api/reportes/
-Responsive Mobile (360px-1440px)
-Sincronización BD en tiempo real
+Codigo_pi/
+├── backend/              # API Django + Django REST Framework
+│   ├── backend_project/  # Configuración principal
+│   ├── totem/           # App principal de beneficios
+│   ├── guardia/         # App módulo guardia
+│   ├── rrhh/            # App módulo RRHH
+│   └── scripts/         # Scripts de utilidad
+├── frontend/            # React + TypeScript + Vite
+│   ├── src/
+│   │   ├── components/  # Componentes React
+│   │   ├── services/    # Servicios API
+│   │   ├── hooks/       # Custom hooks
+│   │   ├── contexts/    # Context providers
+│   │   └── types/       # TypeScript types
+│   └── public/          # Archivos estáticos
+└── docs/                # Documentación del proyecto
 ```
 
----
+## 🚀 Inicio Rápido
 
-## 🚀 INICIO RÁPIDO
+### Backend (Django)
 
-### Terminal 1: Backend
-
-```powershell
-cd "c:\Users\Maxi Barrios\Documents\Codigo_pi\backend"
-python manage.py runserver 0.0.0.0:8000
+```bash
+cd backend
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py runserver
 ```
 
-### Terminal 2: Frontend
+### Frontend (React)
 
-```powershell
-cd "c:\Users\Maxi Barrios\Documents\Codigo_pi\front end"
+```bash
+cd frontend
+npm install
 npm run dev
 ```
 
-### Navegador
+El sistema estará disponible en:
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
 
-```
-http://localhost:3000/
-→ Click "Dashboard RRHH"
-→ Testear cualquier tab
-```
+## 🔑 Módulos Principales
 
----
+### 🖥️ Tótem Autoservicio
+- Escaneo QR de cédulas
+- Validación de beneficios
+- Generación de tickets
 
-## 📖 DOCUMENTACIÓN
+### 🛡️ Panel Guardia
+- Validación de entregas
+- Escaneo QR de tickets
+- Registro de incidencias
 
-👉 **[VER ÍNDICE COMPLETO](./DOCUMENTACION_INDEX.md)** ← EMPIEZA AQUÍ
+### 📊 Dashboard RRHH
+- Gestión de ciclos y beneficios
+- Administración de cajas
+- Control de stock
+- Reportes y métricas
 
-**Rutas rápidas:**
+### ⚙️ Administración
+- Gestión de usuarios
+- Configuración de roles
+- Parámetros del sistema
 
-- **5 min**: `GUIA_RAPIDA_INICIO.md` — Empezar ahora mismo
-- **10 min**: `RESUMEN_VISUAL.md` — Entender el problema y solución
-- **15 min**: `RESUMEN_EJECUTIVO_CAMBIOS.md` — Visión de impacto
-- **20 min**: `CAMBIOS_TECNICOS_EXACTOS.md` — Detalles de código
-- **30 min**: `IMPLEMENTACION_COMPLETADA.md` — Guía completa
-- **30 min**: `CHECKLIST_VALIDACION_FINAL.md` — Testing y validación
-- **60 min**: `AUDIT_FRONTEND_BACKEND_ALIGNMENT.md` — Análisis profundo
+## 🔐 Roles de Usuario
 
----
+- **Admin**: Acceso total al sistema
+- **RRHH**: Gestión de beneficios y ciclos
+- **Guardia**: Validación de entregas
+- **Supervisor**: Vista de reportes
 
-## 🔧 ENDPOINTS PRINCIPALES
+## 📚 Documentación
 
-**Trabajadores:**
+Toda la documentación técnica y guías se encuentra en la carpeta `/docs`:
 
-- `GET /api/trabajadores/` — Listar todos
-- `POST /api/trabajadores/` — Crear nuevo ← FUNCIONA AHORA
-- `PUT /api/trabajadores/{rut}/` — Actualizar
-- `DELETE /api/trabajadores/{rut}/` — Eliminar
+- Guías de deployment
+- Especificaciones técnicas
+- Flujos de trabajo
+- Configuración de producción
 
-**Ciclos:**
+## 🛠️ Tecnologías
 
-- `GET /api/ciclos/` — Listar todos
-- `POST /api/ciclos/` — Crear ciclo
-- `POST /api/ciclos/{id}/cerrar/` — Cerrar ciclo
+**Backend:**
+- Django 4.2
+- Django REST Framework
+- PostgreSQL / SQLite
+- JWT Authentication
 
-**Nómina:**
+**Frontend:**
+- React 18
+- TypeScript
+- Vite
+- Tailwind CSS
+- Shadcn UI
 
-- `POST /api/nomina/preview/` — Previsualizar
-- `POST /api/nomina/confirmar/` — Confirmar generación
+## 🌐 Deployment
 
-Ver `backend/README.md` para lista completa (40+ endpoints).
+Ver `docs/DEPLOYMENT_INSTRUCTIONS_mbarrios_tech.md` para instrucciones completas de deployment en producción.
 
----
+**Dominio**: mbarrios.tech
 
-## Características nuevas
+## 📄 Licencia
 
-| Característica     | Status | Móvil | Desktop |
-| ------------------ | ------ | ----- | ------- |
-| Agregar Trabajador | ✅     | ✅    | ✅      |
-| Gestión Ciclos     | ✅     | ✅    | ✅      |
-| Nómina Preview     | ✅     | ✅    | ✅      |
-| Upload Excel/CSV   | ✅     | ✅    | ✅      |
-| Descarga Plantilla | ✅     | ✅    | ✅      |
-| Trazabilidad QR    | ✅     | ✅    | ✅      |
-| Reportes           | ✅     | ✅    | ✅      |
-| Responsive         | ✅     | ✅    | ✅      |
-
----
-
-## 🧪 TESTING
-
-```powershell
-# Frontend tests
-cd "front end"
-npm test
-
-# Backend tests
-cd "backend"
-pytest
-```
-
----
-
-## Cambios recientes
-
-- **NominaModule.tsx**: Upload funcional con SheetJS (xlsx), drag&drop, validación de extensiones (.xlsx, .xls, .csv) y tamaño (10MB), preview de primeros 5 registros, flujo completo upload → preview → processing → complete
-- **Descarga de plantilla**: Botón operativo con archivo estático en `public/plantillas/nomina_ejemplo.csv`
-- **RRHHModuleNew.tsx**: 6 tabs integrados (dashboard, trabajadores, ciclo, nómina, trazabilidad, reportes)
-- **ciclo.service.ts**: CRUD completo para ciclos bimensuales
-- **nomina.service.ts**: Preview + confirmar nómina
-- **trabajador.service.ts**: Completado con create, update, delete, getTimeline
-- **App.tsx**: Simplificado de 10 a 5 módulos en sidebar
-- **Responsivity**: Mobile-first Tailwind en todos los componentes
-
----
-
-## 🛠️ PRÓXIMAS MEJORAS
-
-- [ ] Validación avanzada de campos
-- [ ] Mensajes de error mejorados
-- [ ] Historial de cambios (audit log)
-- [ ] Exportar reportes (CSV/PDF)
-- [ ] AdministradorModule responsive
-- [ ] GuardiaModule responsive
-
----
-
-## 📝 NOTAS
-
-- Documentación detallada del frontend en `front end/README.md`
-- Ver `GUIA_RAPIDA_INICIO.md` para primer uso y troubleshooting
-- BD desarrollo: `backend/db.sqlite3`
-- Todos los cambios en Git con commits trazables
+Propietario - TMLUC (Terminal Marítimo de Lirquén)

@@ -37,9 +37,17 @@ poetry.lock
 
 # Django
 *.sqlite3
+db.sqlite3
 media/
 staticfiles/
 
 # Tests & reports
 coverage.xml
 coverage_html/
+__tests__/
+examples/
+
+# Documentation (mantenemos solo README)
+docs/
+*.md
+!README.md

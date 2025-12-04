@@ -59,34 +59,18 @@ function extractDate(text: string): string | null {
     return null;
 }
 
+// Importar validación desde rut.ts para evitar duplicación
+import { validateRut as validateRutBase } from './rut';
+
 function isValidRut(rut: string): boolean {
-    // Limpia y valida con Módulo 11
-    const clean = rut.replace(/\./g, '').toUpperCase();
-    const [numStr, dv] = clean.split('-');
-    if (!numStr || !dv) return false;
-    if (!/^[0-9]+$/.test(numStr)) return false;
-    const expected = modulo11(numStr);
-    return dv === expected;
+    return validateRutBase(rut);
 }
 
 // Exportar para uso externo
 export { isValidRut };
 
-function modulo11(numStr: string): string {
-    let sum = 0;
-    let mul = 2;
-    for (let i = numStr.length - 1; i >= 0; i--) {
-        sum += parseInt(numStr[i], 10) * mul;
-        mul = mul === 7 ? 2 : mul + 1;
-    }
-    const res = 11 - (sum % 11);
-    if (res === 11) return '0';
-    if (res === 10) return 'K';
-    return String(res);
-}
-
 function formatRut(rut: string): string {
-    // Formatea RUT limpiando y aplicando formato XX-XX (sin puntos)
+    // Formatea RUT limpiando y aplicando formato XX-XX (sin puntos para PDF417)
     let clean = rut.replace(/[^\dkK]/g, '').toUpperCase();
 
     if (clean.length === 0) return '';

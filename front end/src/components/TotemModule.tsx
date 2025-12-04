@@ -5,6 +5,7 @@ import { ticketService } from '@/services/ticket.service';
 import { incidentService } from '@/services/incident.service';
 import { scheduleService } from '@/services/schedule.service';
 import { mapApiErrorToStateAndToast } from '@/lib/apiErrorMapping';
+import { formatRut } from '@/utils/rut';
 import { RUTInput } from './form/RUTInput';
 import { IScannerControls } from '@zxing/browser';
 import TotemScannerPanel from '@/components/TotemScannerPanel';
@@ -64,7 +65,8 @@ export function TotemModule() {
       setValidationSteps(prev => prev.map((s, i) => ({ ...s, status: i === 0 ? 'active' : 'pending' })));
       try {
         // Paso único: obtener beneficio (incluye identidad y stock)
-        const res = await trabajadorService.getBeneficio(rutEscaneado);
+        const formattedRut = formatRut(rutEscaneado);
+        const res = await trabajadorService.getBeneficio(formattedRut);
         if (cancelled) return;
         setBeneficio(res.beneficio);
         const stock = res.beneficio?.beneficio_disponible?.stock ?? 0;

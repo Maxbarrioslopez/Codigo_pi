@@ -190,7 +190,11 @@ class TrabajadorService:
         logger.info("bloquear_trabajador", trabajador_id=trabajador.id, motivo=motivo)
         
         bd = trabajador.beneficio_disponible or {}
+        # Guardar el tipo original antes de bloquear
+        if bd.get('tipo') != 'BLOQUEADO':
+            bd['tipo_original'] = bd.get('tipo', 'SIN_BENEFICIO')
         bd['tipo'] = 'BLOQUEADO'
+        bd['activo'] = False
         bd['motivo'] = motivo
         bd['bloqueado_at'] = timezone.now().isoformat()
         
@@ -216,7 +220,12 @@ class TrabajadorService:
         
         bd = trabajador.beneficio_disponible or {}
         if bd.get('tipo') == 'BLOQUEADO':
-            bd['tipo'] = 'SIN_BENEFICIO'
+            # Restaurar el tipo original si existe, sino dejar SIN_BENEFICIO
+            tipo_original = bd.pop('tipo_original', 'SIN_BENEFICIO')
+            bd['tipo'] = tipo_original
+            # Si tiene ciclo_id, significa que tiene beneficio asignado, activarlo
+            if bd.get('ciclo_id'):
+                bd['activo'] = True
             bd.pop('motivo', None)
             bd.pop('bloqueado_at', None)
         

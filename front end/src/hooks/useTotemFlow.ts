@@ -3,6 +3,7 @@ import { trabajadorService } from '@/services/trabajador.service';
 import { ticketService } from '@/services/ticket.service';
 import { incidentService } from '@/services/incident.service';
 import { scheduleService } from '@/services/schedule.service';
+import { formatRut } from '@/utils/rut';
 
 export type TotemState =
     | 'initial'
@@ -31,7 +32,8 @@ export function useTotemFlow() {
         setError('');
         setState('validating');
         try {
-            const res = await trabajadorService.getBeneficio(rutInput);
+            const formattedRut = formatRut(rutInput);
+            const res = await trabajadorService.getBeneficio(formattedRut);
             setBeneficio(res.beneficio);
             const stock = res.beneficio?.beneficio_disponible?.stock ?? 0;
             if (!res.beneficio) {

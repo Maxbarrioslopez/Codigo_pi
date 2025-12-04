@@ -1,0 +1,173 @@
+{
+    "ciclo": {
+        "id": 8,
+        "fecha_inicio": "2025-12-01",
+        "fecha_fin": "2025-12-31",
+        "nombre": "Diciembre 2025"
+    },
+    "trabajadores": [
+        {
+            "rut": "11111111-1",
+            "nombre": "Juan Pérez García",
+            "seccion": "Operaciones",
+            "contrato": "INDEFINIDO",
+            "sucursal": "CENTRAL",
+            "beneficio": {
+                "tipo": "Caja",
+                "categoria": "Estándar",
+                "descripcion": "Caja de mercadería estándar",
+                "activo": true
+            },
+            "observaciones": "",
+            "email": "",
+            "telefono": "+56912345678"
+        },
+        {
+            "rut": "22222222-2",
+            "nombre": "María López Silva",
+            "seccion": "Bodega",
+            "contrato": "PLAZO FIJO",
+            "sucursal": "SUR",
+            "beneficio": {
+                "tipo": "SIN_BENEFICIO",
+                "motivo": "Contrato temporal sin beneficios",
+                "activo": false
+            },
+            "observaciones": "Contrato temporal sin beneficios",
+            "email": "",
+            "telefono": ""
+        },
+        {
+            "rut": "33333333-3",
+            "nombre": "Pedro Torres Muñoz",
+            "seccion": "Ventas",
+            "contrato": "INDEFINIDO",
+            "sucursal": "NORTE",
+            "beneficio": {
+                "tipo": "Vale",
+                "valor": 5000,
+                "descripcion": "Vale por $5.000",
+                "activo": true
+            },
+            "observaciones": "",
+            "email": "",
+            "telefono": "+56987654321"
+        },
+        {
+            "rut": "44444444-4",
+            "nombre": "Ana González Rojas",
+            "seccion": "Administración",
+            "contrato": "INDEFINIDO",
+            "sucursal": "CENTRAL",
+            "beneficio": {
+                "tipo": "Monto",
+                "valor": 10000,
+                "descripcion": "Monto de $10.000",
+                "activo": true
+            },
+            "observaciones": "",
+            "email": "ana.gonzalez@empresa.cl",
+            "telefono": "+56911223344"
+        },
+        {
+            "rut": "55555555-5",
+            "nombre": "Carlos Ramírez Soto",
+            "seccion": "Producción",
+            "contrato": "OBRA",
+            "sucursal": "ORIENTE",
+            "beneficio": {
+                "tipo": "SIN_BENEFICIO",
+                "motivo": "En período de prueba",
+                "activo": false
+            },
+            "observaciones": "Trabajador en período de prueba",
+            "email": "carlos.ramirez@empresa.cl",
+            "telefono": ""
+        },
+        {
+            "rut": "66666666-6",
+            "nombre": "Luis Fernández Vega",
+            "seccion": "Mantención",
+            "contrato": "INDEFINIDO",
+            "sucursal": "CENTRAL",
+            "beneficio": {
+                "tipo": "Vale",
+                "descripcion": "Vale estándar",
+                "activo": true
+            },
+            "observaciones": "",
+            "email": "",
+            "telefono": "+56944555666"
+        },
+        {
+            "rut": "77777777-7",
+            "nombre": "Patricia Morales Bravo",
+            "seccion": "Calidad",
+            "contrato": "PLAZO FIJO",
+            "sucursal": "NORTE",
+            "beneficio": {
+                "tipo": "Caja",
+                "categoria": "Premium",
+                "descripcion": "Caja premium para personal de confianza",
+                "activo": true
+            },
+            "observaciones": "",
+            "email": "patricia.morales@empresa.cl",
+            "telefono": ""
+        },
+        {
+            "rut": "88888888-8",
+            "nombre": "Roberto Díaz Castro",
+            "seccion": "Logística",
+            "contrato": "INDEFINIDO",
+            "sucursal": "SUR",
+            "beneficio": {
+                "tipo": "Vale",
+                "valor": 8000,
+                "descripcion": "Vale por $8.000",
+                "activo": true
+            },
+            "observaciones": "",
+            "email": "",
+            "telefono": "+56966777888"
+        },
+        {
+            "rut": "99999999-9",
+            "nombre": "Claudia Núñez Parra",
+            "seccion": "Administración",
+            "contrato": "INDEFINIDO",
+            "sucursal": "CENTRAL",
+            "beneficio": {
+                "tipo": "Monto",
+                "valor": 12000,
+                "descripcion": "Monto de $12.000",
+                "activo": true
+            },
+            "observaciones": "",
+            "email": "claudia.nunez@empresa.cl",
+            "telefono": "+56977888999"
+        },
+        {
+            "rut": "12345678-5",
+            "nombre": "Francisco Soto Reyes",
+            "seccion": "Bodega",
+            "contrato": "OBRA",
+            "sucursal": "ORIENTE",
+            "beneficio": {
+                "tipo": "SIN_BENEFICIO",
+                "motivo": "Trabajador externo",
+                "activo": false
+            },
+            "observaciones": "Trabajador externo sin beneficios",
+            "email": "",
+            "telefono": ""
+        }
+    ],
+    "metadata": {
+        "total_trabajadores": 10,
+        "total_con_beneficio": 7,
+        "total_sin_beneficio": 3,
+        "fecha_generacion": "2025-12-03",
+        "generado_por": "Sistema RRHH"
+    }
+}

@@ -44,13 +44,17 @@ logger = logging.getLogger(__name__)
 def obtener_beneficio(request, rut):
     """
     Obtiene información del beneficio disponible para un trabajador.
+    Soporta búsqueda general o por ciclo específico.
     
-    ENDPOINT: GET /api/beneficios/{rut}/
+    ENDPOINT: GET /api/beneficios/{rut}/?ciclo_id={id}
     PERMISOS: Público (tótem sin autenticación)
     RATE LIMIT: 30 peticiones por minuto por IP
     
     PARÁMETROS URL:
         rut (str): RUT del trabajador en formato 12345678-9 o 12345678-K
+    
+    PARÁMETROS QUERY:
+        ciclo_id (int, opcional): ID del ciclo para filtrar beneficio
     
     RESPUESTA EXITOSA (200):
         {
@@ -61,16 +65,26 @@ def obtener_beneficio(request, rut):
                 "beneficio_disponible": {
                     "tipo": "Caja",
                     "categoria": "Estándar",
+                    "ciclo_id": 8,
+                    "activo": true,
                     "descripcion": "Caja de mercadería estándar"
-                }
+                },
+                "ciclo_id_filtrado": 8  # Solo si se pasó ciclo_id como parámetro
             }
         }
     
     ERRORES:
         400: RUT con formato inválido
-        404: Trabajador no encontrado
+        404: Trabajador no encontrado o sin beneficio en ciclo especificado
         429: Límite de peticiones excedido
         500: Error interno del servidor
+    
+    EJEMPLO:
+        # Obtener beneficio general
+        GET /api/beneficios/12345678-9/
+        
+        # Obtener beneficio específico del ciclo 8
+        GET /api/beneficios/12345678-9/?ciclo_id=8
     """
     try:
         rut_c = clean_rut(rut)
@@ -82,10 +96,35 @@ def obtener_beneficio(request, rut):
         except Trabajador.DoesNotExist:
             raise TrabajadorNotFoundException('No se encontró trabajador con ese RUT.')
 
-        serializer = TrabajadorSerializer(trabajador)
-        return Response({'beneficio': serializer.data}, status=status.HTTP_200_OK)
+        # Obtener ciclo_id de query params si está disponible
+        ciclo_id = request.query_params.get('ciclo_id')
+        
+        result = TrabajadorSerializer(trabajador).data
+        
+        # Si se especifica ciclo_id, filtrar el beneficio para ese ciclo
+        if ciclo_id:
+            ciclo_id = int(ciclo_id)
+            beneficio = result.get('beneficio_disponible', {})
+            
+            # Si el beneficio tiene ciclo_id, verificar que coincida
+            if beneficio.get('ciclo_id') == ciclo_id:
+                result['ciclo_id_filtrado'] = ciclo_id
+                # Si el beneficio está bloqueado, retornar error 404
+                if beneficio.get('tipo') == 'BLOQUEADO' or not beneficio.get('activo', False):
+                    raise TrabajadorNotFoundException(
+                        f'No hay beneficio activo para el ciclo {ciclo_id}.'
+                    )
+            else:
+                # No hay beneficio para este ciclo
+                raise TrabajadorNotFoundException(
+                    f'No hay beneficio registrado para el ciclo {ciclo_id}.'
+                )
+        
+        return Response({'beneficio': result}, status=status.HTTP_200_OK)
     except TotemBaseException:
         raise
+    except ValueError:
+        raise ValidationException(detail='ciclo_id debe ser un número entero válido.')
     except Exception as e:
         logger.error(f"Error inesperado en obtener_beneficio: {e}")
         return Response({'detail': 'Error interno del servidor'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

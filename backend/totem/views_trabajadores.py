@@ -2,6 +2,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
 from django.db.models import Q
+from django.utils import timezone
+from datetime import datetime
 from .models import Trabajador, Ticket, TicketEvent, Incidencia, Agendamiento
 from .serializers import TrabajadorSerializer
 from .permissions import IsRRHHOrSupervisor
@@ -103,7 +105,7 @@ def trabajadores_list_create(request):
         data = TrabajadorSerializer(qs[:500], many=True).data
         return Response(data)
 
-    # POST
+    # POST - Crear o actualizar trabajador en un ciclo específico
     payload = request.data
     rut = clean_rut(payload.get('rut', ''))
     if not rut or not valid_rut(rut):
@@ -111,9 +113,36 @@ def trabajadores_list_create(request):
     nombre = payload.get('nombre')
     if not nombre:
         raise ValidationException(detail='Nombre requerido')
-    if Trabajador.objects.filter(rut__iexact=rut).exists():
-        raise ValidationException(detail='Trabajador ya existe')
-    t = Trabajador.objects.create(rut=rut, nombre=nombre, beneficio_disponible=payload.get('beneficio_disponible') or {})
+    
+    # Obtener datos adicionales
+    contrato = payload.get('contrato')
+    sucursal = payload.get('sucursal')
+    beneficio = payload.get('beneficio_disponible') or {}
+    ciclo_id = beneficio.get('ciclo_id')
+    
+    # Buscar trabajador existente
+    trabajador_existente = Trabajador.objects.filter(rut__iexact=rut).first()
+    
+    if trabajador_existente:
+        # Trabajador existe - actualizar datos y beneficio del ciclo actual
+        trabajador_existente.nombre = nombre  # Actualizar nombre por si cambió
+        
+        # El campo beneficio_disponible ahora representa el beneficio del ciclo actual
+        # Se sobrescribe con el nuevo beneficio para el ciclo especificado
+        trabajador_existente.beneficio_disponible = beneficio
+        trabajador_existente.save()
+        
+        return Response(
+            TrabajadorSerializer(trabajador_existente).data, 
+            status=200  # 200 indica actualización exitosa
+        )
+    
+    # Trabajador nuevo - crear
+    t = Trabajador.objects.create(
+        rut=rut, 
+        nombre=nombre, 
+        beneficio_disponible=beneficio
+    )
     return Response(TrabajadorSerializer(t).data, status=201)
 
 
@@ -207,10 +236,32 @@ def trabajador_detail(request, rut):
         t.save()
         return Response(TrabajadorSerializer(t).data)
 
-    # DELETE: soft - marcar beneficio como bloqueado
+    # DELETE: Por defecto soft delete - marcar beneficio como bloqueado
+    # Si se envía ?hard=true, se elimina permanentemente del sistema
+    hard_delete = request.GET.get('hard', '').lower() == 'true'
+    
+    if hard_delete:
+        # Eliminación permanente - verificar que no tenga tickets activos
+        tickets_activos = Ticket.objects.filter(
+            trabajador=t,
+            estado__in=['PENDIENTE', 'AGENDADO']
+        ).exists()
+        
+        if tickets_activos:
+            return Response(
+                {'detail': 'No se puede eliminar. El trabajador tiene tickets activos.'},
+                status=400
+            )
+        
+        # Eliminar físicamente
+        t.delete()
+        return Response(status=204)
+    
+    # Soft delete - marcar beneficio como bloqueado
     bd = t.beneficio_disponible or {}
     bd['tipo'] = 'BLOQUEADO'
     bd['motivo'] = request.data.get('motivo', 'Desactivado por RRHH')
+    bd['fecha_bloqueo'] = str(datetime.now())
     t.beneficio_disponible = bd
     t.save()
     return Response(status=204)
@@ -267,8 +318,13 @@ def trabajador_bloquear(request, rut):
     except Trabajador.DoesNotExist:
         raise TrabajadorNotFoundException()
     bd = t.beneficio_disponible or {}
+    # Guardar el tipo original antes de bloquear
+    if bd.get('tipo') != 'BLOQUEADO':
+        bd['tipo_original'] = bd.get('tipo', 'SIN_BENEFICIO')
     bd['tipo'] = 'BLOQUEADO'
+    bd['activo'] = False
     bd['motivo'] = request.data.get('motivo', 'Bloqueado por RRHH')
+    bd['bloqueado_at'] = timezone.now().isoformat()
     t.beneficio_disponible = bd
     t.save()
     return Response(TrabajadorSerializer(t).data)
@@ -323,8 +379,14 @@ def trabajador_desbloquear(request, rut):
         raise TrabajadorNotFoundException()
     bd = t.beneficio_disponible or {}
     if bd.get('tipo') == 'BLOQUEADO':
-        bd['tipo'] = 'SIN_BENEFICIO'
+        # Restaurar el tipo original si existe, sino dejar SIN_BENEFICIO
+        tipo_original = bd.pop('tipo_original', 'SIN_BENEFICIO')
+        bd['tipo'] = tipo_original
+        # Si tiene ciclo_id, significa que tiene beneficio asignado, activarlo
+        if bd.get('ciclo_id'):
+            bd['activo'] = True
         bd.pop('motivo', None)
+        bd.pop('bloqueado_at', None)
     t.beneficio_disponible = bd
     t.save()
     return Response(TrabajadorSerializer(t).data)
@@ -420,3 +482,56 @@ def trabajador_timeline(request, rut):
         eventos.append({'tipo': 'agendamiento', 'fecha': ag.created_at.isoformat(), 'metadata': {'fecha_retiro': ag.fecha_retiro.isoformat(), 'estado': ag.estado}})
     eventos.sort(key=lambda x: x['fecha'], reverse=True)
     return Response({'rut': t.rut, 'nombre': t.nombre, 'eventos': eventos})
+
+
+@api_view(['POST'])
+@permission_classes([IsRRHHOrSupervisor])
+def trabajador_actualizar_beneficio(request, rut):
+    """
+    POST /api/trabajadores/{rut}/actualizar_beneficio/
+    
+    Actualiza el beneficio de un trabajador para un ciclo específico.
+    Permite activar/desactivar o cambiar el tipo de beneficio.
+    
+    ENDPOINT: POST /api/trabajadores/{rut}/actualizar_beneficio/
+    MÉTODO: POST
+    PERMISOS: IsRRHHOrSupervisor
+    AUTENTICACIÓN: JWT requerido
+    
+    PARÁMETROS URL:
+        rut (str): RUT del trabajador
+    
+    BODY (JSON):
+        {
+            "beneficio_disponible": {
+                "tipo": "Caja",              # Tipo de beneficio
+                "categoria": "Estándar",      # Categoría
+                "ciclo_id": 5,                # ID del ciclo
+                "activo": true                # Si está activo o no
+            }
+        }
+    
+    RESPUESTA (200):
+        {
+            "id": 1,
+            "rut": "12345678-9",
+            "nombre": "Juan Pérez",
+            "beneficio_disponible": {
+                "tipo": "Caja",
+                "categoria": "Estándar",
+                "ciclo_id": 5,
+                "activo": true
+            }
+        }
+    """
+    rc = clean_rut(rut)
+    try:
+        t = Trabajador.objects.get(rut__iexact=rc)
+    except Trabajador.DoesNotExist:
+        raise TrabajadorNotFoundException()
+    
+    beneficio = request.data.get('beneficio_disponible', {})
+    t.beneficio_disponible = beneficio
+    t.save()
+    
+    return Response(TrabajadorSerializer(t).data)

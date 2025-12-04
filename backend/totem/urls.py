@@ -57,6 +57,7 @@ urlpatterns = [
     path('trabajadores/<str:rut>/', trab_views.trabajador_detail, name='trabajador_detail'),
     path('trabajadores/<str:rut>/bloquear/', trab_views.trabajador_bloquear, name='trabajador_bloquear'),
     path('trabajadores/<str:rut>/desbloquear/', trab_views.trabajador_desbloquear, name='trabajador_desbloquear'),
+    path('trabajadores/<str:rut>/actualizar_beneficio/', trab_views.trabajador_actualizar_beneficio, name='trabajador_actualizar_beneficio'),
     path('trabajadores/<str:rut>/timeline/', trab_views.trabajador_timeline, name='trabajador_timeline'),
 
     # Ciclos

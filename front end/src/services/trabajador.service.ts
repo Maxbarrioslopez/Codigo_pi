@@ -25,11 +25,15 @@ export class TrabajadorService {
     /**
      * Obtener beneficio disponible para un trabajador
      * @param rut - RUT del trabajador (formato: 12345678-9)
+     * @param cicloId - ID del ciclo (opcional) para obtener beneficio específico de ese ciclo
      * @returns Información del beneficio y trabajador
      */
-    async getBeneficio(rut: string): Promise<BeneficioResponse> {
+    async getBeneficio(rut: string, cicloId?: number): Promise<BeneficioResponse> {
         try {
-            const { data } = await apiClient.get<BeneficioResponse>(`beneficios/${rut}/`);
+            const url = cicloId
+                ? `beneficios/${rut}/?ciclo_id=${cicloId}`
+                : `beneficios/${rut}/`;
+            const { data } = await apiClient.get<BeneficioResponse>(url);
             return data;
         } catch (error) {
             throw ErrorHandler.handle(error, 'TrabajadorService.getBeneficio', false);
@@ -68,9 +72,9 @@ export class TrabajadorService {
     /**
      * Bloquear trabajador (módulo RRHH)
      * @param rut - RUT del trabajador
-     * @param motivo - Motivo del bloqueo
+     * @param motivo - Motivo del bloqueo (opcional)
      */
-    async bloquear(rut: string, motivo: string): Promise<void> {
+    async bloquear(rut: string, motivo: string = 'Desactivado desde módulo RRHH'): Promise<void> {
         try {
             await apiClient.post(`trabajadores/${rut}/bloquear/`, { motivo });
         } catch (error) {
@@ -120,12 +124,31 @@ export class TrabajadorService {
     /**
      * Eliminar trabajador
      * @param rut - RUT del trabajador
+     * @param hard - Si es true, elimina permanentemente. Si es false (default), solo desactiva (soft delete)
      */
-    async delete(rut: string): Promise<void> {
+    async delete(rut: string, hard: boolean = false): Promise<void> {
         try {
-            await apiClient.delete(`trabajadores/${rut}/`);
+            const url = hard ? `trabajadores/${rut}/?hard=true` : `trabajadores/${rut}/`;
+            await apiClient.delete(url);
         } catch (error) {
             throw ErrorHandler.handle(error, 'TrabajadorService.delete', false);
+        }
+    }
+
+    /**
+     * Actualizar beneficio de trabajador para un ciclo específico
+     * @param rut - RUT del trabajador
+     * @param beneficio - Datos del beneficio a actualizar
+     */
+    async actualizarBeneficio(rut: string, beneficio: any): Promise<TrabajadorDTO> {
+        try {
+            const { data } = await apiClient.post<TrabajadorDTO>(
+                `trabajadores/${rut}/actualizar_beneficio/`,
+                { beneficio_disponible: beneficio }
+            );
+            return data;
+        } catch (error) {
+            throw ErrorHandler.handle(error, 'TrabajadorService.actualizarBeneficio', false);
         }
     }
 

@@ -125,15 +125,47 @@ export function TrabajadoresModule() {
   };
 
   const handleDeleteWorker = async (rut: string) => {
-    if (!confirm('¿Está seguro de que desea eliminar este trabajador?')) return;
+    const action = confirm(
+      '¿Qué tipo de eliminación desea realizar?\n\n' +
+      'Aceptar = DESACTIVAR (soft delete - recomendado)\n' +
+      '  → El trabajador permanece en el sistema pero sin beneficio\n\n' +
+      'Cancelar = Ver opción de eliminar permanentemente'
+    );
 
-    try {
-      await trabajadorService.delete(rut);
-      setWorkers(workers.filter(w => w.rut !== rut));
-      showSuccess('Éxito', 'Trabajador eliminado correctamente');
-    } catch (error) {
-      showError('Error', 'No se pudo eliminar el trabajador');
-      console.error(error);
+    if (action) {
+      // Soft delete (recomendado)
+      try {
+        await trabajadorService.delete(rut, false);
+        await loadWorkers();
+        showSuccess('Éxito', 'Trabajador desactivado (beneficio bloqueado)');
+      } catch (error) {
+        showError('Error', 'No se pudo desactivar el trabajador');
+        console.error(error);
+      }
+    } else {
+      // Preguntar por hard delete
+      const hardDelete = confirm(
+        '⚠️ ADVERTENCIA: ELIMINACIÓN PERMANENTE\n\n' +
+        '¿Está seguro de ELIMINAR PERMANENTEMENTE este trabajador?\n\n' +
+        'Esta acción:\n' +
+        '• NO se puede deshacer\n' +
+        '• Elimina todos los registros del sistema\n' +
+        '• Solo es posible si no tiene tickets activos\n\n' +
+        'Aceptar = ELIMINAR PERMANENTEMENTE\n' +
+        'Cancelar = Volver atrás'
+      );
+
+      if (hardDelete) {
+        try {
+          await trabajadorService.delete(rut, true);
+          await loadWorkers();
+          showSuccess('Éxito', 'Trabajador eliminado permanentemente del sistema');
+        } catch (error: any) {
+          const message = error?.response?.data?.detail || 'No se pudo eliminar el trabajador';
+          showError('Error', message);
+          console.error(error);
+        }
+      }
     }
   };
 

@@ -1,15 +1,54 @@
 """
-Management command para cargar nómina de trabajadores desde archivo CSV/Excel.
+Management command para cargar nómina de trabajadores desde archivo CSV/Excel/JSON.
 
 Uso:
     python manage.py cargar_nomina archivo.csv
     python manage.py cargar_nomina archivo.xlsx --sheet "Nomina"
+    python manage.py cargar_nomina archivo.json
 
-Formato CSV esperado:
-    rut,nombre,seccion,contrato,sucursal,beneficio,observaciones,email,telefono
-    12345678-9,Juan Pérez,Operaciones,INDEFINIDO,CENTRAL,CAJA,,,+56912345678
-    98765432-1,María López,Bodega,PLAZO FIJO,SUR,NO,Contrato temporal,,
-    11111111-1,Pedro Torres,Ventas,INDEFINIDO,NORTE,VALE:5000,,,+56987654321
+Formatos soportados:
+
+CSV:
+    rut,nombre,seccion,contrato,sucursal,beneficio,ciclo_id,observaciones,email,telefono
+    12345678-9,Juan Pérez,Operaciones,INDEFINIDO,CENTRAL,CAJA,8,,,+56912345678
+
+Excel (.xlsx):
+    Mismo formato que CSV, se lee de la hoja "Nomina" por defecto
+
+JSON (nomina_estructura.json):
+    {
+        "ciclo": {
+            "id": 8,
+            "fecha_inicio": "2025-12-01",
+            "fecha_fin": "2025-12-31",
+            "nombre": "Diciembre 2025"
+        },
+        "trabajadores": [
+            {
+                "rut": "12345678-9",
+                "nombre": "Juan Pérez",
+                "seccion": "Operaciones",
+                "contrato": "INDEFINIDO",
+                "sucursal": "CENTRAL",
+                "beneficio": {
+                    "tipo": "Caja",
+                    "categoria": "Estándar",
+                    "valor": null,
+                    "descripcion": "Caja de mercadería",
+                    "activo": true
+                },
+                "observaciones": "",
+                "email": "",
+                "telefono": ""
+            }
+        ],
+        "metadata": {
+            "total_trabajadores": 10,
+            "total_con_beneficio": 7,
+            "total_sin_beneficio": 3,
+            "fecha_generacion": "2025-12-01T10:00:00Z"
+        }
+    }
 
 Beneficio puede ser:
     - CAJA: Caja de mercadería
@@ -20,7 +59,8 @@ Beneficio puede ser:
 
 Observaciones: Campo opcional para explicar por qué no recibe beneficio
 """
-     Nota: Uso orientado a desarrollo/operaciones manuales (dev-only).
+
+Nota: Uso orientado a desarrollo/operaciones manuales (dev-only).
      No se ejecuta en runtime de la aplicación.
 
 from django.core.management.base import BaseCommand, CommandError
@@ -28,6 +68,7 @@ from django.db import transaction
 from totem.models import Trabajador, Sucursal
 from totem.validators import RUTValidator, InputSanitizer
 import csv
+import json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -86,8 +127,10 @@ class Command(BaseCommand):
             trabajadores = self._cargar_csv(archivo)
         elif archivo.endswith(('.xlsx', '.xls')):
             trabajadores = self._cargar_excel(archivo, options['sheet'])
+        elif archivo.endswith('.json'):
+            trabajadores = self._cargar_json(archivo)
         else:
-            raise CommandError('Formato no soportado. Use .csv o .xlsx')
+            raise CommandError('Formato no soportado. Use .csv, .xlsx o .json')
         
         if not trabajadores:
             raise CommandError('No se encontraron trabajadores válidos en el archivo')
@@ -203,6 +246,89 @@ class Command(BaseCommand):
         
         return trabajadores
 
+    def _cargar_json(self, archivo):
+        """Carga trabajadores desde archivo JSON (nomina_estructura.json).
+        
+        Formato esperado:
+        {
+            "ciclo": { "id": 8, ... },
+            "trabajadores": [ { "rut": "...", "nombre": "...", ... } ],
+            "metadata": { "total_trabajadores": 10, ... }
+        }
+        """
+        trabajadores = []
+        
+        try:
+            with open(archivo, 'r', encoding='utf-8-sig') as f:
+                data = json.load(f)
+            
+            # Validar estructura JSON
+            if 'trabajadores' not in data:
+                raise CommandError(
+                    'El archivo JSON debe contener una clave "trabajadores" con array de trabajadores'
+                )
+            
+            if not isinstance(data['trabajadores'], list):
+                raise CommandError(
+                    'El campo "trabajadores" debe ser un array'
+                )
+            
+            # Extraer ciclo_id del metadata del JSON si está disponible
+            ciclo_id_json = None
+            if 'ciclo' in data and isinstance(data['ciclo'], dict):
+                ciclo_id_json = data['ciclo'].get('id')
+                self.stdout.write(
+                    self.style.SUCCESS(f'✓ Ciclo extraído del JSON: {ciclo_id_json}')
+                )
+            
+            # Procesar cada trabajador del JSON
+            for idx, trabajador_json in enumerate(data['trabajadores'], start=1):
+                try:
+                    # Convertir estructura JSON a formato compatible con _parsear_fila
+                    row = {
+                        'rut': str(trabajador_json.get('rut', '')).strip(),
+                        'nombre': str(trabajador_json.get('nombre', '')).strip(),
+                        'seccion': str(trabajador_json.get('seccion', '')).strip(),
+                        'contrato': str(trabajador_json.get('contrato', '')).strip(),
+                        'sucursal': str(trabajador_json.get('sucursal', '')).strip(),
+                        'beneficio': str(trabajador_json.get('beneficio', {}).get('tipo', '')).strip(),
+                        'ciclo_id': ciclo_id_json or trabajador_json.get('ciclo_id'),
+                        'observaciones': str(trabajador_json.get('observaciones', '')).strip(),
+                        'email': str(trabajador_json.get('email', '')).strip(),
+                        'telefono': str(trabajador_json.get('telefono', '')).strip(),
+                    }
+                    
+                    # Si el beneficio es un objeto complejo, extraer tipo
+                    if isinstance(trabajador_json.get('beneficio'), dict):
+                        beneficio_obj = trabajador_json['beneficio']
+                        beneficio_tipo = beneficio_obj.get('tipo', '')
+                        beneficio_valor = beneficio_obj.get('valor')
+                        
+                        # Reconstruir string de beneficio si hay valor
+                        if beneficio_valor:
+                            row['beneficio'] = f"{beneficio_tipo}:{beneficio_valor}"
+                        else:
+                            row['beneficio'] = beneficio_tipo
+                    
+                    trabajador = self._parsear_fila(row, idx)
+                    if trabajador:
+                        trabajadores.append(trabajador)
+                
+                except Exception as e:
+                    self.stdout.write(
+                        self.style.ERROR(f'Error procesando trabajador {idx} en JSON: {e}')
+                    )
+                    continue
+        
+        except FileNotFoundError:
+            raise CommandError(f'Archivo no encontrado: {archivo}')
+        except json.JSONDecodeError as e:
+            raise CommandError(f'Error decodificando JSON: {e}')
+        except Exception as e:
+            raise CommandError(f'Error leyendo JSON: {e}')
+        
+        return trabajadores
+
     def _parsear_fila(self, row, linea):
         """Parsea y valida una fila del archivo.
         
@@ -244,6 +370,19 @@ class Command(BaseCommand):
             sucursal_codigo = InputSanitizer.sanitize_string(
                 str(row.get('sucursal', '')).strip(), max_length=50
             )
+            
+            # CICLO ID - REQUERIDO para asociar beneficio a ciclo específico
+            ciclo_id = row.get('ciclo_id', '')
+            if ciclo_id:
+                try:
+                    ciclo_id = int(ciclo_id)
+                except (ValueError, TypeError):
+                    self.stdout.write(
+                        self.style.WARNING(f'Línea {linea}: ciclo_id inválido "{ciclo_id}" para {nombre}. Se usará None.')
+                    )
+                    ciclo_id = None
+            else:
+                ciclo_id = None
             
             if not seccion:
                 self.stdout.write(
@@ -308,6 +447,8 @@ class Command(BaseCommand):
                         beneficio['telefono'] = telefono
                     if sucursal_codigo:
                         beneficio['sucursal'] = sucursal_codigo
+                    if ciclo_id:
+                        beneficio['ciclo_id'] = ciclo_id
                     
                 except Exception as e:
                     self.stdout.write(
@@ -328,6 +469,8 @@ class Command(BaseCommand):
                     'telefono': telefono,
                     'sucursal': sucursal_codigo,
                 }
+                if ciclo_id:
+                    beneficio['ciclo_id'] = ciclo_id
             
             # 6. CONSTRUIR OBJETO TRABAJADOR
             return {

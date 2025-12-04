@@ -7,17 +7,17 @@ from .base import *
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = get_env_list('ALLOWED_HOSTS')
+ALLOWED_HOSTS = get_env_list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
 
 # Database - PostgreSQL required for production
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': get_env('POSTGRES_DB'),
-        'USER': get_env('POSTGRES_USER'),
-        'PASSWORD': get_env('POSTGRES_PASSWORD'),
-        'HOST': get_env('POSTGRES_HOST'),
-        'PORT': get_env('POSTGRES_PORT', '5432'),
+        'NAME': get_env('POSTGRES_DB', default='totem_production'),
+        'USER': get_env('POSTGRES_USER', default='postgres'),
+        'PASSWORD': get_env('POSTGRES_PASSWORD', default='postgres'),
+        'HOST': get_env('POSTGRES_HOST', default='localhost'),
+        'PORT': get_env('POSTGRES_PORT', default='5432'),
         'CONN_MAX_AGE': 600,  # Persistent connections
         'OPTIONS': {
             'connect_timeout': 10,
@@ -42,17 +42,17 @@ CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SAMESITE = 'Strict'
 
 # CORS - Strict origins only
-CORS_ALLOWED_ORIGINS = get_env_list('CORS_ALLOWED_ORIGINS')
+CORS_ALLOWED_ORIGINS = get_env_list('CORS_ALLOWED_ORIGINS', default=['http://localhost:3000', 'http://localhost:5173'])
 CORS_ALLOW_CREDENTIALS = True
 
 # Email Configuration
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = get_env('EMAIL_HOST')
-EMAIL_PORT = get_env_int('EMAIL_PORT', 587)
-EMAIL_USE_TLS = get_env_bool('EMAIL_USE_TLS', True)
-EMAIL_HOST_USER = get_env('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = get_env('EMAIL_HOST_PASSWORD')
-DEFAULT_FROM_EMAIL = get_env('DEFAULT_FROM_EMAIL')
+EMAIL_HOST = get_env('EMAIL_HOST', default='localhost')
+EMAIL_PORT = get_env_int('EMAIL_PORT', default=587)
+EMAIL_USE_TLS = get_env_bool('EMAIL_USE_TLS', default=True)
+EMAIL_HOST_USER = get_env('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = get_env('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = get_env('DEFAULT_FROM_EMAIL', default='noreply@totem.local')
 
 # Static files - Use WhiteNoise for serving
 try:
@@ -68,7 +68,7 @@ try:
     CACHES = {
         'default': {
             'BACKEND': 'django_redis.cache.RedisCache',
-            'LOCATION': get_env('REDIS_URL'),
+            'LOCATION': get_env('REDIS_URL', default='redis://localhost:6379/1'),
             'OPTIONS': {
                 'CLIENT_CLASS': 'django_redis.client.DefaultClient',
                 'SOCKET_CONNECT_TIMEOUT': 5,
@@ -76,7 +76,7 @@ try:
                 'CONNECTION_POOL_CLASS_KWARGS': {
                     'max_connections': 100,
                 },
-                'PASSWORD': get_env('REDIS_PASSWORD', None),
+                'PASSWORD': get_env('REDIS_PASSWORD', default=None),
             },
             'KEY_PREFIX': 'totem_prod',
             'TIMEOUT': 300,
@@ -88,16 +88,23 @@ except ImportError:
 # Celery - Production configuration
 try:
     import celery
-    CELERY_BROKER_URL = get_env('CELERY_BROKER_URL')
-    CELERY_RESULT_BACKEND = get_env('CELERY_RESULT_BACKEND')
+    CELERY_BROKER_URL = get_env('CELERY_BROKER_URL', default='redis://localhost:6379/0')
+    CELERY_RESULT_BACKEND = get_env('CELERY_RESULT_BACKEND', default='redis://localhost:6379/0')
     CELERY_TASK_ALWAYS_EAGER = False
 except ImportError:
     pass
 
 # Logging - Production logging
-LOGGING['handlers']['file']['filename'] = '/var/log/totem/django.log'
-LOGGING['handlers']['audit_file']['filename'] = '/var/log/totem/audit.log'
-LOGGING['handlers']['security_file']['filename'] = '/var/log/totem/security.log'
+# Use system logs if available, otherwise use local logs directory
+import os
+from pathlib import Path
+
+log_dir = Path('/var/log/totem') if Path('/var/log/totem').exists() or os.geteuid() == 0 else (BASE_DIR / 'logs')
+log_dir.mkdir(exist_ok=True, parents=True)
+
+LOGGING['handlers']['file']['filename'] = str(log_dir / 'django.log')
+LOGGING['handlers']['audit_file']['filename'] = str(log_dir / 'audit.log')
+LOGGING['handlers']['security_file']['filename'] = str(log_dir / 'security.log')
 
 # Error tracking with Sentry (optional)
 sentry_dsn = get_env('SENTRY_DSN', None)

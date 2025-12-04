@@ -10,6 +10,10 @@ from datetime import timedelta
 # Build paths
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
+# Ensure log directories exist
+LOGS_DIR = BASE_DIR / 'logs'
+LOGS_DIR.mkdir(exist_ok=True)
+
 # Try to import django-environ, fallback to python-decouple
 try:
     import environ
@@ -55,7 +59,8 @@ except ImportError:
         return config(key, default=default, cast=bool)
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = get_env('DJANGO_SECRET_KEY')
+# Fallback to a default for development if not set
+SECRET_KEY = get_env('DJANGO_SECRET_KEY', default='django-insecure-development-key-change-in-production')
 
 # Application definition
 INSTALLED_APPS = [

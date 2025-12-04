@@ -34,7 +34,7 @@ DOMINIO="mbarrios.tech"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 LOG_FILE="/var/log/totem/updates_${TIMESTAMP}.log"
 BACKUP_DIR="/var/backups/totem"
-REPO_DIR="/home/totem/Codigo_pi"  # Ajusta según tu ruta real
+REPO_DIR="/var/www/Codigo_pi"  # Ruta exacta del servidor
 
 # Colores para terminal
 RED='\033[0;31m'

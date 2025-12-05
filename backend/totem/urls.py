@@ -84,6 +84,7 @@ urlpatterns = [
     # Cajas y Validaciones (RRHH y Guardia)
     path('cajas-beneficio/', cajas_views.cajas_beneficio_list_create, name='cajas_beneficio_list_create'),
     path('cajas-beneficio/<int:caja_id>/', cajas_views.caja_beneficio_detail, name='caja_beneficio_detail'),
+    path('cajas-beneficio/por-tipo/<int:tipo_beneficio_id>/', cajas_views.cajas_por_beneficio, name='cajas_por_beneficio'),
     
     path('beneficios-trabajadores/', cajas_views.beneficio_trabajador_list_create, name='beneficio_trabajador_list_create'),
     path('beneficios-trabajadores/<int:beneficio_id>/', cajas_views.beneficio_trabajador_detail, name='beneficio_trabajador_detail'),

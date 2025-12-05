@@ -72,10 +72,16 @@ class UsuarioSerializer(serializers.ModelSerializer):
 
 
 class TipoBeneficioSerializer(serializers.ModelSerializer):
+    cajas = serializers.SerializerMethodField()
+    
     class Meta:
         model = TipoBeneficio
-        fields = ['id', 'nombre', 'descripcion', 'activo', 'tipos_contrato', 'requiere_validacion_guardia', 'created_at']
+        fields = ['id', 'nombre', 'descripcion', 'activo', 'tipos_contrato', 'requiere_validacion_guardia', 'cajas', 'created_at']
         read_only_fields = ['created_at']
+    
+    def get_cajas(self, obj):
+        cajas = obj.cajas.filter(activo=True)
+        return CajaBeneficioSerializer(cajas, many=True).data
 
 
 class CicloSerializer(serializers.ModelSerializer):

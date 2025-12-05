@@ -68,6 +68,11 @@ class CajasService {
         await apiClient.delete(`/cajas-beneficio/${id}/`);
     }
 
+    async obtenerCajasPorBeneficio(tipoBeneficioId: number): Promise<CajaBeneficioDTO[]> {
+        const response = await apiClient.get(`/cajas-beneficio/por-tipo/${tipoBeneficioId}/`);
+        return response.data;
+    }
+
     // ==================== BENEFICIOS TRABAJADORES ====================
 
     async getBeneficiosTrabajadores(params?: {

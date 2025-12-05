@@ -75,6 +75,31 @@ def caja_beneficio_detail(request, caja_id):
         return Response({'mensaje': 'Caja desactivada'}, status=status.HTTP_200_OK)
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def cajas_por_beneficio(request, tipo_beneficio_id):
+    """
+    GET: Obtener todas las cajas disponibles de un tipo de beneficio
+    
+    ENDPOINT: GET /api/cajas-beneficio/por-tipo/{tipo_beneficio_id}/
+    RESPUESTA: [
+        {
+            "id": 1,
+            "beneficio": 5,
+            "nombre": "Premium",
+            "codigo_tipo": "CAJ-NAV-PREM",
+            "descripcion": "Caja Premium con productos selectos",
+            "activo": true
+        },
+        ...
+    ]
+    """
+    beneficio = get_object_or_404(TipoBeneficio, id=tipo_beneficio_id)
+    cajas = CajaBeneficio.objects.filter(beneficio=beneficio, activo=True)
+    serializer = CajaBeneficioSerializer(cajas, many=True)
+    return Response(serializer.data)
+
+
 # ==================== BENEFICIO TRABAJADOR (RRHH) ====================
 
 @api_view(['GET', 'POST'])

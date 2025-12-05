@@ -3,7 +3,6 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import LoginModule from './components/LoginModule';
 import { useState } from 'react';
-import { DesignSystem } from './components/DesignSystem';
 import { TotemModule } from './components/TotemModule';
 import { GuardiaModule } from './components/GuardiaModule';
 import { RRHHModuleNew } from './components/RRHHModuleNew';
@@ -12,7 +11,7 @@ import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { Toaster } from './components/ui/toaster';
 import { StockModule } from './components/StockModule';
 import { BackendStatusBanner } from './components/BackendStatusBanner';
-import { Menu, X, LogOut, LayoutGrid, MonitorSmartphone, Shield, BarChart3, Boxes, Settings } from 'lucide-react';
+import { Menu, X, LogOut, MonitorSmartphone, Shield, BarChart3, Boxes, Settings } from 'lucide-react';
 
 // Layout principal con sidebar para usuarios autenticados
 function DashboardLayout() {
@@ -22,7 +21,6 @@ function DashboardLayout() {
   // Determinar qué secciones mostrar según el rol
   const getSections = () => {
     const allSections = [
-      { id: 'design-system' as const, label: 'Design System', Icon: LayoutGrid, roles: ['admin'] },
       { id: 'totem' as const, label: 'Tótem Autoservicio', Icon: MonitorSmartphone, roles: ['admin'] },
       { id: 'guardia' as const, label: 'Panel Guardia', Icon: Shield, roles: ['guardia', 'admin'] },
       { id: 'rrhh' as const, label: 'Dashboard RRHH', Icon: BarChart3, roles: ['rrhh', 'admin', 'supervisor'] },
@@ -37,7 +35,7 @@ function DashboardLayout() {
 
   // Si el usuario solo tiene acceso a una sección, mostrar directamente esa
   const [currentSection, setCurrentSection] = useState(
-    sections.length === 1 ? sections[0].id : 'design-system'
+    sections.length === 1 ? sections[0].id : 'rrhh'
   );
 
   const handleLogout = () => {
@@ -121,7 +119,6 @@ function DashboardLayout() {
 
         {/* Main Content - Responsive */}
         <main className="flex-1 p-3 md:p-6 lg:p-8">
-          {currentSection === 'design-system' && <DesignSystem />}
           {currentSection === 'totem' && <TotemModule />}
           {currentSection === 'guardia' && <GuardiaModule />}
           {currentSection === 'rrhh' && <RRHHModuleNew />}

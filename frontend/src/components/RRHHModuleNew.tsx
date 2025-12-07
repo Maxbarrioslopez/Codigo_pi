@@ -746,10 +746,6 @@ export function RRHHModuleNew() {
                                                         <Download className="w-4 h-4" />
                                                         Plantilla simple (rut,nombre,contrato)
                                                     </a>
-                                                    <a href="/plantillas/nomina_ejemplo.csv" download className="inline-flex items-center gap-2 text-sm text-[#6B6B6B] hover:underline">
-                                                        <Download className="w-4 h-4" />
-                                                        Plantilla completa (ejemplo con más campos)
-                                                    </a>
                                                 </div>
                                             </DialogHeader>
                                             <div className="space-y-4">
@@ -827,17 +823,7 @@ export function RRHHModuleNew() {
                                         </DialogHeader>
 
                                         <div className="space-y-4">
-                                            {/* Botón para descargar plantilla Excel */}
-                                            <div className="flex flex-col gap-2 mb-2">
-                                                <a
-                                                    href="/plantillas/nomina_ejemplo.csv"
-                                                    download
-                                                    className="w-full bg-[#017E49] hover:bg-[#015A34] text-white text-sm font-medium py-2 rounded text-center"
-                                                >
-                                                    <Download className="inline mr-2 w-4 h-4" />
-                                                    Descargar plantilla Excel
-                                                </a>
-                                            </div>
+                                            {/* Botón para descargar solo plantilla simple */}
 
                                             {nominaPreview.resumen && (
                                                 <div className="grid grid-cols-2 gap-3 text-xs bg-[#F8F8F8] rounded-lg p-3">

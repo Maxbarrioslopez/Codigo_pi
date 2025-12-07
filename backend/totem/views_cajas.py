@@ -187,6 +187,8 @@ def beneficios_con_cajas(request):
             'nombre': beneficio.nombre,
             'descripcion': beneficio.descripcion,
             'activo': beneficio.activo,
+            'requiere_validacion_guardia': beneficio.requiere_validacion_guardia,
+            'tipos_contrato': beneficio.tipos_contrato,
             'cajas': caja_data
         })
     

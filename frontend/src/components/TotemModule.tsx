@@ -11,12 +11,13 @@ import { IScannerControls } from '@zxing/browser';
 import TotemScannerPanel from '@/components/TotemScannerPanel';
 // Modular screens
 import TotemInitialScreen from '@/components/totem/TotemInitialScreen';
+import TotemBenefitScreen from '@/components/totem/TotemBenefitScreen';
 import TotemValidatingScreen from '@/components/totem/TotemValidatingScreen';
 import TotemSuccessScreen from '@/components/totem/TotemSuccessScreen';
 import TotemNoStockScreen from '@/components/totem/TotemNoStockScreen';
 import TotemIncidentForm from '@/components/totem/TotemIncidentForm';
 
-type TotemScreen = 'initial' | 'validating' | 'success' | 'success-choice' | 'no-stock' | 'schedule-select' | 'schedule-confirm' | 'no-benefit' | 'error' | 'incident-form' | 'incident-sent' | 'incident-scan' | 'incident-status';
+type TotemScreen = 'initial' | 'benefit' | 'validating' | 'success' | 'success-choice' | 'no-stock' | 'schedule-select' | 'schedule-confirm' | 'no-benefit' | 'error' | 'incident-form' | 'incident-sent' | 'incident-scan' | 'incident-status';
 
 export function TotemModule() {
   const [currentScreen, setCurrentScreen] = useState<TotemScreen>('initial');
@@ -69,7 +70,6 @@ export function TotemModule() {
         const res = await trabajadorService.getBeneficio(formattedRut);
         if (cancelled) return;
         setBeneficio(res.beneficio);
-        const stock = res.beneficio?.beneficio_disponible?.stock ?? 0;
 
         setValidationSteps(prev => prev.map(s => ({ ...s, status: 'complete' })));
 
@@ -77,14 +77,8 @@ export function TotemModule() {
         await new Promise(r => setTimeout(r, 200));
         if (cancelled) return;
 
-        // Saltar directamente al siguiente paso basado en resultado
-        if (!res.beneficio) {
-          setCurrentScreen('no-benefit');
-        } else if (stock <= 0) {
-          setCurrentScreen('no-stock');
-        } else {
-          setCurrentScreen('success-choice');
-        }
+        // Ir a pantalla de beneficio (muestra con o sin beneficio)
+        setCurrentScreen('benefit');
       } catch (e: any) {
         if (cancelled) return;
         setValidationSteps(prev => prev.map(s => ({ ...s, status: 'error' })));
@@ -161,20 +155,20 @@ export function TotemModule() {
                 setRutEscaneado(rut);
                 setCurrentScreen('validating');
               }}
-              onManualRut={(rut) => {
-                const rutToUse = rut.trim();
-                if (rutToUse) {
-                  setRutInput(rutToUse);
-                  setRutEscaneado(rutToUse);
-                  setCurrentScreen('validating');
-                }
-              }}
-              onConsultIncident={() => setCurrentScreen('incident-scan')}
-              onReportIncident={() => setCurrentScreen('incident-form')}
             />
           )}
           {currentScreen === 'validating' && (
             <TotemValidatingScreen />
+          )}
+          {currentScreen === 'benefit' && beneficio && (
+            <TotemBenefitScreen
+              rut={rutEscaneado}
+              nombre={beneficio.nombre || 'Trabajador'}
+              beneficio={beneficio.beneficio_disponible}
+              onReportIncident={() => setCurrentScreen('incident-form')}
+              onConsultIncident={() => setCurrentScreen('incident-scan')}
+              onBack={() => setCurrentScreen('initial')}
+            />
           )}
           {currentScreen === 'success-choice' && (
             <TotemSuccessChoice

@@ -2,12 +2,14 @@ import apiClient from './apiClient';
 
 export interface CajaBeneficioDTO {
     id: number;
-    beneficio: number;
+    beneficio: number | null;
+    beneficio_id?: number | null;
     nombre: string;
     descripcion: string;
     codigo_tipo: string;
     activo: boolean;
     created_at: string;
+    beneficio_nombre?: string;
 }
 
 export interface BeneficioTrabajadorDTO {

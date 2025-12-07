@@ -260,11 +260,13 @@ export function CicloBimensualModule() {
     }
   };
 
-  const handleToggleCajaAsignacion = async (cajaId: number, estaAsignada: boolean) => {
+  const handleToggleCajaAsignacion = async (cajaId: number) => {
     if (!selectedBeneficio) return;
 
     try {
-      const nuevoBeneficioId = estaAsignada ? undefined : selectedBeneficio.id;
+      // Verificar si la caja está actualmente asignada al beneficio
+      const estaAsignada = cajasDelBeneficio.some(c => c.id === cajaId);
+      const nuevoBeneficioId = estaAsignada ? null : selectedBeneficio.id;
 
       await cajasService.updateCajaBeneficio(cajaId, {
         beneficio: nuevoBeneficioId
@@ -272,17 +274,33 @@ export function CicloBimensualModule() {
 
       toast.success(estaAsignada ? 'Caja desasignada del beneficio' : 'Caja asignada al beneficio');
 
-      // Actualizar listas
-      const [beneficiosConCajasData, soloCajasData] = await Promise.all([
-        cajasService.getBeneficiosConCajas(false),
-        cajasService.getSoloCajas(false),
-      ]);
-      setBeneficiosConCajas(beneficiosConCajasData);
-      setSoloCajas(soloCajasData);
+      // Actualizar localmente de manera inmediata para mejor UX
+      if (estaAsignada) {
+        // Desasignar
+        setCajasDelBeneficio(cajasDelBeneficio.filter(c => c.id !== cajaId));
+      } else {
+        // Asignar
+        const cajaAAsignar = soloCajas.find(c => c.id === cajaId);
+        if (cajaAAsignar) {
+          setCajasDelBeneficio([...cajasDelBeneficio, { ...cajaAAsignar, beneficio: selectedBeneficio.id, beneficio_id: selectedBeneficio.id }]);
+        }
+      }
 
-      // Actualizar cajas del beneficio actual
-      const cajasActualizadas = await cajasService.obtenerCajasPorBeneficio(selectedBeneficio.id, true);
-      setCajasDelBeneficio(cajasActualizadas);
+      // Recargar datos del servidor después de actualizar UI
+      try {
+        const [beneficiosConCajasData, soloCajasData, cajasActualizadas] = await Promise.all([
+          cajasService.getBeneficiosConCajas(false),
+          cajasService.getSoloCajas(false),
+          cajasService.obtenerCajasPorBeneficio(selectedBeneficio.id, true),
+        ]);
+        setBeneficiosConCajas(beneficiosConCajasData);
+        setSoloCajas(soloCajasData);
+        // Validar que las cajas cargadas realmente pertenezcan a este beneficio
+        const cajasValidas = cajasActualizadas.filter((c: any) => c.beneficio === selectedBeneficio.id || c.beneficio_id === selectedBeneficio.id);
+        setCajasDelBeneficio(cajasValidas);
+      } catch (error) {
+        console.error('Error reloading cajas:', error);
+      }
     } catch (error) {
       toast.error('Error al actualizar asignación de caja');
       console.error(error);
@@ -664,8 +682,8 @@ export function CicloBimensualModule() {
                             </>
                           )}
                         </div>
-                        <Badge className={beneficio.requiere_validacion_guardia 
-                          ? 'bg-[#FFE6CC] text-[#FF9F55] border border-[#FF9F55]' 
+                        <Badge className={beneficio.requiere_validacion_guardia
+                          ? 'bg-[#FFE6CC] text-[#FF9F55] border border-[#FF9F55]'
                           : 'bg-[#E6F3EE] text-[#017E49] border border-[#017E49]'
                         }>
                           {beneficio.requiere_validacion_guardia ? 'Doble Validación' : 'Sin Validación'}
@@ -1283,7 +1301,7 @@ export function CicloBimensualModule() {
             </div>
           </div>
 
-          <div className="sticky bottom-0 left-0 right-0 z-50 bg-gradient-to-t from-white via-white to-transparent pt-6 pb-4 px-4">
+          <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-[#E0E0E0] z-50 pt-4 pb-4 px-4 shadow-lg">
             <div className="flex flex-col gap-3">
               <Button
                 type="button"
@@ -1426,7 +1444,7 @@ export function CicloBimensualModule() {
               ) : (
                 <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
                   {soloCajas.map((caja) => {
-                    const estaAsignada = caja.beneficio === selectedBeneficio?.id;
+                    const estaAsignada = cajasDelBeneficio.some(c => c.id === caja.id);
                     return (
                       <label
                         key={caja.id}
@@ -1438,7 +1456,7 @@ export function CicloBimensualModule() {
                         <input
                           type="checkbox"
                           checked={estaAsignada}
-                          onChange={() => handleToggleCajaAsignacion(caja.id, estaAsignada)}
+                          onChange={() => handleToggleCajaAsignacion(caja.id)}
                           className="w-5 h-5 rounded border-2 border-[#E0E0E0] text-[#FF8C00] focus:ring-2 focus:ring-[#FF8C00]"
                         />
                         <div className="flex-1">

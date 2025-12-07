@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Calendar, Clock, Settings, History, Unlock, AlertCircle, CheckCircle, XCircle, Package, User, Plus, Edit2, Trash2, Check, X, Boxes, List } from 'lucide-react';
+import { Calendar, Clock, Settings, History, Unlock, AlertCircle, CheckCircle, XCircle, Package, User, Plus, Edit2, Edit, Trash2, Check, X, Boxes, List } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
@@ -35,6 +35,7 @@ export function CicloBimensualModule() {
   const [showCreateBeneficioModal, setShowCreateBeneficioModal] = useState(false);
   const [showCreateCajaModal, setShowCreateCajaModal] = useState(false);
   const [showEditBeneficioModal, setShowEditBeneficioModal] = useState(false);
+  const [showEditCajaModal, setShowEditCajaModal] = useState(false);
   const [showAgregarBeneficioModal, setShowAgregarBeneficioModal] = useState(false);
   const [showUnlockModal, setShowUnlockModal] = useState(false);
 
@@ -43,6 +44,7 @@ export function CicloBimensualModule() {
   const [beneficioForm, setBeneficioForm] = useState({ nombre: '', descripcion: '', activo: true, tipos_contrato: [] as string[], requiere_validacion_guardia: false });
   const [cajaForm, setCajaForm] = useState({ beneficio: 0, nombre: '', descripcion: '', codigo_tipo: '', activo: true });
   const [selectedBeneficio, setSelectedBeneficio] = useState<TipoBeneficioDTO | null>(null);
+  const [selectedCaja, setSelectedCaja] = useState<any>(null);
   const [selectedCiclo, setSelectedCiclo] = useState<CicloDTO | null>(null);
   const [selectedBeneficiosParaCiclo, setSelectedBeneficiosParaCiclo] = useState<number[]>([]);
   const [selectedWorker, setSelectedWorker] = useState<any>(null);
@@ -238,7 +240,6 @@ export function CicloBimensualModule() {
       toast.success('Caja creada exitosamente');
       setShowCreateCajaModal(false);
       setCajaForm({ beneficio: 0, nombre: '', descripcion: '', codigo_tipo: '', activo: true });
-      setSelectedBeneficio(null);
 
       const [beneficiosConCajasData, soloCajasData] = await Promise.all([
         cajasService.getBeneficiosConCajas(false),
@@ -246,6 +247,12 @@ export function CicloBimensualModule() {
       ]);
       setBeneficiosConCajas(beneficiosConCajasData);
       setSoloCajas(soloCajasData);
+
+      // Recargar cajas del beneficio si está seleccionado
+      if (selectedBeneficio) {
+        const cajasActualizadas = await cajasService.obtenerCajasPorBeneficio(selectedBeneficio.id, true);
+        setCajasDelBeneficio(cajasActualizadas);
+      }
     } catch (error: any) {
       const detalle = error?.response?.data ? JSON.stringify(error.response.data) : '';
       toast.error(detalle ? `Error al crear caja: ${detalle}` : 'Error al crear caja');
@@ -282,15 +289,94 @@ export function CicloBimensualModule() {
     }
   };
 
+  const handleEditCaja = (caja: any) => {
+    setSelectedCaja(caja);
+    setCajaForm({
+      beneficio: caja.beneficio_id || 0,
+      nombre: caja.nombre,
+      descripcion: caja.descripcion || '',
+      codigo_tipo: caja.codigo_tipo,
+      activo: caja.activo !== false,
+    });
+    if (caja.beneficio_id) {
+      const ben = beneficios.find(b => b.id === caja.beneficio_id);
+      setSelectedBeneficio(ben || null);
+    } else {
+      setSelectedBeneficio(null);
+    }
+    setShowEditCajaModal(true);
+  };
+
+  const handleUpdateCaja = async () => {
+    if (!selectedCaja) return;
+
+    if (!cajaForm.nombre || !cajaForm.codigo_tipo) {
+      toast.error('Por favor completa nombre y código');
+      return;
+    }
+
+    try {
+      await cajasService.updateCajaBeneficio(selectedCaja.id, {
+        nombre: cajaForm.nombre,
+        descripcion: cajaForm.descripcion,
+        codigo_tipo: cajaForm.codigo_tipo,
+        activo: cajaForm.activo !== false,
+      });
+      toast.success('Caja actualizada exitosamente');
+      setShowEditCajaModal(false);
+      setCajaForm({ beneficio: 0, nombre: '', descripcion: '', codigo_tipo: '', activo: true });
+      setSelectedCaja(null);
+      setSelectedBeneficio(null);
+
+      // Recargar datos
+      try {
+        const [beneficiosConCajasData, soloCajasData] = await Promise.all([
+          cajasService.getBeneficiosConCajas(false),
+          cajasService.getSoloCajas(false),
+        ]);
+        setBeneficiosConCajas(beneficiosConCajasData);
+        setSoloCajas(soloCajasData);
+
+        if (selectedBeneficio) {
+          const cajasActualizadas = await cajasService.obtenerCajasPorBeneficio(selectedBeneficio.id, true);
+          setCajasDelBeneficio(cajasActualizadas);
+        }
+      } catch (error) {
+        console.error('Error reloading cajas:', error);
+      }
+    } catch (error) {
+      toast.error('Error al actualizar caja');
+      console.error(error);
+    }
+  };
+
   const handleToggleCajaActivo = async (cajaId: number, cajaActual: any) => {
     try {
       const caja = await cajasService.toggleCajaActivo(cajaId);
       toast.success(caja.activo ? 'Caja activada' : 'Caja desactivada');
 
-      // Actualizar la lista
+      // Actualizar la lista local
       setCajasDelBeneficio(cajasDelBeneficio.map(c =>
         c.id === cajaId ? { ...c, activo: caja.activo } : c
       ));
+
+      // Recargar datos de beneficios con cajas
+      try {
+        const [beneficiosConCajasData, soloCajasData] = await Promise.all([
+          cajasService.getBeneficiosConCajas(false),
+          cajasService.getSoloCajas(false),
+        ]);
+        setBeneficiosConCajas(beneficiosConCajasData);
+        setSoloCajas(soloCajasData);
+
+        // Recargar cajas del beneficio si está seleccionado
+        if (selectedBeneficio) {
+          const cajasActualizadas = await cajasService.obtenerCajasPorBeneficio(selectedBeneficio.id, true);
+          setCajasDelBeneficio(cajasActualizadas);
+        }
+      } catch (error) {
+        console.error('Error reloading cajas:', error);
+      }
     } catch (error) {
       toast.error('Error al actualizar caja');
       console.error(error);
@@ -305,8 +391,26 @@ export function CicloBimensualModule() {
       await cajasService.deleteCajaBeneficio(cajaId);
       toast.success('Caja eliminada exitosamente');
 
-      // Actualizar la lista
+      // Actualizar la lista local
       setCajasDelBeneficio(cajasDelBeneficio.filter(c => c.id !== cajaId));
+
+      // Recargar datos de beneficios con cajas
+      try {
+        const [beneficiosConCajasData, soloCajasData] = await Promise.all([
+          cajasService.getBeneficiosConCajas(false),
+          cajasService.getSoloCajas(false),
+        ]);
+        setBeneficiosConCajas(beneficiosConCajasData);
+        setSoloCajas(soloCajasData);
+
+        // Recargar cajas del beneficio si está seleccionado
+        if (selectedBeneficio) {
+          const cajasActualizadas = await cajasService.obtenerCajasPorBeneficio(selectedBeneficio.id, true);
+          setCajasDelBeneficio(cajasActualizadas);
+        }
+      } catch (error) {
+        console.error('Error reloading cajas:', error);
+      }
     } catch (error) {
       if (error instanceof Error && error.message.includes('409')) {
         toast.error('No se puede eliminar: hay trabajadores con esta caja asignada');
@@ -449,9 +553,24 @@ export function CicloBimensualModule() {
 
                   <div className="flex gap-2">
                     <Button
-                      onClick={() => {
+                      onClick={async () => {
                         setSelectedCiclo(ciclo);
                         setSelectedBeneficiosParaCiclo(ciclo.beneficios_activos.map(b => b.id));
+
+                        // Cargar datos de cajas si no están disponibles
+                        if (beneficiosConCajas.length === 0) {
+                          try {
+                            const [beneficiosConCajasData, soloCajasData] = await Promise.all([
+                              cajasService.getBeneficiosConCajas(false),
+                              cajasService.getSoloCajas(false),
+                            ]);
+                            setBeneficiosConCajas(beneficiosConCajasData);
+                            setSoloCajas(soloCajasData);
+                          } catch (error) {
+                            console.error('Error loading cajas data:', error);
+                          }
+                        }
+
                         setShowAgregarBeneficioModal(true);
                       }}
                       className="flex-1 bg-[#017E49] text-white hover:bg-[#016339]"
@@ -645,6 +764,13 @@ export function CicloBimensualModule() {
                                 {/* ACCIONES */}
                                 <div className="flex gap-2 justify-end">
                                   <button
+                                    onClick={() => handleEditCaja(caja)}
+                                    className="flex items-center gap-1 px-3 py-2 rounded text-xs font-medium transition-colors bg-[#E6F3EE] text-[#017E49] hover:bg-[#D9E9E3]"
+                                  >
+                                    <Edit className="w-3 h-3" />
+                                    Editar
+                                  </button>
+                                  <button
                                     onClick={() => handleToggleCajaActivo(caja.id, caja)}
                                     className={`flex items-center gap-1 px-3 py-2 rounded text-xs font-medium transition-colors ${caja.activo
                                       ? 'bg-[#FFF4E6] text-[#FF9F55] hover:bg-[#FFE6CC]'
@@ -662,14 +788,6 @@ export function CicloBimensualModule() {
                                         Activar
                                       </>
                                     )}
-                                  </button>
-
-                                  <button
-                                    onClick={() => handleDeleteCaja(caja.id)}
-                                    className="flex items-center gap-1 px-3 py-2 rounded text-xs font-medium bg-[#FFE6E6] text-[#E12019] hover:bg-[#FFCCCC] transition-colors"
-                                  >
-                                    <Trash2 className="w-3 h-3" />
-                                    Eliminar
                                   </button>
                                 </div>
                               </div>
@@ -770,6 +888,13 @@ export function CicloBimensualModule() {
                           {/* ACCIONES */}
                           <div className="flex gap-2 justify-end">
                             <button
+                              onClick={() => handleEditCaja(caja)}
+                              className="flex items-center gap-1 px-3 py-2 rounded text-xs font-medium transition-colors bg-[#E6F3EE] text-[#017E49] hover:bg-[#D9E9E3]"
+                            >
+                              <Edit className="w-3 h-3" />
+                              Editar
+                            </button>
+                            <button
                               onClick={() => handleToggleCajaActivo(caja.id, caja)}
                               className={`flex items-center gap-1 px-3 py-2 rounded text-xs font-medium transition-colors ${caja.activo
                                 ? 'bg-[#FFF4E6] text-[#FF9F55] hover:bg-[#FFE6CC]'
@@ -787,14 +912,6 @@ export function CicloBimensualModule() {
                                   Activar
                                 </>
                               )}
-                            </button>
-
-                            <button
-                              onClick={() => handleDeleteCaja(caja.id)}
-                              className="flex items-center gap-1 px-3 py-2 rounded text-xs font-medium bg-[#FFE6E6] text-[#E12019] hover:bg-[#FFCCCC] transition-colors"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                              Eliminar
                             </button>
                           </div>
                         </div>
@@ -971,16 +1088,24 @@ export function CicloBimensualModule() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal Crear Caja */}
-      <Dialog open={showCreateCajaModal} onOpenChange={setShowCreateCajaModal}>
+      {/* Modal Crear/Editar Caja */}
+      <Dialog open={showCreateCajaModal || showEditCajaModal} onOpenChange={(open) => {
+        setShowCreateCajaModal(open);
+        setShowEditCajaModal(open);
+        if (!open) {
+          setCajaForm({ beneficio: 0, nombre: '', descripcion: '', codigo_tipo: '', activo: true });
+          setSelectedCaja(null);
+          setSelectedBeneficio(null);
+        }
+      }}>
         <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Package className="w-5 h-5 text-[#FF8C00]" />
-              Agregar Nueva Caja
+              {showEditCajaModal ? 'Editar Caja' : 'Agregar Nueva Caja'}
             </DialogTitle>
             <DialogDescription>
-              Crea una variante de caja para un beneficio (ej: Premium, Estándar, Básica)
+              {showEditCajaModal ? 'Modifica los detalles de la caja' : 'Crea una variante de caja para un beneficio (ej: Premium, Estándar, Básica)'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -1099,11 +1224,11 @@ export function CicloBimensualModule() {
             <div className="flex flex-col gap-3">
               <Button
                 type="button"
-                onClick={handleCreateCaja}
+                onClick={showEditCajaModal ? handleUpdateCaja : handleCreateCaja}
                 className="w-full h-14 bg-gradient-to-r from-[#FF7300] to-[#FF9500] hover:from-[#E05F00] hover:to-[#E07700] text-white border-2 border-[#E05F00] font-bold shadow-lg text-lg flex items-center justify-center rounded-xl transition-all duration-200 hover:shadow-xl hover:scale-[1.02]"
               >
                 <Plus className="w-5 h-5 mr-2" />
-                CREAR CAJA
+                {showEditCajaModal ? 'GUARDAR CAMBIOS' : 'CREAR CAJA'}
               </Button>
               <Button
                 type="button"
@@ -1351,52 +1476,46 @@ export function CicloBimensualModule() {
                       )}
 
                       {/* INFORMACIÓN ADICIONAL */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                      <div className="space-y-2 mt-3 p-3 bg-[#F8F8F8] rounded-lg border border-[#E0E0E0]">
                         {/* Tipos de contrato */}
-                        <div className="flex items-center gap-2 text-xs">
-                          <span className="font-semibold text-[#333333]">Aplica a:</span>
-                          <span className="text-[#6B6B6B]">
+                        <div className="flex items-start gap-2 text-xs">
+                          <span className="font-semibold text-[#333333] min-w-[100px]">Aplica a:</span>
+                          <span className="text-[#6B6B6B] flex-1">
                             {beneficio.tipos_contrato && beneficio.tipos_contrato.length > 0
-                              ? beneficio.tipos_contrato.join(', ')
+                              ? beneficio.tipos_contrato.map((t: string) => t.charAt(0).toUpperCase() + t.slice(1)).join(', ')
                               : 'No especificado'}
                           </span>
                         </div>
 
                         {/* Validación de guardia */}
-                        <div className="flex items-center gap-2 text-xs">
+                        <div className="flex items-start gap-2 text-xs">
+                          <span className="font-semibold text-[#333333] min-w-[100px]">Verificación:</span>
                           {beneficio.requiere_validacion_guardia ? (
-                            <>
-                              <span className="text-[#017E49] font-semibold">✓ Validación Guardia:</span>
-                              <span className="text-[#017E49] font-medium">Requerida</span>
-                            </>
+                            <span className="text-[#017E49] font-medium bg-[#E6F3EE] px-2 py-1 rounded flex items-center gap-1">
+                              🔐 Doble verificación guardia
+                            </span>
                           ) : (
-                            <>
-                              <span className="text-[#6B6B6B] font-semibold">• Validación Guardia:</span>
-                              <span className="text-[#6B6B6B]">No requerida</span>
-                            </>
+                            <span className="text-[#999999]">Sin verificación</span>
                           )}
                         </div>
 
                         {/* Cantidad de cajas */}
-                        <div className="flex items-center gap-2 text-xs">
-                          <span className="font-semibold text-[#333333]">Cajas:</span>
+                        <div className="flex items-start gap-2 text-xs">
+                          <span className="font-semibold text-[#333333] min-w-[100px]">Cajas:</span>
                           {beneficio.cajas && beneficio.cajas.length > 0 ? (
-                            <>
-                              <span className="text-[#FF9F55] font-medium">{beneficio.cajas.length}</span>
-                              <span className="text-[#6B6B6B]">
-                                ({beneficio.cajas.filter((c: any) => c.activo).length} activas)
-                              </span>
-                            </>
+                            <span className="text-[#FF9F55] font-bold">
+                              {beneficio.cajas.length} ({beneficio.cajas.filter((c: any) => c.activo).length} activas)
+                            </span>
                           ) : (
-                            <span className="text-[#999999]">Sin cajas definidas</span>
+                            <span className="text-[#999999]">Sin cajas</span>
                           )}
                         </div>
 
-                        {/* Estado general */}
-                        <div className="flex items-center gap-2 text-xs">
-                          <span className="font-semibold text-[#333333]">Estado:</span>
-                          <Badge className="bg-[#E6F3EE] text-[#017E49] border border-[#017E49]">
-                            Beneficio {beneficio.activo ? 'Activo' : 'Inactivo'}
+                        {/* Estado */}
+                        <div className="flex items-start gap-2 text-xs">
+                          <span className="font-semibold text-[#333333] min-w-[100px]">Estado:</span>
+                          <Badge className={beneficio.activo ? 'bg-[#E6F3EE] text-[#017E49] border border-[#017E49]' : 'bg-[#F0F0F0] text-[#999999]'}>
+                            {beneficio.activo ? '✓ Activo' : '✗ Inactivo'}
                           </Badge>
                         </div>
                       </div>
@@ -1602,14 +1721,6 @@ export function CicloBimensualModule() {
                               Activar
                             </>
                           )}
-                        </button>
-
-                        <button
-                          onClick={() => handleDeleteCaja(caja.id)}
-                          className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium bg-[#FFE6E6] text-[#E12019] hover:bg-[#FFCCCC] transition-colors"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                          Eliminar
                         </button>
                       </div>
                     </div>

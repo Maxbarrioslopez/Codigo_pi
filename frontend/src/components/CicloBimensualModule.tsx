@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Calendar, Clock, Settings, History, Unlock, AlertCircle, CheckCircle, XCircle, Package, User, Plus, Edit2, Trash2, Check, X } from 'lucide-react';
+import { Calendar, Clock, Settings, History, Unlock, AlertCircle, CheckCircle, XCircle, Package, User, Plus, Edit2, Trash2, Check, X, Boxes, List } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
@@ -25,7 +25,10 @@ export function CicloBimensualModule() {
 
   // Estados para cajas
   const [cajasDelBeneficio, setCajasDelBeneficio] = useState<any[]>([]);
+  const [beneficiosConCajas, setBeneficiosConCajas] = useState<any[]>([]);
+  const [soloCajas, setSoloCajas] = useState<any[]>([]);
   const [showViewCajasModal, setShowViewCajasModal] = useState(false);
+  const [cajasTabActual, setCajasTabActual] = useState<'beneficios' | 'solo-cajas'>('beneficios');
 
   // Modales
   const [showCreateCicloModal, setShowCreateCicloModal] = useState(false);
@@ -38,7 +41,7 @@ export function CicloBimensualModule() {
   // Datos de formularios
   const [cicloForm, setCicloForm] = useState({ nombre: '', fecha_inicio: '', fecha_fin: '', descripcion: '' });
   const [beneficioForm, setBeneficioForm] = useState({ nombre: '', descripcion: '', activo: true, tipos_contrato: [] as string[], requiere_validacion_guardia: false });
-  const [cajaForm, setCajaForm] = useState({ beneficio: 0, nombre: '', descripcion: '', codigo_tipo: '' });
+  const [cajaForm, setCajaForm] = useState({ beneficio: 0, nombre: '', descripcion: '', codigo_tipo: '', activo: true });
   const [selectedBeneficio, setSelectedBeneficio] = useState<TipoBeneficioDTO | null>(null);
   const [selectedCiclo, setSelectedCiclo] = useState<CicloDTO | null>(null);
   const [selectedBeneficiosParaCiclo, setSelectedBeneficiosParaCiclo] = useState<number[]>([]);
@@ -141,7 +144,7 @@ export function CicloBimensualModule() {
     }
   };
 
-  const openEditBeneficio = (beneficio: TipoBeneficioDTO) => {
+  const openEditBeneficio = async (beneficio: TipoBeneficioDTO) => {
     setSelectedBeneficio(beneficio);
     setBeneficioForm({
       nombre: beneficio.nombre,
@@ -150,14 +153,36 @@ export function CicloBimensualModule() {
       tipos_contrato: beneficio.tipos_contrato || [],
       requiere_validacion_guardia: beneficio.requiere_validacion_guardia || false,
     });
+
+    // Cargar cajas del beneficio y todas las cajas disponibles
+    try {
+      const [cajas, todasLasCajas] = await Promise.all([
+        cajasService.obtenerCajasPorBeneficio(beneficio.id, true),
+        cajasService.getSoloCajas(false),
+      ]);
+      setCajasDelBeneficio(cajas);
+      setSoloCajas(todasLasCajas);
+    } catch (error) {
+      console.error('Error al cargar cajas:', error);
+      setCajasDelBeneficio([]);
+      setSoloCajas([]);
+    }
+
     setShowEditBeneficioModal(true);
   };
 
   const handleVerCajasBeneficio = async (beneficio: TipoBeneficioDTO) => {
     try {
       setSelectedBeneficio(beneficio);
-      const cajas = await cajasService.obtenerCajasPorBeneficio(beneficio.id);
+      const [cajas, beneficiosConCajasData, soloCajasData] = await Promise.all([
+        cajasService.obtenerCajasPorBeneficio(beneficio.id, true),
+        cajasService.getBeneficiosConCajas(false),
+        cajasService.getSoloCajas(false),
+      ]);
       setCajasDelBeneficio(cajas);
+      setBeneficiosConCajas(beneficiosConCajasData);
+      setSoloCajas(soloCajasData);
+      setCajasTabActual('beneficios');
       setShowViewCajasModal(true);
     } catch (error) {
       toast.error('Error al cargar cajas');
@@ -168,21 +193,109 @@ export function CicloBimensualModule() {
   // ==================== CRUD CAJAS ====================
 
   const handleCreateCaja = async () => {
-    if (!cajaForm.beneficio || !cajaForm.nombre || !cajaForm.codigo_tipo) {
+    const beneficioId = cajaForm.beneficio && cajaForm.beneficio !== 0 ? cajaForm.beneficio : null;
+
+    if (!cajaForm.nombre || !cajaForm.codigo_tipo) {
       toast.error('Completa todos los campos requeridos');
       return;
     }
+
     try {
-      await cajasService.createCajaBeneficio({
-        ...cajaForm,
-        activo: true,
-      });
+      if (beneficioId) {
+        await cajasService.crearCajaBeneficio(beneficioId, {
+          nombre: cajaForm.nombre,
+          descripcion: cajaForm.descripcion,
+          codigo_tipo: cajaForm.codigo_tipo,
+          activo: cajaForm.activo !== false,
+        });
+      } else {
+        await cajasService.createCajaBeneficio({
+          nombre: cajaForm.nombre,
+          descripcion: cajaForm.descripcion,
+          codigo_tipo: cajaForm.codigo_tipo,
+          activo: cajaForm.activo !== false,
+          beneficio: null,
+        });
+      }
+
       toast.success('Caja creada exitosamente');
       setShowCreateCajaModal(false);
-      setCajaForm({ beneficio: 0, nombre: '', descripcion: '', codigo_tipo: '' });
-      loadData();
+      setCajaForm({ beneficio: 0, nombre: '', descripcion: '', codigo_tipo: '', activo: true });
+      setSelectedBeneficio(null);
+
+      const [beneficiosConCajasData, soloCajasData] = await Promise.all([
+        cajasService.getBeneficiosConCajas(false),
+        cajasService.getSoloCajas(false),
+      ]);
+      setBeneficiosConCajas(beneficiosConCajasData);
+      setSoloCajas(soloCajasData);
+    } catch (error: any) {
+      const detalle = error?.response?.data ? JSON.stringify(error.response.data) : '';
+      toast.error(detalle ? `Error al crear caja: ${detalle}` : 'Error al crear caja');
+      console.error(error);
+    }
+  };
+
+  const handleToggleCajaAsignacion = async (cajaId: number, estaAsignada: boolean) => {
+    if (!selectedBeneficio) return;
+
+    try {
+      const nuevoBeneficioId = estaAsignada ? null : selectedBeneficio.id;
+
+      await cajasService.updateCajaBeneficio(cajaId, {
+        beneficio: nuevoBeneficioId
+      });
+
+      toast.success(estaAsignada ? 'Caja desasignada del beneficio' : 'Caja asignada al beneficio');
+
+      // Actualizar listas
+      const [beneficiosConCajasData, soloCajasData] = await Promise.all([
+        cajasService.getBeneficiosConCajas(false),
+        cajasService.getSoloCajas(false),
+      ]);
+      setBeneficiosConCajas(beneficiosConCajasData);
+      setSoloCajas(soloCajasData);
+
+      // Actualizar cajas del beneficio actual
+      const cajasActualizadas = await cajasService.obtenerCajasPorBeneficio(selectedBeneficio.id, true);
+      setCajasDelBeneficio(cajasActualizadas);
     } catch (error) {
-      toast.error('Error al crear caja');
+      toast.error('Error al actualizar asignación de caja');
+      console.error(error);
+    }
+  };
+
+  const handleToggleCajaActivo = async (cajaId: number, cajaActual: any) => {
+    try {
+      const caja = await cajasService.toggleCajaActivo(cajaId);
+      toast.success(caja.activo ? 'Caja activada' : 'Caja desactivada');
+
+      // Actualizar la lista
+      setCajasDelBeneficio(cajasDelBeneficio.map(c =>
+        c.id === cajaId ? { ...c, activo: caja.activo } : c
+      ));
+    } catch (error) {
+      toast.error('Error al actualizar caja');
+      console.error(error);
+    }
+  };
+
+  const handleDeleteCaja = async (cajaId: number) => {
+    if (!confirm('¿Estás seguro de que quieres eliminar esta caja?')) {
+      return;
+    }
+    try {
+      await cajasService.deleteCajaBeneficio(cajaId);
+      toast.success('Caja eliminada exitosamente');
+
+      // Actualizar la lista
+      setCajasDelBeneficio(cajasDelBeneficio.filter(c => c.id !== cajaId));
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('409')) {
+        toast.error('No se puede eliminar: hay trabajadores con esta caja asignada');
+      } else {
+        toast.error('Error al eliminar caja');
+      }
       console.error(error);
     }
   };
@@ -410,48 +523,277 @@ export function CicloBimensualModule() {
               <p className="text-[#6B6B6B]">No hay beneficios con cajas disponibles</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {beneficios.map((beneficio) => (
-                <div key={beneficio.id} className="bg-white border-2 border-[#E0E0E0] rounded-xl p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h3 className="text-[#333333] font-bold text-lg">{beneficio.nombre}</h3>
-                      <p className="text-[#6B6B6B] text-sm">{beneficio.descripcion}</p>
-                    </div>
-                    <Badge className={beneficio.activo ? 'bg-[#017E49]' : 'bg-[#6B6B6B]'}>
-                      {beneficio.activo ? 'Activo' : 'Inactivo'}
-                    </Badge>
-                  </div>
+            <Tabs defaultValue="por-beneficio" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 bg-[#F8F8F8] border-2 border-[#E0E0E0]">
+                <TabsTrigger value="por-beneficio" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-[#FF9F55]">
+                  <Package className="w-4 h-4 mr-2" />
+                  Por Beneficio
+                </TabsTrigger>
+                <TabsTrigger value="todas-cajas" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-[#FF9F55]">
+                  <List className="w-4 h-4 mr-2" />
+                  Todas las Cajas
+                </TabsTrigger>
+              </TabsList>
 
-                  <div className="mb-4">
-                    <Button
-                      onClick={() => handleVerCajasBeneficio(beneficio)}
-                      className="w-full bg-[#0066CC] text-white hover:bg-[#0052A3]"
-                    >
-                      <Package className="w-4 h-4 mr-2" />
-                      Ver {beneficio.cajas?.length || 0} Caja(s) Disponible(s)
-                    </Button>
-                  </div>
-
-                  {beneficio.cajas && beneficio.cajas.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {beneficio.cajas.map((caja: any) => (
-                        <div key={caja.id} className="border border-[#E0E0E0] rounded-lg p-4 bg-[#F8F8F8]">
-                          <h4 className="font-semibold text-[#333333] mb-2">{caja.nombre}</h4>
-                          <p className="text-xs text-[#6B6B6B] mb-2">
-                            <span className="font-semibold">Código:</span> {caja.codigo_tipo}
-                          </p>
-                          {caja.descripcion && (
-                            <p className="text-xs text-[#6B6B6B] mb-2">{caja.descripcion}</p>
-                          )}
-                          <Badge className="bg-[#017E49]">Activa</Badge>
+              {/* SUB-TAB: POR BENEFICIO */}
+              <TabsContent value="por-beneficio" className="space-y-4 mt-6">
+                {beneficios.map((beneficio) => (
+                  <div key={beneficio.id} className="bg-white border-2 border-[#E0E0E0] rounded-xl overflow-hidden">
+                    {/* HEADER BENEFICIO */}
+                    <div className="bg-gradient-to-r from-[#FFF4E6] to-[#FFE6CC] border-b-2 border-[#FF9F55] p-6">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <h3 className="text-[#333333] font-bold text-lg flex items-center gap-2">
+                            <Package className="w-5 h-5 text-[#FF9F55]" />
+                            {beneficio.nombre}
+                          </h3>
+                          <p className="text-[#6B6B6B] text-sm mt-1">{beneficio.descripcion || 'Sin descripción'}</p>
                         </div>
-                      ))}
+                        <div className="flex items-center gap-2">
+                          <Badge className={beneficio.activo ? 'bg-[#017E49]' : 'bg-[#6B6B6B]'}>
+                            {beneficio.activo ? 'Activo' : 'Inactivo'}
+                          </Badge>
+                          {beneficio.requiere_validacion_guardia && (
+                            <Badge className="bg-[#E12019] text-white">Validación Guardia</Badge>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
+
+                    {/* CAJAS */}
+                    <div className="p-6">
+                      {beneficio.cajas && beneficio.cajas.length > 0 ? (
+                        <div className="space-y-3">
+                          {beneficio.cajas.map((caja: any) => (
+                            <div
+                              key={caja.id}
+                              className="border-2 border-[#E0E0E0] rounded-lg p-4 hover:border-[#FF9F55] transition-colors"
+                            >
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <h4 className="font-bold text-[#333333] text-base">{caja.nombre}</h4>
+                                    <Badge className={caja.activo ? 'bg-[#017E49] text-white' : 'bg-[#999999] text-white'}>
+                                      {caja.activo ? 'Activa' : 'Inactiva'}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-xs text-[#6B6B6B] font-mono mb-2">{caja.codigo_tipo}</p>
+                                </div>
+                              </div>
+
+                              {/* DESCRIPCIÓN */}
+                              {caja.descripcion && (
+                                <p className="text-sm text-[#6B6B6B] p-2 bg-[#F8F8F8] rounded mb-3 border-l-4 border-[#FF9F55]">
+                                  {caja.descripcion}
+                                </p>
+                              )}
+
+                              {/* INFO Y ACCIONES */}
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
+                                {/* INFORMACIÓN */}
+                                <div className="space-y-1 text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-[#333333]">Beneficio:</span>
+                                    <span className="text-[#6B6B6B]">{beneficio.nombre}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-[#333333]">Código:</span>
+                                    <span className="text-[#6B6B6B] font-mono">{caja.codigo_tipo}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-[#333333]">Disponible:</span>
+                                    <Badge className="bg-[#E6F3EE] text-[#017E49] border border-[#017E49]">
+                                      {caja.activo ? 'Sí' : 'No'}
+                                    </Badge>
+                                  </div>
+                                </div>
+
+                                {/* VALIDACIÓN GUARDIA INFO */}
+                                <div className="flex items-center gap-2 text-xs p-2 bg-[#FFF4E6] rounded border border-[#FF9F55]">
+                                  {caja.activo && beneficio.requiere_validacion_guardia ? (
+                                    <>
+                                      <span className="text-[#FF9F55] font-semibold">✓</span>
+                                      <span className="text-[#6B6B6B]">El guardia validará esta caja</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="text-[#6B6B6B]">•</span>
+                                      <span className="text-[#6B6B6B]">
+                                        {caja.activo ? 'Sin validación requerida' : 'Caja inactiva'}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+
+                                {/* ACCIONES */}
+                                <div className="flex gap-2 justify-end">
+                                  <button
+                                    onClick={() => handleToggleCajaActivo(caja.id, caja)}
+                                    className={`flex items-center gap-1 px-3 py-2 rounded text-xs font-medium transition-colors ${caja.activo
+                                      ? 'bg-[#FFF4E6] text-[#FF9F55] hover:bg-[#FFE6CC]'
+                                      : 'bg-[#E6F3EE] text-[#017E49] hover:bg-[#D9E9E3]'
+                                      }`}
+                                  >
+                                    {caja.activo ? (
+                                      <>
+                                        <X className="w-3 h-3" />
+                                        Desactivar
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Check className="w-3 h-3" />
+                                        Activar
+                                      </>
+                                    )}
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleDeleteCaja(caja.id)}
+                                    className="flex items-center gap-1 px-3 py-2 rounded text-xs font-medium bg-[#FFE6E6] text-[#E12019] hover:bg-[#FFCCCC] transition-colors"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                    Eliminar
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-6 bg-[#F8F8F8] rounded-lg border-2 border-dashed border-[#E0E0E0]">
+                          <Package className="w-8 h-8 mx-auto mb-2 text-[#E0E0E0]" />
+                          <p className="text-[#6B6B6B] text-sm font-semibold">No hay cajas definidas para este beneficio</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* BOTÓN AGREGAR CAJA */}
+                    <div className="bg-[#F8F8F8] border-t-2 border-[#E0E0E0] p-4">
+                      <Button
+                        onClick={() => {
+                          setSelectedBeneficio(beneficio);
+                          setCajaForm({ beneficio: beneficio.id, nombre: '', descripcion: '', codigo_tipo: '' });
+                          setShowCreateCajaModal(true);
+                        }}
+                        className="w-full bg-[#FF8C00] text-white hover:bg-[#E67E00]"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Agregar Nueva Caja a {beneficio.nombre}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </TabsContent>
+
+              {/* SUB-TAB: TODAS LAS CAJAS */}
+              <TabsContent value="todas-cajas" className="space-y-4 mt-6">
+                {beneficios.flatMap((b) => b.cajas || []).length > 0 ? (
+                  <div className="space-y-3">
+                    {beneficios.flatMap((beneficio) =>
+                      (beneficio.cajas || []).map((caja: any) => (
+                        <div
+                          key={caja.id}
+                          className="border-2 border-[#E0E0E0] rounded-lg p-4 hover:border-[#FF9F55] transition-colors bg-white"
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-bold text-[#333333] text-base">{caja.nombre}</h4>
+                                <Badge className={caja.activo ? 'bg-[#017E49] text-white' : 'bg-[#999999] text-white'}>
+                                  {caja.activo ? 'Activa' : 'Inactiva'}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-[#6B6B6B] font-mono mb-2">{caja.codigo_tipo}</p>
+                            </div>
+                          </div>
+
+                          {/* DESCRIPCIÓN */}
+                          {caja.descripcion && (
+                            <p className="text-sm text-[#6B6B6B] p-2 bg-[#F8F8F8] rounded mb-3 border-l-4 border-[#FF9F55]">
+                              {caja.descripcion}
+                            </p>
+                          )}
+
+                          {/* INFO Y ACCIONES */}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
+                            {/* INFORMACIÓN */}
+                            <div className="space-y-1 text-xs">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-[#333333]">Beneficio:</span>
+                                <span className="text-[#6B6B6B]">{beneficio.nombre}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-[#333333]">Código:</span>
+                                <span className="text-[#6B6B6B] font-mono">{caja.codigo_tipo}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-[#333333]">Disponible:</span>
+                                <Badge className="bg-[#E6F3EE] text-[#017E49] border border-[#017E49]">
+                                  {caja.activo ? 'Sí' : 'No'}
+                                </Badge>
+                              </div>
+                            </div>
+
+                            {/* VALIDACIÓN GUARDIA INFO */}
+                            <div className="flex items-center gap-2 text-xs p-2 bg-[#FFF4E6] rounded border border-[#FF9F55]">
+                              {caja.activo && beneficio.requiere_validacion_guardia ? (
+                                <>
+                                  <span className="text-[#FF9F55] font-semibold">✓</span>
+                                  <span className="text-[#6B6B6B]">El guardia validará esta caja</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="text-[#6B6B6B]">•</span>
+                                  <span className="text-[#6B6B6B]">
+                                    {caja.activo ? 'Sin validación requerida' : 'Caja inactiva'}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+
+                            {/* ACCIONES */}
+                            <div className="flex gap-2 justify-end">
+                              <button
+                                onClick={() => handleToggleCajaActivo(caja.id, caja)}
+                                className={`flex items-center gap-1 px-3 py-2 rounded text-xs font-medium transition-colors ${caja.activo
+                                  ? 'bg-[#FFF4E6] text-[#FF9F55] hover:bg-[#FFE6CC]'
+                                  : 'bg-[#E6F3EE] text-[#017E49] hover:bg-[#D9E9E3]'
+                                  }`}
+                              >
+                                {caja.activo ? (
+                                  <>
+                                    <X className="w-3 h-3" />
+                                    Desactivar
+                                  </>
+                                ) : (
+                                  <>
+                                    <Check className="w-3 h-3" />
+                                    Activar
+                                  </>
+                                )}
+                              </button>
+
+                              <button
+                                onClick={() => handleDeleteCaja(caja.id)}
+                                className="flex items-center gap-1 px-3 py-2 rounded text-xs font-medium bg-[#FFE6E6] text-[#E12019] hover:bg-[#FFCCCC] transition-colors"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                Eliminar
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-white border-2 border-[#E0E0E0] rounded-xl p-12 text-center">
+                    <Package className="w-12 h-12 text-[#6B6B6B] mx-auto mb-4" />
+                    <p className="text-[#6B6B6B]">No hay cajas creadas</p>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           )}
         </TabsContent>
       </Tabs>
@@ -465,7 +807,7 @@ export function CicloBimensualModule() {
             <DialogTitle>Crear Nuevo Ciclo</DialogTitle>
             <DialogDescription>Define un nuevo ciclo de beneficios</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4 pb-24">
             <div>
               <Label htmlFor="ciclo-nombre">Nombre del Ciclo *</Label>
               <Input
@@ -616,24 +958,53 @@ export function CicloBimensualModule() {
 
       {/* Modal Crear Caja */}
       <Dialog open={showCreateCajaModal} onOpenChange={setShowCreateCajaModal}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Crear Nueva Caja</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="w-5 h-5 text-[#FF8C00]" />
+              Agregar Nueva Caja
+            </DialogTitle>
             <DialogDescription>
-              Define una variante de caja para un beneficio (ej: Premium, Estándar)
+              Crea una variante de caja para un beneficio (ej: Premium, Estándar, Básica)
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {/* NOMBRE */}
             <div>
-              <Label htmlFor="caja-beneficio">Beneficio *</Label>
+              <Label htmlFor="caja-nombre" className="text-[#333333] font-semibold">
+                Nombre de la Caja *
+              </Label>
+              <Input
+                id="caja-nombre"
+                placeholder="ej: Premium, Estándar, VIP, Básica"
+                value={cajaForm.nombre}
+                onChange={(e) => setCajaForm({ ...cajaForm, nombre: e.target.value })}
+                className="mt-2 h-10 border-2 border-[#E0E0E0] rounded-lg"
+              />
+              <p className="text-xs text-[#6B6B6B] mt-1">Nombre descriptivo de la variante de caja</p>
+            </div>
+
+            {/* BENEFICIO - OPCIONAL */}
+            <div>
+              <Label htmlFor="caja-beneficio" className="text-[#333333] font-semibold">Beneficio (Opcional)</Label>
               <Select
-                value={cajaForm.beneficio?.toString() || ''}
-                onValueChange={(value) => setCajaForm({ ...cajaForm, beneficio: parseInt(value) })}
+                value={cajaForm.beneficio && cajaForm.beneficio !== 0 ? cajaForm.beneficio.toString() : '0'}
+                onValueChange={(value) => {
+                  if (value === '0') {
+                    setSelectedBeneficio(null);
+                    setCajaForm({ ...cajaForm, beneficio: 0 });
+                  } else {
+                    const ben = beneficios.find(b => b.id.toString() === value);
+                    setSelectedBeneficio(ben || null);
+                    setCajaForm({ ...cajaForm, beneficio: ben ? ben.id : 0 });
+                  }
+                }}
               >
-                <SelectTrigger className="mt-2">
-                  <SelectValue placeholder="Selecciona un beneficio" />
+                <SelectTrigger className="mt-2 h-10 border-2 border-[#E0E0E0] rounded-lg">
+                  <SelectValue placeholder="Sin beneficio asignado" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="0">Sin beneficio</SelectItem>
                   {beneficios.map((ben) => (
                     <SelectItem key={ben.id} value={ben.id.toString()}>
                       {ben.nombre}
@@ -641,142 +1012,264 @@ export function CicloBimensualModule() {
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-[#6B6B6B] mt-1">Opcionalmente asigna esta caja a un beneficio específico</p>
             </div>
+
+            {/* BENEFICIO ASIGNADO - INFO */}
+            {selectedBeneficio && (
+              <div className="bg-[#FFF4E6] border-2 border-[#FF9F55] rounded-lg p-3">
+                <p className="text-xs text-[#6B6B6B] font-semibold mb-1">
+                  Asignada a: <span className="text-[#FF9F55] font-bold">{selectedBeneficio.nombre}</span>
+                </p>
+              </div>
+            )}
+
+            {/* CÓDIGO ÚNICO */}
             <div>
-              <Label htmlFor="caja-nombre">Nombre de la Caja *</Label>
-              <Input
-                id="caja-nombre"
-                placeholder="ej: Premium, Estándar, VIP"
-                value={cajaForm.nombre}
-                onChange={(e) => setCajaForm({ ...cajaForm, nombre: e.target.value })}
-                className="mt-2"
-              />
-            </div>
-            <div>
-              <Label htmlFor="caja-codigo">Código Tipo *</Label>
+              <Label htmlFor="caja-codigo" className="text-[#333333] font-semibold">
+                Código Único *
+              </Label>
               <Input
                 id="caja-codigo"
-                placeholder="ej: NAV-PREM, NAV-STD"
+                placeholder="ej: CAJ-NAV-PREM, CAJ-NAV-STD, CAJ-PASEO-VIP"
                 value={cajaForm.codigo_tipo}
-                onChange={(e) => setCajaForm({ ...cajaForm, codigo_tipo: e.target.value })}
-                className="mt-2"
+                onChange={(e) => setCajaForm({ ...cajaForm, codigo_tipo: e.target.value.toUpperCase() })}
+                className="mt-2 h-10 border-2 border-[#E0E0E0] rounded-lg font-mono text-sm"
               />
+              <p className="text-xs text-[#6B6B6B] mt-1">
+                Código único y automatizado. Formato: CAJ-[TIPO]-[VARIANTE]
+              </p>
             </div>
+
+            {/* DESCRIPCIÓN */}
             <div>
-              <Label htmlFor="caja-desc">Descripción</Label>
+              <Label htmlFor="caja-desc" className="text-[#333333] font-semibold">
+                Descripción (opcional)
+              </Label>
               <Textarea
                 id="caja-desc"
-                placeholder="Describe esta caja..."
+                placeholder="ej: Caja premium con productos de alta calidad, incluye..."
                 value={cajaForm.descripcion}
                 onChange={(e) => setCajaForm({ ...cajaForm, descripcion: e.target.value })}
-                className="mt-2"
+                className="mt-2 border-2 border-[#E0E0E0] rounded-lg text-sm"
                 rows={3}
               />
             </div>
+
+            {/* ESTADO ACTIVO/INACTIVO */}
+            <div className="bg-[#F0F0F0] rounded-lg p-4 border-2 border-[#E0E0E0]">
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-[#333333] font-semibold">Estado de la Caja</Label>
+                <Switch
+                  id="caja-activa"
+                  checked={cajaForm.activo !== false}
+                  onCheckedChange={(checked) => setCajaForm({ ...cajaForm, activo: checked })}
+                />
+              </div>
+              <div className="text-xs bg-white p-2 rounded border border-[#E0E0E0]">
+                {cajaForm.activo !== false ? (
+                  <p className="text-[#017E49]">
+                    ✓ <span className="font-semibold">Caja Activa</span> - El guardia deberá validar cada entrega con QR
+                  </p>
+                ) : (
+                  <p className="text-[#999999]">
+                    • <span className="font-semibold">Caja Inactiva</span> - Esta caja no estará disponible
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowCreateCajaModal(false);
-                setCajaForm({ beneficio: 0, nombre: '', descripcion: '', codigo_tipo: '' });
-              }}
-              className="flex-1"
-            >
-              Cancelar
-            </Button>
-            <Button onClick={handleCreateCaja} className="flex-1 bg-[#FF8C00] text-white hover:bg-[#E67E00]">
-              Crear Caja
-            </Button>
+
+          <div className="sticky bottom-0 left-0 right-0 z-50 bg-gradient-to-t from-white via-white to-transparent pt-6 pb-4 px-4">
+            <div className="flex flex-col gap-3">
+              <Button
+                type="button"
+                onClick={handleCreateCaja}
+                className="w-full h-14 bg-gradient-to-r from-[#FF7300] to-[#FF9500] hover:from-[#E05F00] hover:to-[#E07700] text-white border-2 border-[#E05F00] font-bold shadow-lg text-lg flex items-center justify-center rounded-xl transition-all duration-200 hover:shadow-xl hover:scale-[1.02]"
+              >
+                <Plus className="w-5 h-5 mr-2" />
+                CREAR CAJA
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowCreateCajaModal(false);
+                  setCajaForm({ beneficio: 0, nombre: '', descripcion: '', codigo_tipo: '', activo: true });
+                  setSelectedBeneficio(null);
+                }}
+                className="w-full h-11 text-[#666666] border-[#D0D0D0] hover:bg-gray-50"
+              >
+                Cancelar
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
 
       {/* Modal Editar Beneficio */}
       <Dialog open={showEditBeneficioModal} onOpenChange={setShowEditBeneficioModal}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Editar Tipo de Beneficio</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="w-5 h-5 text-[#FF9F55]" />
+              {selectedBeneficio?.nombre}
+            </DialogTitle>
+            <DialogDescription>
+              Edita los detalles del beneficio y gestiona sus cajas
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="edit-ben-nombre">Nombre del Beneficio *</Label>
-              <Input
-                id="edit-ben-nombre"
-                value={beneficioForm.nombre}
-                onChange={(e) => setBeneficioForm({ ...beneficioForm, nombre: e.target.value })}
-                className="mt-2"
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-ben-desc">Descripción</Label>
-              <Textarea
-                id="edit-ben-desc"
-                value={beneficioForm.descripcion}
-                onChange={(e) => setBeneficioForm({ ...beneficioForm, descripcion: e.target.value })}
-                className="mt-2"
-                rows={3}
-              />
-            </div>
-            <div>
-              <Label>Aplica a tipos de contrato *</Label>
-              <div className="space-y-2 mt-2">
-                {['todos', 'planta', 'contrata', 'honorarios'].map((tipo) => (
-                  <div key={tipo} className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id={`edit-tipo-${tipo}`}
-                      checked={beneficioForm.tipos_contrato.includes(tipo)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setBeneficioForm({
-                            ...beneficioForm,
-                            tipos_contrato: [...beneficioForm.tipos_contrato, tipo],
-                          });
-                        } else {
-                          setBeneficioForm({
-                            ...beneficioForm,
-                            tipos_contrato: beneficioForm.tipos_contrato.filter((t) => t !== tipo),
-                          });
-                        }
-                      }}
-                      className="w-4 h-4"
-                    />
-                    <label htmlFor={`edit-tipo-${tipo}`} className="text-sm cursor-pointer">
-                      {tipo === 'todos' ? 'Todos los contratos' : tipo.charAt(0).toUpperCase() + tipo.slice(1)}
-                    </label>
-                  </div>
-                ))}
+
+          <Tabs defaultValue="detalles" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="detalles">Detalles</TabsTrigger>
+              <TabsTrigger value="cajas">Cajas ({cajasDelBeneficio.length})</TabsTrigger>
+            </TabsList>
+
+            {/* TAB DETALLES */}
+            <TabsContent value="detalles" className="space-y-4 py-4">
+              <div>
+                <Label htmlFor="edit-ben-nombre" className="font-semibold">Nombre del Beneficio *</Label>
+                <Input
+                  id="edit-ben-nombre"
+                  value={beneficioForm.nombre}
+                  onChange={(e) => setBeneficioForm({ ...beneficioForm, nombre: e.target.value })}
+                  className="mt-2 h-10 border-2 border-[#E0E0E0] rounded-lg"
+                />
               </div>
-            </div>
-            <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <Label htmlFor="edit-ben-guardia" className="text-sm font-medium">Requiere Validación del Guardia</Label>
-              <Switch
-                id="edit-ben-guardia"
-                checked={beneficioForm.requiere_validacion_guardia}
-                onCheckedChange={(checked) => setBeneficioForm({ ...beneficioForm, requiere_validacion_guardia: checked })}
-              />
-            </div>
-            <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
-              {beneficioForm.requiere_validacion_guardia
-                ? '✓ Doble autenticación: El guardia verificará cada entrega con QR'
-                : '• Entrega normal: Sin validación del guardia'}
-            </div>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="edit-ben-activo">Activo</Label>
-              <Switch
-                id="edit-ben-activo"
-                checked={beneficioForm.activo}
-                onCheckedChange={(checked) => setBeneficioForm({ ...beneficioForm, activo: checked })}
-              />
-            </div>
-          </div>
-          <div className="flex gap-3">
+
+              <div>
+                <Label htmlFor="edit-ben-desc" className="font-semibold">Descripción</Label>
+                <Textarea
+                  id="edit-ben-desc"
+                  value={beneficioForm.descripcion}
+                  onChange={(e) => setBeneficioForm({ ...beneficioForm, descripcion: e.target.value })}
+                  className="mt-2 border-2 border-[#E0E0E0] rounded-lg"
+                  rows={3}
+                />
+              </div>
+
+              <div>
+                <Label className="font-semibold mb-3 block">Aplica a tipos de contrato *</Label>
+                <div className="space-y-2 bg-[#F8F8F8] p-3 rounded-lg border border-[#E0E0E0]">
+                  {['todos', 'planta', 'contrata', 'honorarios'].map((tipo) => (
+                    <div key={tipo} className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        id={`edit-tipo-${tipo}`}
+                        checked={beneficioForm.tipos_contrato.includes(tipo)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setBeneficioForm({
+                              ...beneficioForm,
+                              tipos_contrato: [...beneficioForm.tipos_contrato, tipo],
+                            });
+                          } else {
+                            setBeneficioForm({
+                              ...beneficioForm,
+                              tipos_contrato: beneficioForm.tipos_contrato.filter((t) => t !== tipo),
+                            });
+                          }
+                        }}
+                        className="w-4 h-4 cursor-pointer"
+                      />
+                      <label htmlFor={`edit-tipo-${tipo}`} className="text-sm cursor-pointer flex-1">
+                        {tipo === 'todos' ? 'Todos los contratos' : tipo.charAt(0).toUpperCase() + tipo.slice(1)}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-[#E6F3EE] rounded-lg border-2 border-[#017E49]">
+                <Label htmlFor="edit-ben-guardia" className="text-sm font-medium text-[#333333]">
+                  Requiere Validación del Guardia
+                </Label>
+                <Switch
+                  id="edit-ben-guardia"
+                  checked={beneficioForm.requiere_validacion_guardia}
+                  onCheckedChange={(checked) => setBeneficioForm({ ...beneficioForm, requiere_validacion_guardia: checked })}
+                />
+              </div>
+
+              <div className="text-xs text-[#6B6B6B] bg-[#FFF4E6] p-3 rounded border-l-4 border-[#FF9F55]">
+                {beneficioForm.requiere_validacion_guardia
+                  ? '✓ Doble autenticación: El guardia verificará cada entrega con QR'
+                  : '• Entrega normal: Sin validación del guardia'}
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-[#F0F0F0] rounded-lg border border-[#E0E0E0]">
+                <Label htmlFor="edit-ben-activo" className="font-semibold text-[#333333]">Activo</Label>
+                <Switch
+                  id="edit-ben-activo"
+                  checked={beneficioForm.activo}
+                  onCheckedChange={(checked) => setBeneficioForm({ ...beneficioForm, activo: checked })}
+                />
+              </div>
+            </TabsContent>
+
+            {/* TAB CAJAS */}
+            <TabsContent value="cajas" className="space-y-4 py-4">
+              <p className="text-sm text-[#6B6B6B] mb-4">
+                Selecciona las cajas que pertenecen a este beneficio
+              </p>
+
+              {soloCajas.length === 0 ? (
+                <div className="text-center py-8 bg-[#F8F8F8] rounded-lg border-2 border-dashed border-[#E0E0E0]">
+                  <Package className="w-12 h-12 mx-auto mb-3 text-[#E0E0E0]" />
+                  <p className="text-[#6B6B6B] font-semibold">No hay cajas disponibles</p>
+                  <p className="text-xs text-[#6B6B6B] mt-1">Primero crea cajas en el sistema</p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
+                  {soloCajas.map((caja) => {
+                    const estaAsignada = caja.beneficio === selectedBeneficio?.id;
+                    return (
+                      <label
+                        key={caja.id}
+                        className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${estaAsignada
+                          ? 'border-[#FF8C00] bg-[#FFF4E6]'
+                          : 'border-[#E0E0E0] bg-white hover:border-[#CCCCCC]'
+                          }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={estaAsignada}
+                          onChange={() => handleToggleCajaAsignacion(caja.id, estaAsignada)}
+                          className="w-5 h-5 rounded border-2 border-[#E0E0E0] text-[#FF8C00] focus:ring-2 focus:ring-[#FF8C00]"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-[#333333]">{caja.nombre}</h4>
+                            <span className="text-xs text-[#6B6B6B] font-mono">{caja.codigo_tipo}</span>
+                            {caja.beneficio_nombre && caja.beneficio !== selectedBeneficio?.id && (
+                              <Badge className="bg-[#999999] text-white text-xs">
+                                {caja.beneficio_nombre}
+                              </Badge>
+                            )}
+                            <Badge className={caja.activo ? 'bg-[#017E49] text-white text-xs' : 'bg-[#999999] text-white text-xs'}>
+                              {caja.activo ? 'Activa' : 'Inactiva'}
+                            </Badge>
+                          </div>
+                          {caja.descripcion && (
+                            <p className="text-xs text-[#6B6B6B] mt-1">{caja.descripcion}</p>
+                          )}
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+
+          <div className="flex gap-3 pt-4 border-t border-[#E0E0E0]">
             <Button
               variant="outline"
               onClick={() => {
                 setShowEditBeneficioModal(false);
                 setSelectedBeneficio(null);
+                setCajasDelBeneficio([]);
               }}
               className="flex-1"
             >
@@ -791,46 +1284,143 @@ export function CicloBimensualModule() {
 
       {/* Modal Agregar Beneficio a Ciclo */}
       <Dialog open={showAgregarBeneficioModal} onOpenChange={setShowAgregarBeneficioModal}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Gestionar Beneficios del Ciclo</DialogTitle>
-            <DialogDescription>Selecciona los beneficios para {selectedCiclo?.nombre}</DialogDescription>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="w-5 h-5 text-[#FF9F55]" />
+              Gestionar Beneficios del Ciclo
+            </DialogTitle>
+            <DialogDescription>
+              Selecciona los beneficios para <span className="font-semibold text-[#333333]">{selectedCiclo?.nombre}</span>
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <p className="text-sm text-[#6B6B6B]">Marca los beneficios que deseas agregar/eliminar del ciclo:</p>
-            <div className="space-y-3 max-h-96 overflow-y-auto">
+
+          <div className="space-y-3 py-4">
+            <p className="text-sm text-[#6B6B6B] font-semibold">
+              Marca los beneficios que deseas agregar/eliminar del ciclo:
+            </p>
+
+            <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
               {beneficios.filter(ben => ben.activo).map((beneficio) => (
-                <div key={beneficio.id} className="flex items-start gap-3 p-3 border border-[#E0E0E0] rounded-lg hover:bg-[#F8F8F8]">
-                  <input
-                    type="checkbox"
-                    id={`ben-${beneficio.id}`}
-                    checked={selectedBeneficiosParaCiclo.includes(beneficio.id)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedBeneficiosParaCiclo([...selectedBeneficiosParaCiclo, beneficio.id]);
-                      } else {
-                        setSelectedBeneficiosParaCiclo(selectedBeneficiosParaCiclo.filter(id => id !== beneficio.id));
-                      }
-                    }}
-                    className="w-5 h-5 mt-0.5"
-                  />
-                  <label htmlFor={`ben-${beneficio.id}`} className="flex-1 cursor-pointer">
-                    <p className="font-semibold text-[#333333]">{beneficio.nombre}</p>
-                    <p className="text-xs text-[#6B6B6B] mt-1">{beneficio.descripcion || 'Sin descripción'}</p>
-                    <p className="text-xs text-[#017E49] mt-1">
-                      Aplica a: {beneficio.tipos_contrato.join(', ') || 'No especificado'}
-                    </p>
-                  </label>
+                <div
+                  key={beneficio.id}
+                  className="border-2 border-[#E0E0E0] rounded-lg p-4 hover:border-[#FF9F55] transition-colors"
+                >
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id={`ben-${beneficio.id}`}
+                      checked={selectedBeneficiosParaCiclo.includes(beneficio.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedBeneficiosParaCiclo([...selectedBeneficiosParaCiclo, beneficio.id]);
+                        } else {
+                          setSelectedBeneficiosParaCiclo(selectedBeneficiosParaCiclo.filter(id => id !== beneficio.id));
+                        }
+                      }}
+                      className="w-5 h-5 mt-1 cursor-pointer"
+                    />
+                    <label htmlFor={`ben-${beneficio.id}`} className="flex-1 cursor-pointer">
+                      <div className="flex items-center gap-2 mb-2">
+                        <p className="font-bold text-[#333333] text-base">{beneficio.nombre}</p>
+                        <Badge className={beneficio.activo ? 'bg-[#017E49] text-white' : 'bg-[#999999] text-white'}>
+                          {beneficio.activo ? 'Activo' : 'Inactivo'}
+                        </Badge>
+                      </div>
+
+                      {/* DESCRIPCIÓN */}
+                      {beneficio.descripcion && (
+                        <p className="text-sm text-[#6B6B6B] mb-2 p-2 bg-[#F8F8F8] rounded border-l-4 border-[#FF9F55]">
+                          {beneficio.descripcion}
+                        </p>
+                      )}
+
+                      {/* INFORMACIÓN ADICIONAL */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                        {/* Tipos de contrato */}
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="font-semibold text-[#333333]">Aplica a:</span>
+                          <span className="text-[#6B6B6B]">
+                            {beneficio.tipos_contrato && beneficio.tipos_contrato.length > 0
+                              ? beneficio.tipos_contrato.join(', ')
+                              : 'No especificado'}
+                          </span>
+                        </div>
+
+                        {/* Validación de guardia */}
+                        <div className="flex items-center gap-2 text-xs">
+                          {beneficio.requiere_validacion_guardia ? (
+                            <>
+                              <span className="text-[#017E49] font-semibold">✓ Validación Guardia:</span>
+                              <span className="text-[#017E49] font-medium">Requerida</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-[#6B6B6B] font-semibold">• Validación Guardia:</span>
+                              <span className="text-[#6B6B6B]">No requerida</span>
+                            </>
+                          )}
+                        </div>
+
+                        {/* Cantidad de cajas */}
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="font-semibold text-[#333333]">Cajas:</span>
+                          {beneficio.cajas && beneficio.cajas.length > 0 ? (
+                            <>
+                              <span className="text-[#FF9F55] font-medium">{beneficio.cajas.length}</span>
+                              <span className="text-[#6B6B6B]">
+                                ({beneficio.cajas.filter((c: any) => c.activo).length} activas)
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-[#999999]">Sin cajas definidas</span>
+                          )}
+                        </div>
+
+                        {/* Estado general */}
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="font-semibold text-[#333333]">Estado:</span>
+                          <Badge className="bg-[#E6F3EE] text-[#017E49] border border-[#017E49]">
+                            Beneficio {beneficio.activo ? 'Activo' : 'Inactivo'}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      {/* CAJAS DISPONIBLES */}
+                      {beneficio.cajas && beneficio.cajas.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-[#E0E0E0]">
+                          <p className="text-xs font-semibold text-[#333333] mb-2">Cajas disponibles:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {beneficio.cajas.map((caja: any) => (
+                              <div
+                                key={caja.id}
+                                className={`text-xs px-2 py-1 rounded border ${caja.activo
+                                  ? 'bg-[#E6F3EE] text-[#017E49] border-[#017E49]'
+                                  : 'bg-[#F0F0F0] text-[#999999] border-[#E0E0E0]'
+                                  }`}
+                              >
+                                <span className="font-medium">{caja.nombre}</span>
+                                <span className="text-xs ml-1">({caja.codigo_tipo})</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </label>
+                  </div>
                 </div>
               ))}
             </div>
+
             {beneficios.filter(ben => ben.activo).length === 0 && (
-              <div className="text-center py-6 text-[#6B6B6B]">
-                No hay beneficios activos disponibles
+              <div className="text-center py-8 bg-[#F8F8F8] rounded-lg border-2 border-dashed border-[#E0E0E0]">
+                <Package className="w-12 h-12 mx-auto mb-2 text-[#E0E0E0]" />
+                <p className="text-[#6B6B6B] font-semibold">No hay beneficios activos disponibles</p>
               </div>
             )}
           </div>
-          <div className="flex gap-3">
+
+          <div className="flex gap-3 pt-4 border-t border-[#E0E0E0]">
             <Button
               variant="outline"
               onClick={() => {
@@ -841,97 +1431,185 @@ export function CicloBimensualModule() {
             >
               Cancelar
             </Button>
-            <Button onClick={handleAgregarBeneficioACiclo} className="flex-1 bg-[#017E49] text-white hover:bg-[#016339]">
+            <Button
+              onClick={handleAgregarBeneficioACiclo}
+              className="flex-1 bg-[#017E49] text-white hover:bg-[#016339] font-semibold"
+            >
               Guardar Cambios
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Modal Ver Cajas del Beneficio */}
+      {/* Modal Ver Cajas del Beneficio - CON TABS */}
       <Dialog open={showViewCajasModal} onOpenChange={setShowViewCajasModal}>
-        <DialogContent className="sm:max-w-[700px]">
+        <DialogContent className="sm:max-w-[900px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Cajas Disponibles: {selectedBeneficio?.nombre}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="w-5 h-5 text-[#FF8C00]" />
+              Gestión de Cajas
+            </DialogTitle>
             <DialogDescription>
-              Gestiona las cajas para este tipo de beneficio
+              Visualiza y gestiona las cajas de beneficio disponibles
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            {cajasDelBeneficio.length === 0 ? (
-              <div className="text-center py-8 text-[#6B6B6B]">
-                <Package className="w-12 h-12 mx-auto mb-3 text-[#E0E0E0]" />
-                <p>No hay cajas definidas para este beneficio</p>
-                <p className="text-sm mt-2">Crea cajas usando el botón "Crear Caja" en el panel principal</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
-                {cajasDelBeneficio.map((caja) => (
-                  <div key={caja.id} className="border-2 border-[#E0E0E0] rounded-xl p-4 hover:border-[#0066CC] transition">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h4 className="font-bold text-[#333333]">{caja.nombre}</h4>
-                        <p className="text-xs text-[#6B6B6B] mt-1">
-                          <span className="font-semibold">Código:</span> {caja.codigo_tipo}
-                        </p>
+
+          <Tabs value={cajasTabActual} onValueChange={(value: any) => setCajasTabActual(value)} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 bg-[#F0F0F0] p-1 rounded-lg">
+              <TabsTrigger value="beneficios" className="data-[state=active]:bg-white data-[state=active]:text-[#FF8C00]">
+                <Package className="w-4 h-4 mr-2" />
+                Beneficios con Cajas
+              </TabsTrigger>
+              <TabsTrigger value="solo-cajas" className="data-[state=active]:bg-white data-[state=active]:text-[#FF8C00]">
+                <Boxes className="w-4 h-4 mr-2" />
+                Solo Cajas
+              </TabsTrigger>
+            </TabsList>
+
+            {/* TAB 1: BENEFICIOS CON CAJAS */}
+            <TabsContent value="beneficios" className="space-y-4 py-4">
+              {beneficiosConCajas.length === 0 ? (
+                <div className="text-center py-8 bg-[#F8F8F8] rounded-lg border-2 border-dashed border-[#E0E0E0]">
+                  <Package className="w-12 h-12 mx-auto mb-3 text-[#E0E0E0]" />
+                  <p className="text-[#6B6B6B] font-semibold">No hay beneficios con cajas</p>
+                  <p className="text-xs text-[#6B6B6B] mt-1">Define cajas para un beneficio primero</p>
+                </div>
+              ) : (
+                <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                  {beneficiosConCajas.map((beneficio: any) => (
+                    <div key={beneficio.id} className="border-2 border-[#E0E0E0] rounded-lg p-4 hover:border-[#FF8C00] transition-colors">
+                      <div className="flex items-center gap-2 mb-3">
+                        <h4 className="font-bold text-[#333333] text-base">{beneficio.nombre}</h4>
+                        <Badge className={beneficio.activo ? 'bg-[#017E49] text-white' : 'bg-[#999999] text-white'}>
+                          {beneficio.activo ? 'Activo' : 'Inactivo'}
+                        </Badge>
                       </div>
-                      <Badge className="bg-[#017E49]">Activa</Badge>
+
+                      {beneficio.descripcion && (
+                        <p className="text-sm text-[#6B6B6B] mb-3">{beneficio.descripcion}</p>
+                      )}
+
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold text-[#6B6B6B] uppercase">Cajas disponibles:</p>
+                        {beneficio.cajas.length === 0 ? (
+                          <p className="text-xs text-[#999999] italic">Sin cajas definidas</p>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {beneficio.cajas.map((caja: any) => (
+                              <div key={caja.id} className="bg-[#F8F8F8] p-2 rounded border border-[#E0E0E0]">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1">
+                                    <p className="font-semibold text-xs text-[#333333]">{caja.nombre}</p>
+                                    <p className="text-xs text-[#6B6B6B]">{caja.codigo_tipo}</p>
+                                  </div>
+                                  <Badge className={caja.activo ? 'bg-[#E6F3EE] text-[#017E49]' : 'bg-[#FFEBEB] text-[#E12019]'}>
+                                    {caja.activo ? '✓' : '✕'}
+                                  </Badge>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    {caja.descripcion && (
-                      <p className="text-sm text-[#6B6B6B] mb-3 p-2 bg-[#F8F8F8] rounded">
-                        {caja.descripcion}
-                      </p>
-                    )}
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1"
-                        onClick={() => {
-                          // Aquí puedes agregar editar caja
-                          toast.info('Editar caja: Función próxima');
-                        }}
-                      >
-                        <Edit2 className="w-3 h-3 mr-1" />
-                        Editar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1 text-red-600 hover:text-red-700"
-                        onClick={() => {
-                          // Aquí puedes agregar eliminar caja
-                          toast.info('Eliminar caja: Función próxima');
-                        }}
-                      >
-                        <Trash2 className="w-3 h-3 mr-1" />
-                        Eliminar
-                      </Button>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* TAB 2: SOLO CAJAS */}
+            <TabsContent value="solo-cajas" className="space-y-4 py-4">
+              {soloCajas.length === 0 ? (
+                <div className="text-center py-8 bg-[#F8F8F8] rounded-lg border-2 border-dashed border-[#E0E0E0]">
+                  <Boxes className="w-12 h-12 mx-auto mb-3 text-[#E0E0E0]" />
+                  <p className="text-[#6B6B6B] font-semibold">No hay cajas definidas</p>
+                  <p className="text-xs text-[#6B6B6B] mt-1">Crea cajas para los beneficios primero</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                  {soloCajas.map((caja: any) => (
+                    <div key={caja.id} className="border-2 border-[#E0E0E0] rounded-lg p-4 hover:border-[#FF8C00] transition-colors">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-[#333333] text-base">{caja.nombre}</h4>
+                            <Badge className={caja.activo ? 'bg-[#017E49] text-white' : 'bg-[#999999] text-white'}>
+                              {caja.activo ? 'Activa' : 'Inactiva'}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-[#6B6B6B] mt-1">
+                            <span className="font-semibold">Beneficio:</span> {caja.beneficio_nombre}
+                          </p>
+                          <p className="text-xs text-[#6B6B6B] mt-1">
+                            <span className="font-semibold">Código:</span> {caja.codigo_tipo}
+                          </p>
+                        </div>
+                      </div>
+
+                      {caja.descripcion && (
+                        <p className="text-sm text-[#6B6B6B] mb-3 p-2 bg-[#F8F8F8] rounded border-l-4 border-[#FF8C00]">
+                          {caja.descripcion}
+                        </p>
+                      )}
+
+                      <div className="flex gap-2 flex-wrap">
+                        <button
+                          onClick={() => handleToggleCajaActivo(caja.id, caja)}
+                          className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium transition-colors ${caja.activo
+                            ? 'bg-[#FFF4E6] text-[#FF8C00] hover:bg-[#FFE6CC]'
+                            : 'bg-[#E6F3EE] text-[#017E49] hover:bg-[#D9E9E3]'
+                            }`}
+                        >
+                          {caja.activo ? (
+                            <>
+                              <X className="w-3 h-3" />
+                              Desactivar
+                            </>
+                          ) : (
+                            <>
+                              <Check className="w-3 h-3" />
+                              Activar
+                            </>
+                          )}
+                        </button>
+
+                        <button
+                          onClick={() => handleDeleteCaja(caja.id)}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium bg-[#FFE6E6] text-[#E12019] hover:bg-[#FFCCCC] transition-colors"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          Eliminar
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="flex gap-3">
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+
+          <div className="flex gap-3 pt-4 border-t border-[#E0E0E0]">
             <Button
               onClick={() => {
                 setShowViewCajasModal(false);
                 setCajasDelBeneficio([]);
               }}
-              className="flex-1 bg-[#E12019] text-white hover:bg-[#B51810]"
+              variant="outline"
+              className="flex-1"
             >
               Cerrar
             </Button>
             <Button
               onClick={() => {
+                // Preparar formulario para nueva caja
+                setCajaForm({ beneficio: selectedBeneficio?.id || 0, nombre: '', descripcion: '', codigo_tipo: '' });
                 setShowCreateCajaModal(true);
                 setShowViewCajasModal(false);
               }}
               className="flex-1 bg-[#FF8C00] text-white hover:bg-[#E67E00]"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Nueva Caja
+              Agregar Caja
             </Button>
           </div>
         </DialogContent>

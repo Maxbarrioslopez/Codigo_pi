@@ -231,7 +231,7 @@ export function CicloBimensualModule() {
           descripcion: cajaForm.descripcion,
           codigo_tipo: cajaForm.codigo_tipo,
           activo: cajaForm.activo !== false,
-          beneficio: null,
+          beneficio: undefined,
         });
       }
 
@@ -257,7 +257,7 @@ export function CicloBimensualModule() {
     if (!selectedBeneficio) return;
 
     try {
-      const nuevoBeneficioId = estaAsignada ? null : selectedBeneficio.id;
+      const nuevoBeneficioId = estaAsignada ? undefined : selectedBeneficio.id;
 
       await cajasService.updateCajaBeneficio(cajaId, {
         beneficio: nuevoBeneficioId
@@ -689,7 +689,7 @@ export function CicloBimensualModule() {
                       <Button
                         onClick={() => {
                           setSelectedBeneficio(beneficio);
-                          setCajaForm({ beneficio: beneficio.id, nombre: '', descripcion: '', codigo_tipo: '' });
+                          setCajaForm({ beneficio: beneficio.id, nombre: '', descripcion: '', codigo_tipo: '', activo: true });
                           setShowCreateCajaModal(true);
                         }}
                         className="w-full bg-[#FF8C00] text-white hover:bg-[#E67E00]"
@@ -1316,7 +1316,7 @@ export function CicloBimensualModule() {
             </p>
 
             <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-              {beneficios.filter(ben => ben.activo).map((beneficio) => (
+              {beneficiosConCajas.filter(ben => ben.activo).map((beneficio: any) => (
                 <div
                   key={beneficio.id}
                   className="border-2 border-[#E0E0E0] rounded-lg p-4 hover:border-[#FF9F55] transition-colors"
@@ -1617,7 +1617,7 @@ export function CicloBimensualModule() {
             <Button
               onClick={() => {
                 // Preparar formulario para nueva caja
-                setCajaForm({ beneficio: selectedBeneficio?.id || 0, nombre: '', descripcion: '', codigo_tipo: '' });
+                setCajaForm({ beneficio: selectedBeneficio?.id || 0, nombre: '', descripcion: '', codigo_tipo: '', activo: true });
                 setShowCreateCajaModal(true);
                 setShowViewCajasModal(false);
               }}

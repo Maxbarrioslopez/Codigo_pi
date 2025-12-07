@@ -162,12 +162,15 @@ class NominaCargaSerializer(serializers.ModelSerializer):
 
 
 class CajaBeneficioSerializer(serializers.ModelSerializer):
-    beneficio_nombre = serializers.CharField(source='beneficio.nombre', read_only=True)
+    beneficio_nombre = serializers.SerializerMethodField()
     
     class Meta:
         model = CajaBeneficio
         fields = ['id', 'beneficio', 'beneficio_nombre', 'nombre', 'descripcion', 'codigo_tipo', 'activo', 'created_at']
         read_only_fields = ['created_at']
+    
+    def get_beneficio_nombre(self, obj):
+        return obj.beneficio.nombre if obj.beneficio else None
 
 
 class BeneficioTrabajadorSerializer(serializers.ModelSerializer):

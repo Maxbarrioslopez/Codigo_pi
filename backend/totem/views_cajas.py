@@ -75,27 +75,161 @@ def caja_beneficio_detail(request, caja_id):
         return Response({'mensaje': 'Caja desactivada'}, status=status.HTTP_200_OK)
 
 
-@api_view(['GET'])
+@api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def cajas_por_beneficio(request, tipo_beneficio_id):
     """
-    GET: Obtener todas las cajas disponibles de un tipo de beneficio
+    GET: Obtener todas las cajas de un tipo de beneficio
+    POST: Crear nueva caja para este tipo de beneficio
     
-    ENDPOINT: GET /api/cajas-beneficio/por-tipo/{tipo_beneficio_id}/
-    RESPUESTA: [
+    ENDPOINT: GET|POST /api/cajas-beneficio/por-tipo/{tipo_beneficio_id}/
+    
+    GET PARAMS:
+        ?incluir_inactivas=true  # Incluye cajas inactivas (default: false)
+    
+    GET RESPUESTA: [
         {
             "id": 1,
             "beneficio": 5,
+            "beneficio_nombre": "Caja de Navidad",
             "nombre": "Premium",
             "codigo_tipo": "CAJ-NAV-PREM",
             "descripcion": "Caja Premium con productos selectos",
+            "activo": true,
+            "created_at": "2025-01-01T10:00:00Z"
+        },
+        ...
+    ]
+    
+    POST BODY:
+        {
+            "nombre": "Básica",
+            "descripcion": "Caja con productos básicos",
+            "codigo_tipo": "CAJ-NAV-BASICA",
             "activo": true
+        }
+    """
+    beneficio = get_object_or_404(TipoBeneficio, id=tipo_beneficio_id)
+    
+    if request.method == 'GET':
+        incluir_inactivas = request.query_params.get('incluir_inactivas', 'false').lower() == 'true'
+        
+        if incluir_inactivas:
+            cajas = CajaBeneficio.objects.filter(beneficio=beneficio)
+        else:
+            cajas = CajaBeneficio.objects.filter(beneficio=beneficio, activo=True)
+        
+        serializer = CajaBeneficioSerializer(cajas, many=True)
+        return Response(serializer.data)
+    
+    elif request.method == 'POST':
+        # Crear nueva caja para este beneficio
+        data = request.data.copy()
+        data['beneficio'] = tipo_beneficio_id
+        
+        serializer = CajaBeneficioSerializer(data=data)
+        if serializer.is_valid():
+            with transaction.atomic():
+                caja = serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsRRHH])
+def beneficios_con_cajas(request):
+    """
+    GET: Obtener todos los beneficios que TIENEN cajas asociadas
+    
+    ENDPOINT: GET /api/beneficios-con-cajas/
+    
+    GET PARAMS:
+        ?solo_activos=true  # Solo beneficios y cajas activos (default: false)
+    
+    GET RESPUESTA: [
+        {
+            "id": 5,
+            "nombre": "Caja de Navidad",
+            "descripcion": "Beneficio de navidad",
+            "activo": true,
+            "cajas": [
+                {
+                    "id": 1,
+                    "nombre": "Premium",
+                    "descripcion": "Caja Premium",
+                    "codigo_tipo": "CAJ-NAV-PREM",
+                    "activo": true
+                },
+                ...
+            ]
         },
         ...
     ]
     """
-    beneficio = get_object_or_404(TipoBeneficio, id=tipo_beneficio_id)
-    cajas = CajaBeneficio.objects.filter(beneficio=beneficio, activo=True)
+    solo_activos = request.query_params.get('solo_activos', 'false').lower() == 'true'
+    
+    # Obtener beneficios que tienen cajas
+    beneficios = TipoBeneficio.objects.filter(cajas__isnull=False).distinct()
+    
+    if solo_activos:
+        beneficios = beneficios.filter(activo=True)
+    
+    resultado = []
+    for beneficio in beneficios:
+        cajas = beneficio.cajas.all()
+        if solo_activos:
+            cajas = cajas.filter(activo=True)
+        
+        caja_data = CajaBeneficioSerializer(cajas, many=True).data
+        
+        resultado.append({
+            'id': beneficio.id,
+            'nombre': beneficio.nombre,
+            'descripcion': beneficio.descripcion,
+            'activo': beneficio.activo,
+            'cajas': caja_data
+        })
+    
+    return Response(resultado)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsRRHH])
+def solo_cajas(request):
+    """
+    GET: Obtener SOLO las cajas (sin agrupar por beneficio)
+    
+    ENDPOINT: GET /api/solo-cajas/
+    
+    GET PARAMS:
+        ?solo_activas=true     # Solo cajas activas (default: false)
+        ?tipo_beneficio_id=5   # Filtrar por tipo de beneficio (opcional)
+    
+    GET RESPUESTA: [
+        {
+            "id": 1,
+            "beneficio": 5,
+            "beneficio_nombre": "Caja de Navidad",
+            "nombre": "Premium",
+            "codigo_tipo": "CAJ-NAV-PREM",
+            "descripcion": "Caja Premium",
+            "activo": true,
+            "created_at": "2025-01-01T10:00:00Z"
+        },
+        ...
+    ]
+    """
+    solo_activas = request.query_params.get('solo_activas', 'false').lower() == 'true'
+    tipo_beneficio_id = request.query_params.get('tipo_beneficio_id')
+    
+    cajas = CajaBeneficio.objects.select_related('beneficio').all()
+    
+    if solo_activas:
+        cajas = cajas.filter(activo=True)
+    
+    if tipo_beneficio_id:
+        cajas = cajas.filter(beneficio_id=tipo_beneficio_id)
+    
     serializer = CajaBeneficioSerializer(cajas, many=True)
     return Response(serializer.data)
 
@@ -344,6 +478,47 @@ def validacion_caja_listar(request):
         queryset = queryset.filter(fecha_validacion__lte=fecha_hasta)
     
     serializer = ValidacionCajaSerializer(queryset, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated, IsRRHH])
+def caja_beneficio_toggle_activo(request, caja_id):
+    """
+    PATCH: Alternar estado activo/inactivo de una caja
+    
+    ENDPOINT: PATCH /api/cajas-beneficio/<caja_id>/toggle-activo/
+    
+    BODY (OPCIONAL):
+        {
+            "activo": true  # Si se proporciona, establece el valor. Si no, invierte el estado actual.
+        }
+    
+    RESPUESTA:
+        {
+            "id": 1,
+            "beneficio": 5,
+            "beneficio_nombre": "Caja de Navidad",
+            "nombre": "Premium",
+            "codigo_tipo": "CAJ-NAV-PREM",
+            "descripcion": "Caja Premium",
+            "activo": false,  # Estado actualizado
+            "created_at": "2025-01-01T10:00:00Z"
+        }
+    """
+    caja = get_object_or_404(CajaBeneficio, id=caja_id)
+    
+    # Si se proporciona 'activo' en el body, usar ese valor. Si no, invertir.
+    nuevo_estado = request.data.get('activo')
+    if nuevo_estado is None:
+        caja.activo = not caja.activo
+    else:
+        caja.activo = bool(nuevo_estado)
+    
+    with transaction.atomic():
+        caja.save(update_fields=['activo'])
+    
+    serializer = CajaBeneficioSerializer(caja)
     return Response(serializer.data)
 
 

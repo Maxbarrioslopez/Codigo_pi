@@ -39,18 +39,33 @@ export function AdministradorModule() {
     loadUsers();
   }, []);
 
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm('¿Está seguro de que desea eliminar este usuario?')) return;
+  const handleDeleteUser = async (userId: number, username: string) => {
+    if (!confirm(`¿Está seguro de que desea eliminar al usuario "${username}"? Esta acción no se puede deshacer.`)) return;
 
     try {
       setSavingUser(true);
-      // Implementar eliminación de usuario cuando el endpoint esté disponible
-      // await authService.deleteUser(userId);
+      await authService.deleteUser(userId);
       setSystemUsers(systemUsers.filter(u => u.id !== userId));
-      showSuccess('Éxito', 'Usuario eliminado correctamente');
-    } catch (error) {
-      showError('Error', 'No se pudo eliminar el usuario');
+      showSuccess('Éxito', `Usuario "${username}" eliminado correctamente`);
+    } catch (error: any) {
       console.error(error);
+      showError('Error', error.response?.data?.detail || 'No se pudo eliminar el usuario');
+    } finally {
+      setSavingUser(false);
+    }
+  };
+
+  const handleChangeRole = async (userId: number, newRole: string) => {
+    if (!confirm(`¿Cambiar rol a "${newRole.toUpperCase()}"?`)) return;
+
+    try {
+      setSavingUser(true);
+      const updatedUser = await authService.updateUserRole(userId, newRole as any);
+      setSystemUsers(systemUsers.map(u => u.id === userId ? updatedUser : u));
+      showSuccess('Éxito', `Rol actualizado a "${newRole.toUpperCase()}"`);
+    } catch (error: any) {
+      console.error(error);
+      showError('Error', error.response?.data?.detail || 'No se pudo actualizar el rol');
     } finally {
       setSavingUser(false);
     }
@@ -314,13 +329,25 @@ export function AdministradorModule() {
                         }) : 'Nunca'}
                       </td>
                       <td className="p-4">
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 items-center">
+                          <Select value={user.rol} onValueChange={(newRole) => handleChangeRole(user.id, newRole)} disabled={savingUser}>
+                            <SelectTrigger className="h-9 w-32 rounded-lg border-2 border-[#E0E0E0] bg-white">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="admin">Admin</SelectItem>
+                              <SelectItem value="rrhh">RRHH</SelectItem>
+                              <SelectItem value="guardia">Guardia</SelectItem>
+                              <SelectItem value="supervisor">Supervisor</SelectItem>
+                            </SelectContent>
+                          </Select>
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleDeleteUser(user.id)}
+                            onClick={() => handleDeleteUser(user.id, user.username)}
                             disabled={savingUser}
                             className="h-9 px-3 rounded-lg border-2 border-[#E12019] text-[#E12019] hover:bg-[#FFE6E6]"
+                            title="Eliminar usuario"
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>

@@ -192,6 +192,35 @@ export class AuthService {
             throw ErrorHandler.handle(error, 'AuthService.listUsers', false);
         }
     }
+
+    /**
+     * Eliminar un usuario del sistema (solo admin)
+     * @param usuarioId - ID del usuario a eliminar
+     */
+    async deleteUser(usuarioId: number): Promise<{ detail: string }> {
+        try {
+            const { data } = await apiClient.delete<{ detail: string }>(`usuarios/${usuarioId}/`);
+            return data;
+        } catch (error) {
+            throw ErrorHandler.handle(error, 'AuthService.deleteUser', false);
+        }
+    }
+
+    /**
+     * Actualizar rol de un usuario (solo admin)
+     * @param usuarioId - ID del usuario
+     * @param nuevoRol - Nuevo rol a asignar
+     */
+    async updateUserRole(usuarioId: number, nuevoRol: 'admin' | 'rrhh' | 'guardia' | 'supervisor'): Promise<User> {
+        try {
+            const { data } = await apiClient.put<User>(`usuarios/${usuarioId}/`, {
+                rol: nuevoRol
+            });
+            return data;
+        } catch (error) {
+            throw ErrorHandler.handle(error, 'AuthService.updateUserRole', false);
+        }
+    }
 }
 
 // Exportar instancia singleton

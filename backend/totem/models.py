@@ -271,7 +271,7 @@ class CajaBeneficio(models.Model):
     Define las cajas disponibles dentro de un tipo de beneficio.
     Ej: Beneficio "Caja de Navidad" puede tener cajas "Premium" y "Estándar"
     """
-    beneficio = models.ForeignKey(TipoBeneficio, on_delete=models.CASCADE, related_name='cajas')
+    beneficio = models.ForeignKey(TipoBeneficio, on_delete=models.CASCADE, related_name='cajas', null=True, blank=True)
     nombre = models.CharField(max_length=100, help_text="Nombre de la caja (ej: Premium, Estándar, Básica)")
     descripcion = models.TextField(blank=True)
     codigo_tipo = models.CharField(
@@ -285,7 +285,6 @@ class CajaBeneficio(models.Model):
     class Meta:
         verbose_name = 'Caja de Beneficio'
         verbose_name_plural = 'Cajas de Beneficios'
-        unique_together = ('beneficio', 'nombre')
     
     def __str__(self):
         return f"{self.beneficio.nombre} - {self.nombre}"

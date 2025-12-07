@@ -254,3 +254,70 @@ def usuarios_view(request):
     except Exception as e:
         logger.error(f"Error en usuarios_view: {e}")
         return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['DELETE', 'PUT'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def usuario_detail(request, usuario_id):
+    """
+    Maneja DELETE (eliminar usuario) y PUT (actualizar rol) de un usuario específico
+    ENDPOINT: DELETE/PUT /api/usuarios/<id>/
+    PERMISOS: Admin (JWT)
+    """
+    try:
+        # Verificar que el usuario es admin
+        if request.user.rol != 'admin' and not request.user.is_superuser:
+            return Response({'detail': 'Solo administradores pueden gestionar usuarios'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Obtener usuario
+        try:
+            usuario = Usuario.objects.get(id=usuario_id)
+        except Usuario.DoesNotExist:
+            return Response({'detail': 'Usuario no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Prevenir que se elimine al único admin
+        if request.method == 'DELETE':
+            if usuario.rol == 'admin':
+                admin_count = Usuario.objects.filter(rol='admin', is_active=True).count()
+                if admin_count <= 1:
+                    return Response({'detail': 'No se puede eliminar el único administrador activo'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Registrar eliminación
+            logger.info(f"Usuario eliminado: {usuario.username} (id: {usuario.id}) por {request.user.username}")
+
+            # Eliminar usuario
+            usuario.delete()
+            return Response({'detail': 'Usuario eliminado correctamente'}, status=status.HTTP_200_OK)
+
+        # Actualizar rol
+        elif request.method == 'PUT':
+            nuevo_rol = request.data.get('rol')
+
+            if not nuevo_rol:
+                return Response({'rol': 'El rol es requerido'}, status=status.HTTP_400_BAD_REQUEST)
+
+            if nuevo_rol not in ['admin', 'rrhh', 'guardia', 'supervisor']:
+                return Response({'rol': 'Rol inválido'}, status=status.HTTP_400_BAD_REQUEST)
+
+            rol_anterior = usuario.rol
+            usuario.rol = nuevo_rol
+            usuario.save()
+
+            # Registrar cambio
+            logger.info(f"Rol actualizado: {usuario.username} de {rol_anterior} a {nuevo_rol} por {request.user.username}")
+
+            return Response({
+                'id': usuario.id,
+                'username': usuario.username,
+                'email': usuario.email,
+                'first_name': usuario.first_name,
+                'last_name': usuario.last_name,
+                'rol': usuario.rol,
+                'is_active': usuario.is_active,
+                'rol_anterior': rol_anterior
+            }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Error en usuario_detail: {e}")
+        return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

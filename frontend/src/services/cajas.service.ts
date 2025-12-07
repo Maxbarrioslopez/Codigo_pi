@@ -68,8 +68,49 @@ class CajasService {
         await apiClient.delete(`/cajas-beneficio/${id}/`);
     }
 
-    async obtenerCajasPorBeneficio(tipoBeneficioId: number): Promise<CajaBeneficioDTO[]> {
-        const response = await apiClient.get(`/cajas-beneficio/por-tipo/${tipoBeneficioId}/`);
+    async obtenerCajasPorBeneficio(tipoBeneficioId: number, incluirInactivas: boolean = false): Promise<CajaBeneficioDTO[]> {
+        const params = new URLSearchParams();
+        if (incluirInactivas) {
+            params.append('incluir_inactivas', 'true');
+        }
+        const response = await apiClient.get(`/cajas-beneficio/por-tipo/${tipoBeneficioId}/?${params.toString()}`);
+        return response.data;
+    }
+
+    async crearCajaBeneficio(tipoBeneficioId: number, data: {
+        nombre: string;
+        descripcion?: string;
+        codigo_tipo: string;
+        activo?: boolean;
+    }): Promise<CajaBeneficioDTO> {
+        const response = await apiClient.post(`/cajas-beneficio/por-tipo/${tipoBeneficioId}/`, data);
+        return response.data;
+    }
+
+    async toggleCajaActivo(cajaId: number, activo?: boolean): Promise<CajaBeneficioDTO> {
+        const body = activo !== undefined ? { activo } : {};
+        const response = await apiClient.patch(`/cajas-beneficio/${cajaId}/toggle-activo/`, body);
+        return response.data;
+    }
+
+    async getBeneficiosConCajas(soloActivos: boolean = false): Promise<any[]> {
+        const params = new URLSearchParams();
+        if (soloActivos) {
+            params.append('solo_activos', 'true');
+        }
+        const response = await apiClient.get(`/beneficios-con-cajas/?${params.toString()}`);
+        return response.data;
+    }
+
+    async getSoloCajas(soloActivas: boolean = false, tipoBeneficioId?: number): Promise<CajaBeneficioDTO[]> {
+        const params = new URLSearchParams();
+        if (soloActivas) {
+            params.append('solo_activas', 'true');
+        }
+        if (tipoBeneficioId) {
+            params.append('tipo_beneficio_id', tipoBeneficioId.toString());
+        }
+        const response = await apiClient.get(`/solo-cajas/?${params.toString()}`);
         return response.data;
     }
 

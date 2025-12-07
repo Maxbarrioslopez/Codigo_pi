@@ -169,6 +169,101 @@ export class CicloService {
             throw ErrorHandler.handle(error, 'CicloService.deleteTipo', false);
         }
     }
+
+    // ==================== CAJAS DE BENEFICIOS ====================
+
+    /**
+     * Obtener cajas de un tipo de beneficio
+     * @param tipoBeneficioId - ID del tipo de beneficio
+     * @param incluirInactivas - Incluir cajas inactivas (default: false)
+     */
+    async getCajas(tipoBeneficioId: number, incluirInactivas: boolean = false): Promise<any[]> {
+        try {
+            const params = new URLSearchParams();
+            if (incluirInactivas) {
+                params.append('incluir_inactivas', 'true');
+            }
+            const { data } = await apiClient.get<any[]>(
+                `cajas-beneficio/por-tipo/${tipoBeneficioId}/?${params.toString()}`
+            );
+            return data;
+        } catch (error) {
+            throw ErrorHandler.handle(error, 'CicloService.getCajas', false);
+        }
+    }
+
+    /**
+     * Crear caja para un tipo de beneficio
+     * @param tipoBeneficioId - ID del tipo de beneficio
+     * @param data - Datos de la caja
+     */
+    async createCaja(tipoBeneficioId: number, data: {
+        nombre: string;
+        descripcion?: string;
+        codigo_tipo: string;
+        activo?: boolean;
+    }): Promise<any> {
+        try {
+            const { data: result } = await apiClient.post<any>(
+                `cajas-beneficio/por-tipo/${tipoBeneficioId}/`,
+                data
+            );
+            return result;
+        } catch (error) {
+            throw ErrorHandler.handle(error, 'CicloService.createCaja', false);
+        }
+    }
+
+    /**
+     * Actualizar caja de beneficio
+     * @param cajaId - ID de la caja
+     * @param data - Datos a actualizar
+     */
+    async updateCaja(cajaId: number, data: {
+        nombre?: string;
+        descripcion?: string;
+        activo?: boolean;
+    }): Promise<any> {
+        try {
+            const { data: result } = await apiClient.put<any>(
+                `cajas-beneficio/${cajaId}/`,
+                data
+            );
+            return result;
+        } catch (error) {
+            throw ErrorHandler.handle(error, 'CicloService.updateCaja', false);
+        }
+    }
+
+    /**
+     * Alternar estado activo de una caja
+     * @param cajaId - ID de la caja
+     * @param activo - Nuevo estado (opcional, si no se proporciona invierte el actual)
+     */
+    async toggleCajaActivo(cajaId: number, activo?: boolean): Promise<any> {
+        try {
+            const body = activo !== undefined ? { activo } : {};
+            const { data } = await apiClient.patch<any>(
+                `cajas-beneficio/${cajaId}/toggle-activo/`,
+                body
+            );
+            return data;
+        } catch (error) {
+            throw ErrorHandler.handle(error, 'CicloService.toggleCajaActivo', false);
+        }
+    }
+
+    /**
+     * Eliminar caja de beneficio
+     * @param cajaId - ID de la caja
+     */
+    async deleteCaja(cajaId: number): Promise<void> {
+        try {
+            await apiClient.delete(`cajas-beneficio/${cajaId}/`);
+        } catch (error) {
+            throw ErrorHandler.handle(error, 'CicloService.deleteCaja', false);
+        }
+    }
 }
 
 // Exportar instancia singleton

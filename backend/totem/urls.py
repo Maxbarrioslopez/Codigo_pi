@@ -23,6 +23,7 @@ urlpatterns = [
     
     # Gestión de Usuarios (admin)
     path('usuarios/', views_auth.usuarios_view, name='usuarios'),
+    path('usuarios/<int:usuario_id>/', views_auth.usuario_detail, name='usuario_detail'),
     path('usuarios/reset-password/', views_auth.usuarios_reset_password, name='usuarios_reset_password'),
     
     # Beneficios / trabajador
@@ -84,7 +85,10 @@ urlpatterns = [
     # Cajas y Validaciones (RRHH y Guardia)
     path('cajas-beneficio/', cajas_views.cajas_beneficio_list_create, name='cajas_beneficio_list_create'),
     path('cajas-beneficio/<int:caja_id>/', cajas_views.caja_beneficio_detail, name='caja_beneficio_detail'),
+    path('cajas-beneficio/<int:caja_id>/toggle-activo/', cajas_views.caja_beneficio_toggle_activo, name='caja_beneficio_toggle_activo'),
     path('cajas-beneficio/por-tipo/<int:tipo_beneficio_id>/', cajas_views.cajas_por_beneficio, name='cajas_por_beneficio'),
+    path('beneficios-con-cajas/', cajas_views.beneficios_con_cajas, name='beneficios_con_cajas'),
+    path('solo-cajas/', cajas_views.solo_cajas, name='solo_cajas'),
     
     path('beneficios-trabajadores/', cajas_views.beneficio_trabajador_list_create, name='beneficio_trabajador_list_create'),
     path('beneficios-trabajadores/<int:beneficio_id>/', cajas_views.beneficio_trabajador_detail, name='beneficio_trabajador_detail'),

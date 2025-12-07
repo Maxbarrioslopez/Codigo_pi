@@ -33,10 +33,14 @@ function DashboardLayout() {
 
   const sections = getSections();
 
-  // Si el usuario solo tiene acceso a una sección, mostrar directamente esa
-  const [currentSection, setCurrentSection] = useState(
-    sections.length === 1 ? sections[0].id : 'rrhh'
-  );
+  // Determinar sección inicial según el rol del usuario
+  const getInitialSection = () => {
+    if (user?.rol === 'admin') return 'admin';
+    if (sections.length === 1) return sections[0].id;
+    return 'rrhh';
+  };
+
+  const [currentSection, setCurrentSection] = useState(getInitialSection());
 
   const handleLogout = () => {
     logout();

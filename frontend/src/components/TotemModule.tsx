@@ -125,15 +125,33 @@ export function TotemModule() {
     } finally { setLoading(false); }
   };
 
-  const reportarIncidencia = async () => {
-    if (!selectedIncidentType) return;
-    setLoading(true); setErrorMsg('');
+  const reportarIncidencia = async (tipo: string, descripcion: string) => {
+    if (!tipo || !rutEscaneado) {
+      setErrorMsg('Falta información para reportar');
+      return;
+    }
+    setLoading(true);
+    setErrorMsg('');
     try {
-      await incidentService.crearIncidencia({ trabajador_rut: rutEscaneado, tipo: selectedIncidentType, descripcion: incidentDescription, origen: 'totem' } as any);
-      setCurrentScreen('incident-sent');
+      const payload = {
+        trabajador_rut: rutEscaneado,
+        tipo: tipo,
+        descripcion: descripcion,
+        origen: 'totem'
+      };
+      console.log('Enviando incidencia:', payload);
+      await incidentService.crearIncidencia(payload as any);
+      // Limpiar estados
+      setSelectedIncidentType('');
+      setIncidentDescription('');
+      // Volver a beneficio
+      setCurrentScreen('benefit');
     } catch (e: any) {
+      console.error('Error reportando incidencia:', e);
       mapApiErrorToStateAndToast(e, { setError: setErrorMsg, toState: setCurrentScreen });
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -219,10 +237,9 @@ export function TotemModule() {
           {currentScreen === 'incident-form' && (
             <TotemIncidentForm
               onSubmit={(tipo, desc) => {
-                setSelectedIncidentType(tipo);
-                setIncidentDescription(desc);
-                reportarIncidencia();
+                reportarIncidencia(tipo, desc);
               }}
+              onBack={() => setCurrentScreen('benefit')}
               loading={loading}
             />
           )}

@@ -51,6 +51,23 @@ export function CicloBimensualModule() {
     loadData();
   }, []);
 
+  useEffect(() => {
+    // Load cajas data for the Cajas tab
+    const loadCajasData = async () => {
+      try {
+        const [beneficiosConCajasData, soloCajasData] = await Promise.all([
+          cajasService.getBeneficiosConCajas(false).catch(() => []),
+          cajasService.getSoloCajas(false).catch(() => []),
+        ]);
+        setBeneficiosConCajas(beneficiosConCajasData);
+        setSoloCajas(soloCajasData);
+      } catch (error) {
+        console.error('Error loading cajas data:', error);
+      }
+    };
+    loadCajasData();
+  }, []);
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -517,7 +534,7 @@ export function CicloBimensualModule() {
         <TabsContent value="cajas" className="space-y-6 mt-6">
           {loading ? (
             <div className="text-center py-12 text-[#6B6B6B]">Cargando cajas...</div>
-          ) : beneficios.length === 0 ? (
+          ) : beneficiosConCajas.length === 0 ? (
             <div className="bg-white border-2 border-[#E0E0E0] rounded-xl p-12 text-center">
               <Package className="w-12 h-12 text-[#6B6B6B] mx-auto mb-4" />
               <p className="text-[#6B6B6B]">No hay beneficios con cajas disponibles</p>
@@ -537,7 +554,7 @@ export function CicloBimensualModule() {
 
               {/* SUB-TAB: POR BENEFICIO */}
               <TabsContent value="por-beneficio" className="space-y-4 mt-6">
-                {beneficios.map((beneficio) => (
+                {beneficiosConCajas.map((beneficio: any) => (
                   <div key={beneficio.id} className="bg-white border-2 border-[#E0E0E0] rounded-xl overflow-hidden">
                     {/* HEADER BENEFICIO */}
                     <div className="bg-gradient-to-r from-[#FFF4E6] to-[#FFE6CC] border-b-2 border-[#FF9F55] p-6">
@@ -687,104 +704,102 @@ export function CicloBimensualModule() {
 
               {/* SUB-TAB: TODAS LAS CAJAS */}
               <TabsContent value="todas-cajas" className="space-y-4 mt-6">
-                {beneficios.flatMap((b) => b.cajas || []).length > 0 ? (
+                {soloCajas.length > 0 ? (
                   <div className="space-y-3">
-                    {beneficios.flatMap((beneficio) =>
-                      (beneficio.cajas || []).map((caja: any) => (
-                        <div
-                          key={caja.id}
-                          className="border-2 border-[#E0E0E0] rounded-lg p-4 hover:border-[#FF9F55] transition-colors bg-white"
-                        >
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <h4 className="font-bold text-[#333333] text-base">{caja.nombre}</h4>
-                                <Badge className={caja.activo ? 'bg-[#017E49] text-white' : 'bg-[#999999] text-white'}>
-                                  {caja.activo ? 'Activa' : 'Inactiva'}
-                                </Badge>
-                              </div>
-                              <p className="text-xs text-[#6B6B6B] font-mono mb-2">{caja.codigo_tipo}</p>
+                    {soloCajas.map((caja: any) => (
+                      <div
+                        key={caja.id}
+                        className="border-2 border-[#E0E0E0] rounded-lg p-4 hover:border-[#FF9F55] transition-colors bg-white"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-bold text-[#333333] text-base">{caja.nombre}</h4>
+                              <Badge className={caja.activo ? 'bg-[#017E49] text-white' : 'bg-[#999999] text-white'}>
+                                {caja.activo ? 'Activa' : 'Inactiva'}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-[#6B6B6B] font-mono mb-2">{caja.codigo_tipo}</p>
+                          </div>
+                        </div>
+
+                        {/* DESCRIPCIÓN */}
+                        {caja.descripcion && (
+                          <p className="text-sm text-[#6B6B6B] p-2 bg-[#F8F8F8] rounded mb-3 border-l-4 border-[#FF9F55]">
+                            {caja.descripcion}
+                          </p>
+                        )}
+
+                        {/* INFO Y ACCIONES */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
+                          {/* INFORMACIÓN */}
+                          <div className="space-y-1 text-xs">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-[#333333]">Caja:</span>
+                              <span className="text-[#6B6B6B]">{caja.nombre}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-[#333333]">Código:</span>
+                              <span className="text-[#6B6B6B] font-mono">{caja.codigo_tipo}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-[#333333]">Disponible:</span>
+                              <Badge className="bg-[#E6F3EE] text-[#017E49] border border-[#017E49]">
+                                {caja.activo ? 'Sí' : 'No'}
+                              </Badge>
                             </div>
                           </div>
 
-                          {/* DESCRIPCIÓN */}
-                          {caja.descripcion && (
-                            <p className="text-sm text-[#6B6B6B] p-2 bg-[#F8F8F8] rounded mb-3 border-l-4 border-[#FF9F55]">
-                              {caja.descripcion}
-                            </p>
-                          )}
+                          {/* VALIDACIÓN INFO */}
+                          <div className="flex items-center gap-2 text-xs p-2 bg-[#FFF4E6] rounded border border-[#FF9F55]">
+                            {caja.activo ? (
+                              <>
+                                <span className="text-[#FF9F55] font-semibold">✓</span>
+                                <span className="text-[#6B6B6B]">Caja activa</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-[#6B6B6B]">•</span>
+                                <span className="text-[#6B6B6B]">
+                                  Caja inactiva
+                                </span>
+                              </>
+                            )}
+                          </div>
 
-                          {/* INFO Y ACCIONES */}
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
-                            {/* INFORMACIÓN */}
-                            <div className="space-y-1 text-xs">
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-[#333333]">Beneficio:</span>
-                                <span className="text-[#6B6B6B]">{beneficio.nombre}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-[#333333]">Código:</span>
-                                <span className="text-[#6B6B6B] font-mono">{caja.codigo_tipo}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-[#333333]">Disponible:</span>
-                                <Badge className="bg-[#E6F3EE] text-[#017E49] border border-[#017E49]">
-                                  {caja.activo ? 'Sí' : 'No'}
-                                </Badge>
-                              </div>
-                            </div>
-
-                            {/* VALIDACIÓN GUARDIA INFO */}
-                            <div className="flex items-center gap-2 text-xs p-2 bg-[#FFF4E6] rounded border border-[#FF9F55]">
-                              {caja.activo && beneficio.requiere_validacion_guardia ? (
+                          {/* ACCIONES */}
+                          <div className="flex gap-2 justify-end">
+                            <button
+                              onClick={() => handleToggleCajaActivo(caja.id, caja)}
+                              className={`flex items-center gap-1 px-3 py-2 rounded text-xs font-medium transition-colors ${caja.activo
+                                ? 'bg-[#FFF4E6] text-[#FF9F55] hover:bg-[#FFE6CC]'
+                                : 'bg-[#E6F3EE] text-[#017E49] hover:bg-[#D9E9E3]'
+                                }`}
+                            >
+                              {caja.activo ? (
                                 <>
-                                  <span className="text-[#FF9F55] font-semibold">✓</span>
-                                  <span className="text-[#6B6B6B]">El guardia validará esta caja</span>
+                                  <X className="w-3 h-3" />
+                                  Desactivar
                                 </>
                               ) : (
                                 <>
-                                  <span className="text-[#6B6B6B]">•</span>
-                                  <span className="text-[#6B6B6B]">
-                                    {caja.activo ? 'Sin validación requerida' : 'Caja inactiva'}
-                                  </span>
+                                  <Check className="w-3 h-3" />
+                                  Activar
                                 </>
                               )}
-                            </div>
+                            </button>
 
-                            {/* ACCIONES */}
-                            <div className="flex gap-2 justify-end">
-                              <button
-                                onClick={() => handleToggleCajaActivo(caja.id, caja)}
-                                className={`flex items-center gap-1 px-3 py-2 rounded text-xs font-medium transition-colors ${caja.activo
-                                  ? 'bg-[#FFF4E6] text-[#FF9F55] hover:bg-[#FFE6CC]'
-                                  : 'bg-[#E6F3EE] text-[#017E49] hover:bg-[#D9E9E3]'
-                                  }`}
-                              >
-                                {caja.activo ? (
-                                  <>
-                                    <X className="w-3 h-3" />
-                                    Desactivar
-                                  </>
-                                ) : (
-                                  <>
-                                    <Check className="w-3 h-3" />
-                                    Activar
-                                  </>
-                                )}
-                              </button>
-
-                              <button
-                                onClick={() => handleDeleteCaja(caja.id)}
-                                className="flex items-center gap-1 px-3 py-2 rounded text-xs font-medium bg-[#FFE6E6] text-[#E12019] hover:bg-[#FFCCCC] transition-colors"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                                Eliminar
-                              </button>
-                            </div>
+                            <button
+                              onClick={() => handleDeleteCaja(caja.id)}
+                              className="flex items-center gap-1 px-3 py-2 rounded text-xs font-medium bg-[#FFE6E6] text-[#E12019] hover:bg-[#FFCCCC] transition-colors"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              Eliminar
+                            </button>
                           </div>
                         </div>
-                      ))
-                    )}
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <div className="bg-white border-2 border-[#E0E0E0] rounded-xl p-12 text-center">

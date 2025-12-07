@@ -59,9 +59,8 @@ Beneficio puede ser:
 
 Observaciones: Campo opcional para explicar por qué no recibe beneficio
 """
-
-Nota: Uso orientado a desarrollo/operaciones manuales (dev-only).
-     No se ejecuta en runtime de la aplicación.
+# Nota: Uso orientado a desarrollo/operaciones manuales (dev-only).
+# No se ejecuta en runtime de la aplicación.
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
@@ -77,11 +76,11 @@ logger = logging.getLogger(__name__)
 class Command(BaseCommand):
     help = 'Carga nómina de trabajadores: rut, nombre, seccion, contrato, sucursal, beneficio, observaciones'
     
-    # Columnas requeridas
-    COLUMNAS_REQUERIDAS = ['rut', 'nombre', 'seccion', 'contrato', 'sucursal', 'beneficio']
-    
+    # Columnas requeridas (beneficio ahora es opcional)
+    COLUMNAS_REQUERIDAS = ['rut', 'nombre', 'seccion', 'contrato', 'sucursal']
+
     # Columnas opcionales
-    COLUMNAS_OPCIONALES = ['observaciones', 'email', 'telefono']
+    COLUMNAS_OPCIONALES = ['beneficio', 'observaciones', 'email', 'telefono']
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -152,7 +151,6 @@ class Command(BaseCommand):
                 # Validar columnas requeridas (case-insensitive)
                 columnas_archivo = {c.lower().strip() for c in reader.fieldnames}
                 columnas_faltantes = [c for c in self.COLUMNAS_REQUERIDAS if c not in columnas_archivo]
-                
                 if columnas_faltantes:
                     raise CommandError(
                         f'❌ Faltan columnas requeridas: {", ".join(columnas_faltantes)}\n'
@@ -408,7 +406,7 @@ class Command(BaseCommand):
             )
             
             # 5. PROCESAR BENEFICIO
-            beneficio_raw = str(row.get('beneficio', '')).strip().upper()
+            beneficio_raw = str(row.get('beneficio', '')).strip().upper() if 'beneficio' in row else ''
             beneficio = {}
             sin_beneficio = False
             motivo_sin_beneficio = None

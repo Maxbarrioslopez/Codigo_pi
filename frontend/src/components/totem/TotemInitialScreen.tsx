@@ -24,7 +24,7 @@ export default function TotemInitialScreen({ onRutDetected, onManualRut, onConsu
         const formatted = formatRutOnType(e.target.value);
         setRutInput(formatted);
         setBeneficioStatus({ loading: false, error: null, data: null });
-        
+
         // Buscar nombre si el RUT es válido
         if (formatted && validateRut(formatted)) {
             obtenerDatosTrabajador(formatted);
@@ -120,12 +120,11 @@ export default function TotemInitialScreen({ onRutDetected, onManualRut, onConsu
                     onRutDetected={async (rut) => {
                         const formatted = formatRut(rut);
                         setRutInput(formatted);
-                        
+
                         // Buscar nombre del trabajador
                         await obtenerDatosTrabajador(rut);
-                        
+
                         onRutDetected(rut);
-                    }}
                     }}
                     onError={(msg) => {
                         setBeneficioStatus({
@@ -134,6 +133,7 @@ export default function TotemInitialScreen({ onRutDetected, onManualRut, onConsu
                             data: null,
                         });
                     }}
+                }}
                 />
             </div>
 

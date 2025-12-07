@@ -7,7 +7,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { AlertCircle, CheckCircle2, Copy, Eye, EyeOff, Lock, Plus, RefreshCw } from 'lucide-react';
 import { authService, CreateUserRequest, CreateUserResponse, ResetPasswordResponse } from '@/services/auth.service';
-import { formatRut, isValidRut } from '@/utils/parseChileanID';
+import { formatRut, validateRut } from '@/utils/rut';
+import { isValidRut } from '@/utils/parseChileanID';
 
 interface UserManagementDialogProps {
     type: 'create' | 'reset'; // create: nuevo usuario | reset: cambiar contraseña existente

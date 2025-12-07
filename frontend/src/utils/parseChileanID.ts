@@ -9,34 +9,29 @@ export type ChileanID = {
     fechaNacimiento?: string; // ISO o DD/MM/YYYY según disponibilidad
 };
 
+/**
+ * Intenta extraer un RUT válido desde el texto del PDF417 (con o sin guion).
+ */
 export function parseChileanIDFromPdf417(raw: string): ChileanID | null {
     if (!raw) return null;
     const text = normalize(raw);
 
-    // Buscar candidatos de RUT en el texto
-    const rutRegex = /(\b\d{7,8}-[\dkK]\b)/g;
-    const candidates = Array.from(text.matchAll(rutRegex)).map(m => m[1]);
-    const unique = Array.from(new Set(candidates));
+    const rut = normalizeRutFromScan(text);
+    if (!rut) return null;
 
-    for (const candidate of unique) {
-        const rut = candidate.toUpperCase();
-        if (isValidRut(rut)) {
-            // Campos opcionales: heurísticas básicas
-            const nombres = extractToken(text, /(NOMBRES?:?)([^\n]+)/i);
-            const apPat = extractToken(text, /(APELLIDO\s*PATERNO:?)([^\n]+)/i);
-            const apMat = extractToken(text, /(APELLIDO\s*MATERNO:?)([^\n]+)/i);
-            const birth = extractDate(text);
-            return {
-                rut: formatRut(rut),
-                ...(nombres ? { nombres: nombres.trim() } : {}),
-                ...(apPat ? { apellidoPaterno: apPat.trim() } : {}),
-                ...(apMat ? { apellidoMaterno: apMat.trim() } : {}),
-                ...(birth ? { fechaNacimiento: birth } : {}),
-            };
-        }
-    }
+    // Campos opcionales: heurísticas básicas
+    const nombres = extractToken(text, /(NOMBRES?:?)([^\n]+)/i);
+    const apPat = extractToken(text, /(APELLIDO\s*PATERNO:?)([^\n]+)/i);
+    const apMat = extractToken(text, /(APELLIDO\s*MATERNO:?)([^\n]+)/i);
+    const birth = extractDate(text);
 
-    return null;
+    return {
+        rut,
+        ...(nombres ? { nombres: nombres.trim() } : {}),
+        ...(apPat ? { apellidoPaterno: apPat.trim() } : {}),
+        ...(apMat ? { apellidoMaterno: apMat.trim() } : {}),
+        ...(birth ? { fechaNacimiento: birth } : {}),
+    };
 }
 
 function normalize(s: string): string {
@@ -69,21 +64,36 @@ function isValidRut(rut: string): boolean {
 // Exportar para uso externo
 export { isValidRut };
 
-function formatRut(rut: string): string {
-    // Formatea RUT limpiando y aplicando formato XX-XX (sin puntos para PDF417)
-    let clean = rut.replace(/[^\dkK]/g, '').toUpperCase();
-
-    if (clean.length === 0) return '';
-
-    // Si ya tiene el dígito verificador
-    if (clean.length > 1) {
-        const body = clean.slice(0, -1);
-        const dv = clean.slice(-1);
-        return `${body}-${dv}`;
-    }
-
-    return clean;
+function normalizeRutCandidate(candidate: string): string | null {
+    const cleaned = candidate.replace(/[^\dkK]/g, '').toUpperCase();
+    if (cleaned.length < 2) return null;
+    const body = cleaned.slice(0, -1);
+    const dv = cleaned.slice(-1);
+    const formatted = `${body}-${dv}`;
+    return isValidRut(formatted) ? formatted : null;
 }
 
-// Exportar para uso externo
-export { formatRut };
+function formatRut(rut: string): string {
+    // Formatea RUT limpiando y aplicando formato XX-XX (sin puntos para PDF417)
+    const normalized = normalizeRutCandidate(rut);
+    return normalized || '';
+}
+
+export function normalizeRutFromScan(raw: string): string | null {
+    if (!raw) return null;
+    const text = normalize(raw);
+
+    // Buscar candidatos con guion
+    const candidates = Array.from(text.matchAll(/(\b\d{7,8}-[\dkK]\b)/g)).map(m => m[1]);
+    // Y candidatos compactos sin guion (8-9 caracteres numéricos + DV)
+    const compact = Array.from(text.matchAll(/(\b\d{8,9}\b)/g)).map(m => m[1]);
+
+    const unique = Array.from(new Set([...candidates, ...compact]));
+
+    for (const candidate of unique) {
+        const normalized = normalizeRutCandidate(candidate);
+        if (normalized) return normalized;
+    }
+
+    return null;
+}

@@ -1404,18 +1404,34 @@ export function CicloBimensualModule() {
                       {/* CAJAS DISPONIBLES */}
                       {beneficio.cajas && beneficio.cajas.length > 0 && (
                         <div className="mt-3 pt-3 border-t border-[#E0E0E0]">
-                          <p className="text-xs font-semibold text-[#333333] mb-2">Cajas disponibles:</p>
-                          <div className="flex flex-wrap gap-2">
+                          <p className="text-xs font-semibold text-[#333333] mb-3">Cajas Asignadas ({beneficio.cajas.length} total, {beneficio.cajas.filter((c: any) => c.activo).length} activas):</p>
+                          <div className="space-y-2">
                             {beneficio.cajas.map((caja: any) => (
                               <div
                                 key={caja.id}
-                                className={`text-xs px-2 py-1 rounded border ${caja.activo
+                                className={`text-xs px-3 py-2 rounded border-2 ${caja.activo
                                   ? 'bg-[#E6F3EE] text-[#017E49] border-[#017E49]'
                                   : 'bg-[#F0F0F0] text-[#999999] border-[#E0E0E0]'
                                   }`}
                               >
-                                <span className="font-medium">{caja.nombre}</span>
-                                <span className="text-xs ml-1">({caja.codigo_tipo})</span>
+                                <div className="flex items-center justify-between mb-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold">{caja.nombre}</span>
+                                    <span className="font-mono text-xs opacity-75">({caja.codigo_tipo})</span>
+                                  </div>
+                                  <Badge className={caja.activo ? 'bg-[#017E49] text-white text-xs' : 'bg-[#999999] text-white text-xs'}>
+                                    {caja.activo ? 'Activa' : 'Inactiva'}
+                                  </Badge>
+                                </div>
+                                {caja.descripcion && (
+                                  <p className="text-xs opacity-75 mb-1">{caja.descripcion}</p>
+                                )}
+                                {beneficio.requiere_validacion_guardia && (
+                                  <div className="flex items-center gap-1 mt-1 p-1 bg-opacity-30 rounded">
+                                    <span className="text-[#FF9F55] font-bold">🔐</span>
+                                    <span className="text-xs font-semibold">Requiere verificación doble de guardia</span>
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>

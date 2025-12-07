@@ -1,11 +1,11 @@
 rut,nombre,seccion,contrato,sucursal,beneficio,observaciones,email,telefono
-11111111-1,Juan Pérez García,Operaciones,INDEFINIDO,CENTRAL,CAJA,,,+56912345678
-22222222-2,María López Silva,Bodega,PLAZO FIJO,SUR,NO,Contrato temporal sin beneficios,,
-33333333-3,Pedro Torres Muñoz,Ventas,INDEFINIDO,NORTE,VALE:5000,,,+56987654321
-44444444-4,Ana González Rojas,Administración,INDEFINIDO,CENTRAL,MONTO:10000,,ana.gonzalez@empresa.cl,+56911223344
-55555555-5,Carlos Ramírez Soto,Producción,OBRA,ORIENTE,SIN BENEFICIO,Trabajador en período de prueba,carlos.ramirez@empresa.cl,
-66666666-6,Luis Fernández Vega,Mantención,INDEFINIDO,CENTRAL,VALE,,,+56944555666
-77777777-7,Patricia Morales Bravo,Calidad,PLAZO FIJO,NORTE,CAJA,,,patricia.morales@empresa.cl
-88888888-8,Roberto Díaz Castro,Logística,INDEFINIDO,SUR,VALE:8000,,,+56966777888
-99999999-9,Claudia Núñez Parra,Administración,INDEFINIDO,CENTRAL,MONTO:12000,,claudia.nunez@empresa.cl,+56977888999
-12345678-5,Francisco Soto Reyes,Bodega,OBRA,ORIENTE,N/A,Trabajador externo sin beneficios,,
+11111111-1,Juan Perez Garcia,Operaciones,INDEFINIDO,CENTRAL,CAJA,,juan.perez@empresa.cl,+56912345678
+22222222-2,Maria Lopez Silva,Bodega,PLAZO FIJO,SUR,SIN BENEFICIO,Contrato temporal,,
+33333333-3,Pedro Torres,Ventas,INDEFINIDO,NORTE,VALE:5000,,pedro.torres@empresa.cl,+56987654321
+44444444-4,Ana Gonzalez,Administracion,INDEFINIDO,CENTRAL,MONTO:10000,,ana.gonzalez@empresa.cl,+56911223344
+55555555-5,Carlos Ramirez,Produccion,OBRA,ORIENTE,SIN BENEFICIO,Periodo de prueba,carlos.ramirez@empresa.cl,+56999887766
+66666666-6,Luis Fernandez,Mantencion,INDEFINIDO,CENTRAL,VALE:2000,,+56944555666
+77777777-7,Patricia Morales,Calidad,PLAZO FIJO,NORTE,CAJA,,patricia.morales@empresa.cl,+56933445566
+88888888-8,Roberto Diaz,Logistica,INDEFINIDO,SUR,VALE:8000,,roberto.diaz@empresa.cl,+56966777888
+99999999-9,Claudia Nunez,Administracion,INDEFINIDO,CENTRAL,MONTO:12000,,claudia.nunez@empresa.cl,+56977888999
+12345678-5,Francisco Soto,Bodega,OBRA,ORIENTE,SIN BENEFICIO,Externos,,

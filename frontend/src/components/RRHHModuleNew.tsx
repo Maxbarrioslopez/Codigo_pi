@@ -43,6 +43,7 @@ export function RRHHModuleNew() {
     const [showNominaPreview, setShowNominaPreview] = useState(false);
     const [nominaHistorial, setNominaHistorial] = useState<any[]>([]);
     const [file, setFile] = useState<File | null>(null);
+    const [processedFile, setProcessedFile] = useState<File | null>(null);
 
     // Estado para otros datos
     const [incidencias, setIncidencias] = useState<IncidenciaDTO[]>([]);
@@ -289,10 +290,57 @@ export function RRHHModuleNew() {
             return;
         }
 
+        // Procesar CSV separado por punto y coma (;) en cliente: convertir a comas antes de enviar
+        const processCsvIfSemicolon = (f: File) => new Promise<File>((resolve, reject) => {
+            if (!f.name.toLowerCase().endsWith('.csv')) return resolve(f);
+            const reader = new FileReader();
+            reader.onload = () => {
+                try {
+                    const text = String(reader.result || '');
+                    const firstLine = text.split(/\r?\n/)[0] || '';
+                    if (firstLine.includes(';') && !firstLine.includes(',')) {
+                        // reemplazar ; por , en todo el archivo
+                        const converted = text.replace(/\r\n/g, '\n').replace(/;/g, ',');
+                        // Forzar nombre terminado en .csv y tipo MIME correcto
+                        let baseName = f.name.replace(/\.[^/.]+$/, '');
+                        const forcedName = baseName + '_convertido.csv';
+                        const newFile = new File([converted], forcedName, { type: 'text/csv' });
+                        resolve(newFile);
+                    } else {
+                        resolve(f);
+                    }
+                } catch (e) {
+                    resolve(f);
+                }
+            };
+            reader.onerror = () => resolve(f);
+            reader.readAsText(f, 'utf-8');
+        });
+
         setLoading(true);
         try {
-            // Preview
-            const preview = await nominaService.previewFile(file, ciclo.id);
+            // Preview (procesar CSV con ; si corresponde)
+            const fileToSend = await processCsvIfSemicolon(file);
+            setProcessedFile(fileToSend);
+            const preview = await nominaService.previewFile(fileToSend, ciclo.id);
+            // Validación avanzada de datos
+            if (preview?.errores && Array.isArray(preview.errores)) {
+                preview.errores = preview.errores.map((err: any, idx: number) => {
+                    // Validar RUT
+                    if (err.rut && !validateRut(err.rut)) {
+                        err.mensaje = (err.mensaje || '') + ' | RUT inválido';
+                    }
+                    // Validar email
+                    if (err.email && !/^\S+@\S+\.\S+$/.test(err.email)) {
+                        err.mensaje = (err.mensaje || '') + ' | Email inválido';
+                    }
+                    // Validar teléfono
+                    if (err.telefono && !/^\+?\d{8,15}$/.test(err.telefono)) {
+                        err.mensaje = (err.mensaje || '') + ' | Teléfono inválido';
+                    }
+                    return err;
+                });
+            }
             setNominaPreview(preview);
             setShowNominaPreview(true);
 
@@ -306,15 +354,17 @@ export function RRHHModuleNew() {
     };
 
     const handleConfirmarCargaMasiva = async () => {
-        if (!file || !selectedCicloId) return;
+        const toSend = processedFile || file;
+        if (!toSend || !selectedCicloId) return;
 
         setLoading(true);
         try {
-            await nominaService.confirmarFile(file, selectedCicloId);
+            await nominaService.confirmarFile(toSend, selectedCicloId);
             showSuccess('Nómina cargada', 'Trabajadores agregados correctamente');
             setShowCargaMasiva(false);
             setShowNominaPreview(false);
             setFile(null);
+            setProcessedFile(null);
             setNominaPreview(null);
             loadAllData();
         } catch (error: any) {
@@ -690,6 +740,17 @@ export function RRHHModuleNew() {
                                                         Ciclo: {selectedCicloId}
                                                     </p>
                                                 )}
+                                                {/* Enlaces para descargar plantillas (simple y completa) */}
+                                                <div className="mt-2 flex gap-4">
+                                                    <a href="/plantillas/nomina_simple.csv" download className="inline-flex items-center gap-2 text-sm text-[#017E49] hover:underline">
+                                                        <Download className="w-4 h-4" />
+                                                        Plantilla simple (rut,nombre,contrato)
+                                                    </a>
+                                                    <a href="/plantillas/nomina_ejemplo.csv" download className="inline-flex items-center gap-2 text-sm text-[#6B6B6B] hover:underline">
+                                                        <Download className="w-4 h-4" />
+                                                        Plantilla completa (ejemplo con más campos)
+                                                    </a>
+                                                </div>
                                             </DialogHeader>
                                             <div className="space-y-4">
                                                 <div>
@@ -697,12 +758,15 @@ export function RRHHModuleNew() {
                                                     <Input
                                                         type="file"
                                                         accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
-                                                        onChange={(e) => setFile(e.target.files?.[0] || null)}
+                                                        onChange={(e) => { setFile(e.target.files?.[0] || null); setProcessedFile(null); }}
                                                         className="mt-1"
                                                     />
                                                     <p className="text-xs text-[#6B6B6B] mt-1">
                                                         Formato: RUT, Nombre, Tipo Contrato, Sucursal
                                                     </p>
+                                                    {file && (
+                                                        <div className="text-xs text-[#017E49] mt-2">Archivo cargado: {file.name}</div>
+                                                    )}
                                                 </div>
                                                 <Button
                                                     onClick={handleCargaMasiva}
@@ -761,7 +825,20 @@ export function RRHHModuleNew() {
                                                 Vista Previa - Ciclo {selectedCicloId}
                                             </DialogTitle>
                                         </DialogHeader>
+
                                         <div className="space-y-4">
+                                            {/* Botón para descargar plantilla Excel */}
+                                            <div className="flex flex-col gap-2 mb-2">
+                                                <a
+                                                    href="/plantillas/nomina_ejemplo.csv"
+                                                    download
+                                                    className="w-full bg-[#017E49] hover:bg-[#015A34] text-white text-sm font-medium py-2 rounded text-center"
+                                                >
+                                                    <Download className="inline mr-2 w-4 h-4" />
+                                                    Descargar plantilla Excel
+                                                </a>
+                                            </div>
+
                                             {nominaPreview.resumen && (
                                                 <div className="grid grid-cols-2 gap-3 text-xs bg-[#F8F8F8] rounded-lg p-3">
                                                     <div>
@@ -782,13 +859,59 @@ export function RRHHModuleNew() {
                                                     </div>
                                                 </div>
                                             )}
+
+                                            {nominaPreview?.errores && nominaPreview.errores.length > 0 && (
+                                                <div className="mt-4">
+                                                    <h4 className="text-sm font-semibold text-[#FF9F55] mb-2">Errores detectados:</h4>
+                                                    <table className="w-full text-xs border">
+                                                        <thead className="bg-[#FFF3E0]">
+                                                            <tr>
+                                                                <th>Fila</th>
+                                                                <th>RUT</th>
+                                                                <th>Nombre</th>
+                                                                <th>Email</th>
+                                                                <th>Teléfono</th>
+                                                                <th>Mensaje</th>
+                                                                <th>Editar</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {nominaPreview.errores.map((err: any, idx: number) => (
+                                                                <tr key={idx} className="border-b">
+                                                                    <td>{err.fila || idx + 1}</td>
+                                                                    <td>
+                                                                        <input type="text" defaultValue={err.rut} className="border rounded px-1 w-24 text-xs" onBlur={e => err.rut = e.target.value} />
+                                                                    </td>
+                                                                    <td>
+                                                                        <input type="text" defaultValue={err.nombre} className="border rounded px-1 w-24 text-xs" onBlur={e => err.nombre = e.target.value} />
+                                                                    </td>
+                                                                    <td>
+                                                                        <input type="text" defaultValue={err.email} className="border rounded px-1 w-24 text-xs" onBlur={e => err.email = e.target.value} />
+                                                                    </td>
+                                                                    <td>
+                                                                        <input type="text" defaultValue={err.telefono} className="border rounded px-1 w-20 text-xs" onBlur={e => err.telefono = e.target.value} />
+                                                                    </td>
+                                                                    <td className="text-[#FF9F55]">{err.mensaje}</td>
+                                                                    <td>
+                                                                        <Button size="sm" variant="outline" className="text-xs px-2 py-1" onClick={() => { showSuccess('Fila editada', 'Actualiza la vista previa para validar cambios'); }}>
+                                                                            Guardar
+                                                                        </Button>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                    <div className="mt-2 text-xs text-[#6B6B6B]">Edita los campos y guarda para corregir errores antes de confirmar la carga.</div>
+                                                </div>
+                                            )}
+
                                             <div className="pt-2">
                                                 <Button
                                                     onClick={handleConfirmarCargaMasiva}
                                                     disabled={loading}
                                                     className="w-full bg-[#017E49] hover:bg-[#015A34] text-white text-sm font-medium py-2"
                                                 >
-                                                    {loading ? 'Confirmando...' : 'Confirmar Carga'}
+                                                    {loading ? 'Agregando...' : 'Agregar todos'}
                                                 </Button>
                                             </div>
                                         </div>
@@ -825,12 +948,15 @@ export function RRHHModuleNew() {
                                                 const tieneBeneficio = beneficio.tipo !== 'BLOQUEADO' &&
                                                     beneficio.tipo !== 'SIN_BENEFICIO' &&
                                                     beneficio.activo !== false;
+                                                // Mostrar tipo de contrato desde beneficio_disponible
+                                                const contrato = beneficio.tipo_contrato || t.contrato || beneficio.contrato || '-';
+                                                const sucursal = t.sucursal || beneficio.sucursal || '-';
                                                 return (
                                                     <tr key={t.rut} className="border-b border-[#E0E0E0] hover:bg-[#F8F8F8]">
                                                         <td className="p-2 md:p-3 text-[#333333]">{t.rut}</td>
                                                         <td className="p-2 md:p-3 text-[#333333]">{t.nombre}</td>
-                                                        <td className="p-2 md:p-3 text-[#6B6B6B]">{t.contrato || '-'}</td>
-                                                        <td className="p-2 md:p-3 text-[#6B6B6B]">{t.sucursal || '-'}</td>
+                                                        <td className="p-2 md:p-3 text-[#6B6B6B]">{contrato}</td>
+                                                        <td className="p-2 md:p-3 text-[#6B6B6B]">{sucursal}</td>
                                                         <td className="p-2 md:p-3 text-center">
                                                             <Badge className="text-xs px-2 py-0.5" variant={tieneBeneficio ? 'default' : 'outline'}>
                                                                 {tieneBeneficio ? 'Activo' : 'Inactivo'}
@@ -849,7 +975,7 @@ export function RRHHModuleNew() {
                                                                 ) : (
                                                                     <button
                                                                         onClick={() => handleActivarBeneficio(t.rut!)}
-                                                                        className="text-[#017E49] hover:text-[#015A34] text-xs md:text-sm"
+                                                                        className="text-[#017E49] hover:bg-[#015A34] text-xs md:text-sm"
                                                                         title="Activar beneficio"
                                                                     >
                                                                         <CheckCircle2 className="w-4 h-4" />
@@ -865,45 +991,7 @@ export function RRHHModuleNew() {
                                 </table>
                             </div>
 
-                            {/* Historial de cargas */}
-                            <div className="mt-6 border-t border-[#E0E0E0] pt-4">
-                                <h4 className="text-sm md:text-base font-semibold text-[#333333] mb-3">Historial de Cargas Masivas</h4>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-xs md:text-sm">
-                                        <thead className="bg-[#F8F8F8] border-b border-[#E0E0E0]">
-                                            <tr>
-                                                <th className="text-left p-2 md:p-3">Ciclo</th>
-                                                <th className="text-left p-2 md:p-3">Archivo</th>
-                                                <th className="text-left p-2 md:p-3">Usuario</th>
-                                                <th className="text-left p-2 md:p-3">Registros</th>
-                                                <th className="text-left p-2 md:p-3">Fecha</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {nominaHistorial
-                                                .filter(h => !selectedCicloId || h.ciclo_id === selectedCicloId)
-                                                .map((h: any) => (
-                                                    <tr key={h.id} className="border-b border-[#E0E0E0]">
-                                                        <td className="p-2 md:p-3 text-[#333333]">#{h.ciclo_id}</td>
-                                                        <td className="p-2 md:p-3 text-[#333333] truncate">{h.archivo_nombre}</td>
-                                                        <td className="p-2 md:p-3 text-[#6B6B6B]">{h.usuario?.username || '-'}</td>
-                                                        <td className="p-2 md:p-3 text-[#6B6B6B]">{h.total_registros}</td>
-                                                        <td className="p-2 md:p-3 text-[#6B6B6B]">
-                                                            {new Date(h.fecha_carga).toLocaleString('es-CL')}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            {nominaHistorial.length === 0 && (
-                                                <tr>
-                                                    <td colSpan={5} className="p-3 text-center text-[#6B6B6B]">
-                                                        Sin historial disponible
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
+                            {/* Historial de cargas masivas removido */}
                         </div>
                     </TabsContent>
 

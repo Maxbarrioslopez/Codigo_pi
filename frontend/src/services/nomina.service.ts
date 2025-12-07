@@ -90,18 +90,21 @@ export class NominaService {
      * Envía FormData con archivo y opcionalmente ciclo_id
      */
     async previewFile(file: File, ciclo_id?: number): Promise<any> {
-        try {
-            const form = new FormData();
-            // Backend espera el campo 'archivo'
-            form.append('archivo', file);
-            if (typeof ciclo_id === 'number') form.append('ciclo_id', String(ciclo_id));
-            const { data } = await apiClient.post<any>('/nomina/preview/', form, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-            });
-            return data;
-        } catch (error) {
-            throw ErrorHandler.handle(error, 'NominaService.previewFile', false);
+        const form = new FormData();
+        form.append('archivo', file);
+        if (typeof ciclo_id === 'number') form.append('ciclo_id', String(ciclo_id));
+        const token = localStorage.getItem('access_token');
+        const response = await fetch('http://localhost:8000/api/nomina/preview/', {
+            method: 'POST',
+            body: form,
+            credentials: 'include',
+            headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        });
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw ErrorHandler.handle(errorData, 'NominaService.previewFile', false);
         }
+        return await response.json();
     }
 
     /**
@@ -109,18 +112,21 @@ export class NominaService {
      * Envía FormData con archivo y opcionalmente ciclo_id
      */
     async confirmarFile(file: File, ciclo_id?: number): Promise<any> {
-        try {
-            const form = new FormData();
-            // Backend espera el campo 'archivo'
-            form.append('archivo', file);
-            if (typeof ciclo_id === 'number') form.append('ciclo_id', String(ciclo_id));
-            const { data } = await apiClient.post<any>('/nomina/confirmar/', form, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-            });
-            return data;
-        } catch (error) {
-            throw ErrorHandler.handle(error, 'NominaService.confirmarFile', false);
+        const form = new FormData();
+        form.append('archivo', file);
+        if (typeof ciclo_id === 'number') form.append('ciclo_id', String(ciclo_id));
+        const token = localStorage.getItem('access_token');
+        const response = await fetch('http://localhost:8000/api/nomina/confirmar/', {
+            method: 'POST',
+            body: form,
+            credentials: 'include',
+            headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        });
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw ErrorHandler.handle(errorData, 'NominaService.confirmarFile', false);
         }
+        return await response.json();
     }
 
     /**

@@ -609,42 +609,105 @@ export function CicloBimensualModule() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {beneficios.map((beneficio) => (
-                <div key={beneficio.id} className="bg-white border-2 border-[#E0E0E0] rounded-xl p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <Package className="w-8 h-8 text-[#E12019]" />
-                      <div>
-                        <h3 className="text-[#333333] font-semibold">{beneficio.nombre}</h3>
-                        <Badge className={beneficio.activo ? 'bg-[#017E49]' : 'bg-[#6B6B6B]'}>
-                          {beneficio.activo ? 'Activo' : 'Inactivo'}
-                        </Badge>
+              {beneficios.map((beneficio) => {
+                // Buscar cajas relacionadas a este beneficio
+                const beneficioConCajas = beneficiosConCajas.find(b => b.id === beneficio.id);
+                const totalCajas = beneficioConCajas?.cajas?.length || 0;
+                const cajasActivas = beneficioConCajas?.cajas?.filter((c: any) => c.activo).length || 0;
+
+                return (
+                  <div key={beneficio.id} className="bg-white border-2 border-[#E0E0E0] rounded-xl p-6 hover:border-[#FF9F55] transition-colors">
+                    {/* HEADER CON NOMBRE Y ESTADO */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3 flex-1">
+                        <Package className="w-8 h-8 text-[#E12019] flex-shrink-0" />
+                        <div>
+                          <h3 className="text-[#333333] font-semibold text-base">{beneficio.nombre}</h3>
+                          <Badge className={beneficio.activo ? 'bg-[#017E49]' : 'bg-[#6B6B6B]'}>
+                            {beneficio.activo ? 'Activo' : 'Inactivo'}
+                          </Badge>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <p className="text-[#6B6B6B] text-sm mb-4 min-h-[40px]">
-                    {beneficio.descripcion || 'Sin descripción'}
-                  </p>
+                    {/* DESCRIPCIÓN */}
+                    <p className="text-[#6B6B6B] text-sm mb-4 min-h-[40px]">
+                      {beneficio.descripcion || 'Sin descripción'}
+                    </p>
 
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => handleVerCajasBeneficio(beneficio)}
-                      className="flex-1 bg-[#FF8C00] text-white hover:bg-[#E67E00]"
-                    >
-                      <Package className="w-4 h-4 mr-2" />
-                      Ver Cajas
-                    </Button>
-                    <Button
-                      onClick={() => openEditBeneficio(beneficio)}
-                      className="flex-1 bg-[#E12019] text-white hover:bg-[#B51810]"
-                    >
-                      <Edit2 className="w-4 h-4 mr-2" />
-                      Editar
-                    </Button>
+                    {/* INFORMACIÓN DETALLADA */}
+                    <div className="space-y-3 mb-4 p-4 bg-[#F8F8F8] rounded-lg border border-[#E0E0E0]">
+                      {/* CAJAS INFORMACIÓN */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Package className="w-4 h-4 text-[#FF9F55]" />
+                          <span className="text-xs font-semibold text-[#333333]">Cajas:</span>
+                        </div>
+                        <span className="text-sm font-bold text-[#FF9F55]">
+                          {cajasActivas}/{totalCajas}
+                          <span className="text-xs text-[#6B6B6B] ml-1">activas</span>
+                        </span>
+                      </div>
+
+                      {/* VALIDACIÓN GUARDIA */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {beneficio.requiere_validacion_guardia ? (
+                            <>
+                              <span className="text-[#FF9F55]">🔐</span>
+                              <span className="text-xs font-semibold text-[#333333]">Validación:</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-[#6B6B6B]">•</span>
+                              <span className="text-xs font-semibold text-[#333333]">Validación:</span>
+                            </>
+                          )}
+                        </div>
+                        <Badge className={beneficio.requiere_validacion_guardia 
+                          ? 'bg-[#FFE6CC] text-[#FF9F55] border border-[#FF9F55]' 
+                          : 'bg-[#E6F3EE] text-[#017E49] border border-[#017E49]'
+                        }>
+                          {beneficio.requiere_validacion_guardia ? 'Doble Validación' : 'Sin Validación'}
+                        </Badge>
+                      </div>
+
+                      {/* TIPOS DE CONTRATO */}
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4 text-[#017E49]" />
+                          <span className="text-xs font-semibold text-[#333333]">Aplica a:</span>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-[#6B6B6B]">
+                            {beneficio.tipos_contrato?.length > 0
+                              ? beneficio.tipos_contrato.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(', ')
+                              : 'No especificado'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* BOTONES */}
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => handleVerCajasBeneficio(beneficio)}
+                        className="flex-1 bg-[#FF8C00] text-white hover:bg-[#E67E00]"
+                      >
+                        <Package className="w-4 h-4 mr-2" />
+                        Ver Cajas
+                      </Button>
+                      <Button
+                        onClick={() => openEditBeneficio(beneficio)}
+                        className="flex-1 bg-[#E12019] text-white hover:bg-[#B51810]"
+                      >
+                        <Edit2 className="w-4 h-4 mr-2" />
+                        Editar
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </TabsContent>

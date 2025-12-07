@@ -28,6 +28,7 @@ urlpatterns = [
     
     # Beneficios / trabajador
     path('beneficios/<str:rut>/', views.obtener_beneficio, name='obtener_beneficio'),
+    path('trabajadores-datos/<str:rut>/', views.obtener_datos_trabajador, name='obtener_datos_trabajador'),
 
     # Tickets
     path('tickets/', views.crear_ticket, name='crear_ticket'),

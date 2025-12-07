@@ -34,36 +34,11 @@ export function ScannerBase({
     containerClassName = '',
 }: ScannerBaseProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
-    const canvasRef = useRef<HTMLCanvasElement>(null);
     const [torchOn, setTorchOn] = useState(false);
     const [focusMode, setFocusMode] = useState<'auto' | 'manual'>('auto');
     const [brightness, setBrightness] = useState(100);
     const [contrast, setContrast] = useState(100);
     const streamRef = useRef<MediaStream | null>(null);
-
-    // Aplicar mejoras de foto al canvas (brightness, contrast, etc.)
-    useEffect(() => {
-        const canvas = canvasRef.current;
-        const video = videoRef.current;
-        if (!canvas || !video || !isActive) return;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        const animate = () => {
-            if (!video.paused && !video.ended) {
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-
-                // Aplicar filtros
-                ctx.filter = `brightness(${brightness}%) contrast(${contrast}%)`;
-                ctx.drawImage(video, 0, 0);
-            }
-            requestAnimationFrame(animate);
-        };
-
-        animate();
-    }, [isActive, brightness, contrast]);
 
     // Iniciar acceso a cámara
     useEffect(() => {
@@ -168,82 +143,78 @@ export function ScannerBase({
     }, []);
 
     return (
-        <div className={`relative bg-black rounded-lg overflow-hidden ${containerClassName}`}>
+        <div className={`relative bg-black w-full h-full ${containerClassName}`}>
             {/* Video con mejoras de foto */}
-            <div className="relative w-full aspect-video bg-black">
-                <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="absolute inset-0 w-full h-full object-cover"
-                />
-                <canvas
-                    ref={canvasRef}
-                    className="absolute inset-0 w-full h-full object-cover"
-                    style={{ display: brightness !== 100 || contrast !== 100 ? 'block' : 'none' }}
-                />
+            <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{
+                    filter: `brightness(${brightness}%) contrast(${contrast}%)`
+                }}
+            />
 
-                {/* Guía visual mejorada para carnet chileno */}
-                {showGuide === 'qr' && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="relative bg-black/40 absolute inset-0" />
-                        <div className="relative w-80 h-52 border-4 border-green-400 rounded-xl shadow-2xl z-10"
-                            style={{
-                                boxShadow: '0 0 40px rgba(34, 197, 94, 0.5), inset 0 0 20px rgba(34, 197, 94, 0.1)',
-                                animation: 'pulse 2s ease-in-out infinite'
-                            }}>
-                            <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-green-300" />
-                            <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-green-300" />
-                            <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-green-300" />
-                            <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-green-300" />
-                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-green-300 to-transparent animate-scan" />
-                            <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-2 h-12 bg-green-400/60 rounded" />
-                            <div className="absolute right-0 top-1/2 transform -translate-y-1/2 w-2 h-12 bg-green-400/60 rounded" />
-                            <div className="absolute -bottom-16 left-0 right-0 text-center">
-                                <p className="text-white text-sm font-semibold">Coloca el carnet dentro del cuadro</p>
-                                <p className="text-green-300 text-xs mt-1">Asegúrate que el QR esté visible</p>
-                            </div>
+            {/* Guía visual mejorada para carnet chileno */}
+            {showGuide === 'qr' && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="absolute inset-0 bg-black/40" />
+                    <div className="relative w-80 h-52 border-4 border-green-400 rounded-xl shadow-2xl z-10"
+                        style={{
+                            boxShadow: '0 0 40px rgba(34, 197, 94, 0.5), inset 0 0 20px rgba(34, 197, 94, 0.1)',
+                            animation: 'pulse 2s ease-in-out infinite'
+                        }}>
+                        <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-green-300" />
+                        <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-green-300" />
+                        <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-green-300" />
+                        <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-green-300" />
+                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-green-300 to-transparent animate-scan" />
+                        <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-2 h-12 bg-green-400/60 rounded" />
+                        <div className="absolute right-0 top-1/2 transform -translate-y-1/2 w-2 h-12 bg-green-400/60 rounded" />
+                        <div className="absolute -bottom-16 left-0 right-0 text-center">
+                            <p className="text-white text-sm font-semibold">Coloca el carnet dentro del cuadro</p>
+                            <p className="text-green-300 text-xs mt-1">Asegúrate que el QR esté visible</p>
                         </div>
                     </div>
-                )}
+                </div>
+            )}
 
-                {showGuide === 'code128' && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <svg className="w-64 h-20 text-green-400/30" viewBox="0 0 300 50">
-                            <line x1="0" y1="10" x2="300" y2="10" stroke="currentColor" strokeWidth="1" opacity="0.5" />
-                            {Array.from({ length: 15 }).map((_, i) => (
-                                <line
-                                    key={i}
-                                    x1={i * 20 + 10}
-                                    y1="5"
-                                    x2={i * 20 + 10}
-                                    y2="35"
-                                    stroke="currentColor"
-                                    strokeWidth={Math.random() > 0.5 ? 3 : 1}
-                                    opacity="0.5"
-                                />
-                            ))}
-                            <line x1="0" y1="40" x2="300" y2="40" stroke="currentColor" strokeWidth="1" opacity="0.5" />
-                        </svg>
-                    </div>
-                )}
+            {showGuide === 'code128' && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <svg className="w-64 h-20 text-green-400/30" viewBox="0 0 300 50">
+                        <line x1="0" y1="10" x2="300" y2="10" stroke="currentColor" strokeWidth="1" opacity="0.5" />
+                        {Array.from({ length: 15 }).map((_, i) => (
+                            <line
+                                key={i}
+                                x1={i * 20 + 10}
+                                y1="5"
+                                x2={i * 20 + 10}
+                                y2="35"
+                                stroke="currentColor"
+                                strokeWidth={Math.random() > 0.5 ? 3 : 1}
+                                opacity="0.5"
+                            />
+                        ))}
+                        <line x1="0" y1="40" x2="300" y2="40" stroke="currentColor" strokeWidth="1" opacity="0.5" />
+                    </svg>
+                </div>
+            )}
 
-                {/* Indicador de escaneo activo */}
-                {isActive && (
-                    <div className="absolute top-4 right-4 flex items-center gap-2">
-                        <div className="flex h-2 w-2 items-center justify-center">
-                            <div className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-green-400 opacity-75"></div>
-                            <div className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></div>
-                        </div>
-                        <span className="text-xs text-green-400">Escaneando</span>
+            {/* Indicador de escaneo activo */}
+            {isActive && (
+                <div className="absolute top-4 right-4 flex items-center gap-2 z-20">
+                    <div className="flex h-2 w-2 items-center justify-center">
+                        <div className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-green-400 opacity-75" />
+                        <div className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
                     </div>
-                )}
-            </div>
+                    <span className="text-xs text-green-400">Escaneando</span>
+                </div>
+            )}
 
             {/* Controles */}
             {allowControls && (
-                <div className="absolute bottom-4 left-0 right-0 flex items-center justify-center gap-2 px-4">
+                <div className="absolute bottom-4 left-0 right-0 flex items-center justify-center gap-2 px-4 z-20 pointer-events-auto">
                     <Button
                         size="sm"
                         variant="ghost"
@@ -291,20 +262,21 @@ export function ScannerBase({
                     </div>
                 </div>
             )}
+
             <style>{`
-        @keyframes scan {
-          0% { top: 0; opacity: 1; }
-          50% { top: 100%; opacity: 0.8; }
-          100% { top: 0; opacity: 1; }
-        }
-        .animate-scan {
-          animation: scan 1.5s ease-in-out infinite;
-        }
-        @keyframes pulse {
-          0%, 100% { box-shadow: 0 0 40px rgba(34, 197, 94, 0.5), inset 0 0 20px rgba(34, 197, 94, 0.1); }
-          50% { box-shadow: 0 0 60px rgba(34, 197, 94, 0.8), inset 0 0 30px rgba(34, 197, 94, 0.2); }
-        }
-      `}</style>
+                @keyframes scan {
+                  0% { top: 0; opacity: 1; }
+                  50% { top: 100%; opacity: 0.8; }
+                  100% { top: 0; opacity: 1; }
+                }
+                .animate-scan {
+                  animation: scan 1.5s ease-in-out infinite;
+                }
+                @keyframes pulse {
+                  0%, 100% { box-shadow: 0 0 40px rgba(34, 197, 94, 0.5), inset 0 0 20px rgba(34, 197, 94, 0.1); }
+                  50% { box-shadow: 0 0 60px rgba(34, 197, 94, 0.8), inset 0 0 30px rgba(34, 197, 94, 0.2); }
+                }
+            `}</style>
         </div>
     );
 }

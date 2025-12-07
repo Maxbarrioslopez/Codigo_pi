@@ -130,6 +130,63 @@ def obtener_beneficio(request, rut):
         return Response({'detail': 'Error interno del servidor'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@api_view(['GET'])
+@permission_classes([AllowTotem])
+@ratelimit(key='ip', rate='30/m', method='GET')
+def obtener_datos_trabajador(request, rut):
+    """
+    Obtiene datos básicos del trabajador (nombre, RUT) para verificación rápida.
+    
+    ENDPOINT: GET /api/trabajadores-datos/{rut}/
+    PERMISOS: Público (tótem sin autenticación)
+    
+    RESPUESTA EXITOSA (200):
+        {
+            "existe": true,
+            "rut": "12345678-9",
+            "nombre": "Juan Pérez Rodríguez"
+        }
+    
+    RESPUESTA SI NO EXISTE (200):
+        {
+            "existe": false,
+            "rut": "12345678-9",
+            "nombre": null
+        }
+    """
+    try:
+        rut_c = clean_rut(rut)
+        if not valid_rut(rut_c):
+            return Response({
+                'existe': False,
+                'rut': rut_c,
+                'nombre': None,
+                'error': 'RUT inválido'
+            }, status=status.HTTP_200_OK)
+        
+        try:
+            trabajador = Trabajador.objects.get(rut__iexact=rut_c)
+            return Response({
+                'existe': True,
+                'rut': trabajador.rut,
+                'nombre': trabajador.nombre
+            }, status=status.HTTP_200_OK)
+        except Trabajador.DoesNotExist:
+            return Response({
+                'existe': False,
+                'rut': rut_c,
+                'nombre': None
+            }, status=status.HTTP_200_OK)
+    except Exception as e:
+        logger.error(f"Error en obtener_datos_trabajador: {e}")
+        return Response({
+            'existe': False,
+            'rut': rut,
+            'nombre': None,
+            'error': 'Error interno del servidor'
+        }, status=status.HTTP_200_OK)
+
+
 @api_view(['POST'])
 @permission_classes([AllowTotem])
 @ratelimit(key='ip', rate='10/m', method='POST')

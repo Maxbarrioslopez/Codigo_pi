@@ -1,10 +1,8 @@
 import React from 'react';
-import { BarcodeFormat } from '@zxing/library';
-import { useScanner } from '@/hooks/useScanner';
-import { parseChileanIDFromPdf417 } from '@/utils/parseChileanID';
 import { formatRutOnType, validateRut, cleanRut, formatRut } from '@/utils/rut';
 import { trabajadorService } from '@/services/trabajador.service';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
+import TotemScannerPanel from '@/components/TotemScannerPanel';
 
 type Props = {
     onRutDetected: (rut: string) => void;
@@ -14,36 +12,44 @@ type Props = {
 };
 
 export default function TotemInitialScreen({ onRutDetected, onManualRut, onConsultIncident, onReportIncident }: Props) {
-    const videoRef = React.useRef<HTMLVideoElement | null>(null);
     const [rutInput, setRutInput] = React.useState('');
+    const [trabajadorNombre, setTrabajadorNombre] = React.useState<string | null>(null);
     const [beneficioStatus, setBeneficioStatus] = React.useState<{
         loading: boolean;
         error: string | null;
         data: any | null;
     }>({ loading: false, error: null, data: null });
 
-    const scanner = useScanner({
-        formats: [BarcodeFormat.PDF_417],
-        onResult: (text) => {
-            const parsed = parseChileanIDFromPdf417(text);
-            if (parsed?.rut) onRutDetected(parsed.rut);
-        },
-        onError: (err) => {
-            console.error('Scanner error', err);
-        },
-    });
-
-    React.useEffect(() => {
-        if (videoRef.current) {
-            scanner.start(videoRef.current).catch(console.error);
-        }
-        return () => scanner.stop();
-    }, []);
-
     const handleRutInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const formatted = formatRutOnType(e.target.value);
         setRutInput(formatted);
         setBeneficioStatus({ loading: false, error: null, data: null });
+        
+        // Buscar nombre si el RUT es válido
+        if (formatted && validateRut(formatted)) {
+            obtenerDatosTrabajador(formatted);
+        } else {
+            setTrabajadorNombre(null);
+        }
+    };
+
+    // Obtener datos básicos del trabajador (nombre)
+    const obtenerDatosTrabajador = async (rut: string) => {
+        try {
+            const response = await fetch(`/api/trabajadores-datos/${rut}/`);
+            const data = await response.json();
+            if (data.existe) {
+                setTrabajadorNombre(data.nombre);
+                return data.nombre;
+            } else {
+                setTrabajadorNombre(null);
+                return null;
+            }
+        } catch (error) {
+            console.error('Error obteniendo datos del trabajador:', error);
+            setTrabajadorNombre(null);
+            return null;
+        }
     };
 
     const handleVerifyBenefit = async () => {
@@ -107,8 +113,35 @@ export default function TotemInitialScreen({ onRutDetected, onManualRut, onConsu
     return (
         <div className="flex flex-col items-center gap-4 p-4">
             <h2 className="text-2xl font-semibold">Escanea tu cédula o ingresa tu RUT</h2>
-            <div className="w-full max-w-lg aspect-video bg-black rounded-md overflow-hidden">
-                <video ref={videoRef} className="w-full h-full" muted playsInline />
+
+            {/* Escáner mejorado con cuadro de enfoque */}
+            <div className="w-full max-w-lg bg-black rounded-md overflow-hidden border-2 border-gray-300" style={{ minHeight: '300px' }}>
+                <TotemScannerPanel
+                    onRutDetected={async (rut) => {
+                        const formatted = formatRut(rut);
+                        setRutInput(formatted);
+                        
+                        // Buscar nombre del trabajador
+                        await obtenerDatosTrabajador(rut);
+                        
+                        onRutDetected(rut);
+                    }}
+                    }}
+                    onError={(msg) => {
+                        setBeneficioStatus({
+                            loading: false,
+                            error: msg,
+                            data: null,
+                        });
+                    }}
+                />
+            </div>
+
+            {/* Separador visual */}
+            <div className="w-full max-w-lg flex items-center gap-2">
+                <div className="flex-1 border-t border-gray-300"></div>
+                <span className="text-gray-500 text-sm">O ingresa manualmente</span>
+                <div className="flex-1 border-t border-gray-300"></div>
             </div>
 
             {/* RUT Input Section */}
@@ -121,6 +154,19 @@ export default function TotemInitialScreen({ onRutDetected, onManualRut, onConsu
                     maxLength={12}
                 />
             </div>
+
+            {/* Trabajador encontrado */}
+            {trabajadorNombre && (
+                <div className="w-full max-w-lg bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-2">
+                    <CheckCircle2 className="text-blue-600 flex-shrink-0" size={20} />
+                    <div>
+                        <p className="text-sm text-blue-600">
+                            <strong>Persona encontrada:</strong>
+                        </p>
+                        <p className="text-blue-900 font-semibold">{trabajadorNombre}</p>
+                    </div>
+                </div>
+            )}
 
             {/* Benefit Verification Button */}
             <div className="w-full max-w-lg">

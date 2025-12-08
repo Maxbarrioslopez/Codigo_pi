@@ -17,7 +17,21 @@ export interface TicketDTO {
 }
 export interface CicloDTO { id: number; fecha_inicio: string; fecha_fin: string; activo: boolean; dias_restantes: number; }
 export interface AgendamientoDTO { id: number; trabajador: number; ciclo: number; fecha_retiro: string; estado: string; created_at: string; }
-export interface IncidenciaDTO { id: number; codigo: string; trabajador: number | null; tipo: string; descripcion: string; estado: string; creada_por: string; created_at: string; resolved_at: string | null; metadata: any; }
+export interface IncidenciaDTO {
+    id: number;
+    codigo: string;
+    trabajador: number | null;
+    trabajador_rut?: string | null;
+    trabajador_nombre?: string | null;
+    tipo: string;
+    descripcion: string;
+    estado: string;
+    creada_por: string;
+    created_at: string;
+    resolved_at: string | null;
+    resolucion?: string | null;
+    metadata: any;
+}
 export interface ParametroOperativoDTO { id: number; clave: string; valor: string; descripcion: string; updated_at: string; }
 export interface BeneficioResponse { beneficio: TrabajadorDTO; }
 export interface MetricasGuardiaDTO { entregados: number; pendientes: number; incidencias_pendientes: number; }

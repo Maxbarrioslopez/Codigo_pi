@@ -85,12 +85,15 @@ export interface IncidenciaDTO {
     id: number;
     codigo: string;
     trabajador: number | null;
+    trabajador_rut?: string | null;
+    trabajador_nombre?: string | null;
     tipo: string;
     descripcion: string;
     estado: 'pendiente' | 'en_proceso' | 'resuelta';
     creada_por: string;
     created_at: string;
     resolved_at: string | null;
+    resolucion?: string | null;
     metadata: any;
 }
 

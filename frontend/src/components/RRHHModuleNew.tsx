@@ -6,7 +6,8 @@ import { nominaService, NominaPreviewResponse } from '../services/nomina.service
 import { showError, showSuccess } from '../utils/toast';
 import { validateRut, formatRutOnType, formatRut } from '../utils/rut';
 import { stockService } from '../services/stock.service';
-import { listarIncidencias, reportesRetirosPorDia, TicketDTO, IncidenciaDTO, RetirosDiaDTO } from '../services/api';
+import { reportesRetirosPorDia, TicketDTO, IncidenciaDTO, RetirosDiaDTO } from '../services/api';
+import { incidentService } from '../services/incident.service';
 import { useCicloActivo } from '../hooks/useCicloActivo';
 import { TrabajadorDTO, CicloDTO } from '../types';
 import { Input } from './ui/input';
@@ -18,7 +19,7 @@ import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { CicloBimensualModule } from './CicloBimensualModule';
 
-type RRHHTab = 'dashboard' | 'nomina' | 'ciclos' | 'trazabilidad' | 'reportes';
+type RRHHTab = 'dashboard' | 'nomina' | 'ciclos' | 'incidentes' | 'reportes';
 
 export function RRHHModuleNew() {
     const [currentTab, setCurrentTab] = useState<RRHHTab>('dashboard');
@@ -47,6 +48,7 @@ export function RRHHModuleNew() {
 
     // Estado para otros datos
     const [incidencias, setIncidencias] = useState<IncidenciaDTO[]>([]);
+    const [resolviendoIncidencia, setResolviendoIncidencia] = useState<string | null>(null);
     const [tickets, setTickets] = useState<TicketDTO[]>([]);
     const [retirosDia, setRetirosDia] = useState<RetirosDiaDTO[]>([]);
 
@@ -68,19 +70,53 @@ export function RRHHModuleNew() {
             const [trab, cicl, inc, ret, hist] = await Promise.all([
                 trabajadorService.getAll().catch(() => []),
                 cicloService.getAll().catch(() => []),
-                listarIncidencias().catch(() => []),
+                incidentService.listarIncidencias().catch(() => []),
                 reportesRetirosPorDia(7).catch(() => []),
                 nominaService.getHistorial().catch(() => []),
             ]);
             setTrabajadores(trab);
             setCiclos(cicl);
-            setIncidencias(inc);
+            setIncidencias(Array.isArray(inc) ? inc : []);
             setRetirosDia(ret);
             setNominaHistorial(hist);
         } catch (error) {
             console.error('Error loading RRHH data:', error);
+            showError('No se pudieron cargar todos los datos');
         } finally {
             setLoading(false);
+        }
+    }
+
+    async function reloadIncidencias() {
+        try {
+            const inc = await incidentService.listarIncidencias().catch(() => []);
+            setIncidencias(Array.isArray(inc) ? inc : []);
+        } catch (error) {
+            console.error('Error reloading incidencias:', error);
+            showError('No se pudieron recargar las incidencias');
+        }
+    }
+
+    async function handleResponderIncidencia(inc: IncidenciaDTO) {
+        const codigo = inc.codigo || String(inc.id);
+        if (!codigo) {
+            showError('Código de incidencia no disponible');
+            return;
+        }
+
+        const resolucion = window.prompt('Escribe la respuesta para esta incidencia');
+        if (!resolucion || !resolucion.trim()) return;
+
+        try {
+            setResolviendoIncidencia(codigo);
+            await incidentService.resolverIncidencia(codigo, resolucion.trim());
+            showSuccess('Incidencia respondida', `Se envió la respuesta a ${codigo}`);
+            await reloadIncidencias();
+        } catch (error) {
+            console.error('Error al responder incidencia:', error);
+            showError('No se pudo responder la incidencia');
+        } finally {
+            setResolviendoIncidencia(null);
         }
     }
 
@@ -468,10 +504,10 @@ export function RRHHModuleNew() {
                                 <span>Ciclos</span>
                             </span>
                         </TabsTrigger>
-                        <TabsTrigger value="trazabilidad" className="text-xs md:text-sm">
+                        <TabsTrigger value="incidentes" className="text-xs md:text-sm">
                             <span className="inline-flex items-center gap-2">
                                 <QrCode className="w-3 h-3 md:w-4 md:h-4" />
-                                <span>Trazabilidad</span>
+                                <span>Incidentes</span>
                             </span>
                         </TabsTrigger>
                         <TabsTrigger value="reportes" className="text-xs md:text-sm">
@@ -986,37 +1022,57 @@ export function RRHHModuleNew() {
                         <CicloBimensualModule />
                     </TabsContent>
 
-                    {/* TRAZABILIDAD TAB */}
-                    <TabsContent value="trazabilidad" className="space-y-4">
+                    {/* INCIDENTES TAB */}
+                    <TabsContent value="incidentes" className="space-y-4">
                         <div className="bg-white rounded-lg border border-[#E0E0E0] p-3 md:p-6">
                             <div className="mb-3">
-                                <h3 className="text-[#333333] text-sm md:text-base font-semibold">Trazabilidad</h3>
-                                <p className="text-[#6B6B6B] text-xs">Consulta incidencias y eventos relacionados con retiros y agendamientos</p>
+                                <h3 className="text-[#333333] text-sm md:text-base font-semibold">Incidentes</h3>
+                                <p className="text-[#6B6B6B] text-xs">Listado de reportes con opción de responder</p>
                             </div>
-                            <h3 className="text-sm md:text-base font-semibold text-[#333333] mb-4">Incidencias Registradas</h3>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-xs md:text-sm">
                                     <thead className="bg-[#F8F8F8] border-b border-[#E0E0E0]">
                                         <tr>
                                             <th className="text-left p-2 md:p-3">Tipo</th>
-                                            <th className="text-left p-2 md:p-3">RUT</th>
+                                            <th className="text-left p-2 md:p-3">RUT reclamante</th>
                                             <th className="text-left p-2 md:p-3">Descripción</th>
+                                            <th className="text-left p-2 md:p-3">Respuesta</th>
                                             <th className="text-center p-2 md:p-3">Estado</th>
+                                            <th className="text-center p-2 md:p-3">Acción</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {incidencias.slice(0, 10).map((inc) => (
-                                            <tr key={inc.id} className="border-b border-[#E0E0E0]">
-                                                <td className="p-2 md:p-3">{inc.tipo}</td>
-                                                <td className="p-2 md:p-3">{inc.trabajador || 'N/A'}</td>
-                                                <td className="p-2 md:p-3 text-[#6B6B6B] truncate">{inc.descripcion}</td>
-                                                <td className="p-2 md:p-3 text-center">
-                                                    <Badge className="text-xs px-2 py-0.5" variant={inc.estado === 'resuelto' ? 'outline' : 'destructive'}>
-                                                        {inc.estado}
-                                                    </Badge>
-                                                </td>
-                                            </tr>
-                                        ))}
+                                        {incidencias.slice(0, 10).map((inc) => {
+                                            const rutReclamante = (inc as any).trabajador_rut
+                                                || (inc as any).trabajador?.rut
+                                                || (typeof inc.trabajador === 'string' ? inc.trabajador : undefined)
+                                                || (typeof inc.trabajador === 'number' ? inc.trabajador : undefined)
+                                                || 'N/A';
+                                            const respuesta = inc.resolucion || (inc as any)?.metadata?.resolucion || 'Pendiente';
+
+                                            return (
+                                                <tr key={inc.id || inc.codigo} className="border-b border-[#E0E0E0]">
+                                                    <td className="p-2 md:p-3">{inc.tipo || 'N/A'}</td>
+                                                    <td className="p-2 md:p-3">{rutReclamante}</td>
+                                                    <td className="p-2 md:p-3 text-[#6B6B6B] truncate" title={inc.descripcion}>{inc.descripcion || 'Sin descripción'}</td>
+                                                    <td className="p-2 md:p-3 text-[#6B6B6B] truncate" title={respuesta}>{respuesta}</td>
+                                                    <td className="p-2 md:p-3 text-center">
+                                                        <Badge className="text-xs px-2 py-0.5" variant={inc.estado === 'resuelta' ? 'outline' : 'destructive'}>
+                                                            {inc.estado || 'pendiente'}
+                                                        </Badge>
+                                                    </td>
+                                                    <td className="p-2 md:p-3 text-center">
+                                                        <button
+                                                            className="px-3 py-1 rounded bg-[#017E49] text-white text-xs hover:bg-[#015F3A] transition-colors disabled:opacity-50"
+                                                            onClick={() => handleResponderIncidencia(inc)}
+                                                            disabled={resolviendoIncidencia === (inc.codigo || String(inc.id))}
+                                                        >
+                                                            {resolviendoIncidencia === (inc.codigo || String(inc.id)) ? 'Enviando...' : 'Responder'}
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>

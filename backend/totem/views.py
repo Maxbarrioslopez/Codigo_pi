@@ -10,7 +10,8 @@ from rest_framework import status
 from django_ratelimit.decorators import ratelimit
 from .models import (
     # Modelos núcleo (mantener aquí en módulo totem)
-    Trabajador, Ticket, TicketEvent, Ciclo, Agendamiento, Incidencia, Sucursal, CajaFisica, ParametroOperativo
+    Trabajador, Ticket, TicketEvent, Ciclo, Agendamiento, Incidencia, Sucursal, CajaFisica, ParametroOperativo,
+    BeneficioTrabajador
 )
 from .serializers import (
     TrabajadorSerializer, TicketSerializer, CicloSerializer, AgendamientoSerializer,
@@ -100,6 +101,40 @@ def obtener_beneficio(request, rut):
         ciclo_id = request.query_params.get('ciclo_id')
         
         result = TrabajadorSerializer(trabajador).data
+
+        # Enriquecer beneficio con código para validación de guardia (si aplica)
+        beneficio_data = result.get('beneficio_disponible') or {}
+        
+        # Intentar buscar BeneficioTrabajador asociado (si existe)
+        ciclo_id_beneficio = beneficio_data.get('ciclo_id') if beneficio_data else None
+        
+        beneficio_qs = BeneficioTrabajador.objects.filter(trabajador=trabajador)
+        if ciclo_id_beneficio:
+            beneficio_qs = beneficio_qs.filter(ciclo_id=ciclo_id_beneficio)
+        else:
+            ciclo_activo = Ciclo.objects.filter(activo=True).first()
+            if ciclo_activo:
+                beneficio_qs = beneficio_qs.filter(ciclo=ciclo_activo)
+        
+        beneficio_trabajador = beneficio_qs.order_by('-created_at').first()
+        
+        # Si hay BeneficioTrabajador, usar sus datos
+        if beneficio_trabajador and beneficio_data and beneficio_data.get('tipo') not in ['SIN_BENEFICIO', 'BLOQUEADO']:
+            beneficio_data['requiere_validacion_guardia'] = beneficio_trabajador.tipo_beneficio.requiere_validacion_guardia
+            
+            if beneficio_trabajador.tipo_beneficio.requiere_validacion_guardia:
+                beneficio_data['codigo_guardia'] = beneficio_trabajador.codigo_verificacion
+                beneficio_data['codigo_verificacion'] = beneficio_trabajador.codigo_verificacion
+            
+            result['beneficio_disponible'] = beneficio_data
+        # Si no hay BeneficioTrabajador pero hay beneficio, generar código simple
+        elif beneficio_data and beneficio_data.get('tipo') not in ['SIN_BENEFICIO', 'BLOQUEADO']:
+            # Generar código simple basado en RUT + timestamp
+            codigo_simple = f"BEN-{rut_c}-{timezone.now().strftime('%Y%m%d')}"
+            beneficio_data['requiere_validacion_guardia'] = True  # Asumir que requiere validación
+            beneficio_data['codigo_guardia'] = codigo_simple
+            beneficio_data['codigo_verificacion'] = codigo_simple
+            result['beneficio_disponible'] = beneficio_data
         
         # Si se especifica ciclo_id, filtrar el beneficio para ese ciclo
         if ciclo_id:

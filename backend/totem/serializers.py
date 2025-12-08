@@ -128,13 +128,36 @@ class AgendamientoSerializer(serializers.ModelSerializer):
 
 
 class IncidenciaSerializer(serializers.ModelSerializer):
+    trabajador_rut = serializers.SerializerMethodField()
+    trabajador_nombre = serializers.SerializerMethodField()
+    resolucion = serializers.SerializerMethodField()
+
     class Meta:
         model = Incidencia
         fields = [
-            'id', 'codigo', 'trabajador', 'tipo', 'descripcion', 'estado',
-            'creada_por', 'created_at', 'resolved_at', 'metadata'
+            'id', 'codigo', 'trabajador', 'trabajador_rut', 'trabajador_nombre',
+            'tipo', 'descripcion', 'estado', 'creada_por', 'created_at', 'resolved_at', 'metadata',
+            'resolucion'
         ]
         read_only_fields = ['created_at', 'resolved_at']
+
+    def get_trabajador_rut(self, obj):
+        try:
+            return obj.trabajador.rut if obj.trabajador else None
+        except Exception:
+            return None
+
+    def get_trabajador_nombre(self, obj):
+        try:
+            return obj.trabajador.nombre if obj.trabajador else None
+        except Exception:
+            return None
+
+    def get_resolucion(self, obj):
+        try:
+            return obj.metadata.get('resolucion') if obj.metadata else None
+        except Exception:
+            return None
 
 
 class TicketEventSerializer(serializers.ModelSerializer):

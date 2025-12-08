@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Scan, CheckCircle2, XCircle, FileText, AlertCircle, ArrowLeft, Printer, AlertTriangle, Calendar, ChevronLeft, ChevronRight, Info, Search, Camera, X } from 'lucide-react';
+import { Scan, CheckCircle2, XCircle, FileText, AlertCircle, ArrowLeft, Printer, AlertTriangle, Calendar, ChevronLeft, ChevronRight, Info, Search, Camera, X, Star } from 'lucide-react';
 import { trabajadorService } from '@/services/trabajador.service';
 import { ticketService } from '@/services/ticket.service';
 import { incidentService } from '@/services/incident.service';
@@ -16,8 +16,9 @@ import TotemValidatingScreen from '@/components/totem/TotemValidatingScreen';
 import TotemSuccessScreen from '@/components/totem/TotemSuccessScreen';
 import TotemNoStockScreen from '@/components/totem/TotemNoStockScreen';
 import TotemIncidentForm from '@/components/totem/TotemIncidentForm';
+import { TotemCheckIncidents } from '@/components/TotemCheckIncidents';
 
-type TotemScreen = 'initial' | 'benefit' | 'validating' | 'success' | 'success-choice' | 'no-stock' | 'schedule-select' | 'schedule-confirm' | 'no-benefit' | 'error' | 'incident-form' | 'incident-sent' | 'incident-scan' | 'incident-status';
+type TotemScreen = 'initial' | 'benefit' | 'validating' | 'success' | 'success-choice' | 'no-stock' | 'schedule-select' | 'schedule-confirm' | 'no-benefit' | 'error' | 'incident-form' | 'incident-sent' | 'check-incidents';
 
 export function TotemModule() {
   const [currentScreen, setCurrentScreen] = useState<TotemScreen>('initial');
@@ -159,13 +160,20 @@ export function TotemModule() {
       {DEV_MODE && (
         <div className="flex flex-wrap gap-2 p-4 bg-[#F8F8F8] border rounded-xl">
           <p className="text-xs text-[#6B6B6B] w-full">Modo desarrollador: navegación manual</p>
-          {['initial', 'validating', 'success-choice', 'success', 'no-stock', 'schedule-select', 'schedule-confirm', 'no-benefit', 'error', 'incident-scan', 'incident-status', 'incident-form', 'incident-sent'].map(s => (
+          {['initial', 'validating', 'success-choice', 'success', 'no-stock', 'schedule-select', 'schedule-confirm', 'no-benefit', 'error', 'incident-form', 'incident-sent', 'check-incidents'].map(s => (
             <button key={s} onClick={() => setCurrentScreen(s as TotemScreen)} className={`text-xs px-2 py-1 rounded border ${currentScreen === s ? 'bg-[#E12019] text-white border-[#E12019]' : 'bg-white text-[#333333] hover:bg-[#F0F0F0]'}`}>{s}</button>
           ))}
         </div>
       )}
       <div className="bg-[#333333] p-4 md:p-8 rounded-xl overflow-x-hidden">
-        <div className="max-w-2xl mx-auto bg-[#F8F8F8] rounded-xl shadow-2xl overflow-hidden min-h-[600px] md:min-h-[800px]" style={{ aspectRatio: '9/16' }}>
+        <div className="relative max-w-2xl mx-auto bg-[#F8F8F8] rounded-xl shadow-2xl overflow-hidden min-h-[600px] md:min-h-[800px]" style={{ aspectRatio: '9/16' }}>
+          <button
+            onClick={() => { window.location.href = '/login'; }}
+            className="absolute top-3 left-3 p-3 rounded-full bg-white text-[#E12019] shadow-lg border border-[#E0E0E0] hover:bg-[#FFF5F5] transition-colors"
+            aria-label="Ir a login"
+          >
+            <Star className="w-5 h-5" />
+          </button>
           {currentScreen === 'initial' && (
             <TotemInitialScreen
               onRutDetected={(rut) => {
@@ -173,6 +181,7 @@ export function TotemModule() {
                 setRutEscaneado(rut);
                 setCurrentScreen('validating');
               }}
+              onCheckIncidents={() => setCurrentScreen('check-incidents')}
             />
           )}
           {currentScreen === 'validating' && (
@@ -184,7 +193,6 @@ export function TotemModule() {
               nombre={beneficio.nombre || 'Trabajador'}
               beneficio={beneficio.beneficio_disponible}
               onReportIncident={() => setCurrentScreen('incident-form')}
-              onConsultIncident={() => setCurrentScreen('incident-scan')}
               onBack={() => setCurrentScreen('initial')}
             />
           )}
@@ -225,15 +233,6 @@ export function TotemModule() {
           )}
           {currentScreen === 'no-benefit' && <TotemNoBenefitScreen onBack={() => setCurrentScreen('initial')} />}
           {currentScreen === 'error' && <TotemErrorScreen onReportIncident={() => setCurrentScreen('incident-form')} onRetry={() => setCurrentScreen('initial')} />}
-          {currentScreen === 'incident-scan' && (
-            <TotemIncidentScan
-              onScan={() => setCurrentScreen('incident-status')}
-              onBack={() => setCurrentScreen('initial')}
-            />
-          )}
-          {currentScreen === 'incident-status' && (
-            <TotemIncidentStatus onBack={() => setCurrentScreen('initial')} />
-          )}
           {currentScreen === 'incident-form' && (
             <TotemIncidentForm
               onSubmit={(tipo, desc) => {
@@ -244,6 +243,11 @@ export function TotemModule() {
             />
           )}
           {currentScreen === 'incident-sent' && <TotemIncidentSent onBack={() => setCurrentScreen('initial')} />}
+          {currentScreen === 'check-incidents' && (
+            <TotemCheckIncidents
+              onBack={() => setCurrentScreen('initial')}
+            />
+          )}
         </div>
       </div>
     </div>
@@ -322,17 +326,19 @@ function LocalTotemInitialScreen({ onScan, onConsultIncident, onReportIncident, 
         </p>
 
         {/* Camera View + RUT Input */}
-        <div className="bg-white border-4 border-dashed border-[#E12019] rounded-xl p-2 md:p-4 mb-4 md:mb-6 w-full max-w-lg md:max-w-2xl relative">
-          <div className="flex flex-col items-center w-full">
+        <div className="bg-white border-4 border-dashed border-[#E12019] rounded-xl p-2 md:p-4 mb-4 md:mb-6 w-full max-w-lg md:max-w-2xl relative" style={{ minHeight: '400px' }}>
+          <div className="flex flex-col items-center w-full h-full">
             {cameraActive ? (
-              <div className="relative w-full mb-4">
-                <TotemScannerPanel
-                  onRutDetected={(rut: string) => {
-                    onRutChange(rut);
-                    setTimeout(() => onScan(rut), 100);
-                  }}
-                  onError={(msg: string) => setCameraError(msg)}
-                />
+              <div className="relative w-full flex-1 flex items-center justify-center">
+                <div className="w-full h-full">
+                  <TotemScannerPanel
+                    onRutDetected={(rut: string) => {
+                      onRutChange(rut);
+                      setTimeout(() => onScan(rut), 100);
+                    }}
+                    onError={(msg: string) => setCameraError(msg)}
+                  />
+                </div>
                 <button
                   onClick={toggleCamera}
                   className="absolute top-2 right-2 p-2 bg-[#E12019] text-white rounded-full hover:bg-[#B51810] transition-colors shadow-lg z-10"
@@ -1176,116 +1182,3 @@ function TotemIncidentScan({ onScan, onBack }: { onScan: () => void; onBack: () 
   );
 }
 
-function TotemIncidentStatus({ onBack }: { onBack: () => void }) {
-  return (
-    <div className="h-full flex flex-col p-12 overflow-y-auto">
-      {/* Back Button */}
-      <button
-        onClick={onBack}
-        className="flex items-center gap-2 text-[#333333] hover:text-[#E12019] transition-colors mb-8 self-start"
-        style={{ fontSize: '16px', fontWeight: 500 }}
-      >
-        <ArrowLeft className="w-5 h-5" />
-        Volver
-      </button>
-
-      {/* Header */}
-      <div className="text-center mb-8">
-        <div style={{ fontSize: '32px', fontWeight: 700 }} className="text-[#333333] mb-2">
-          Estado de tu incidencia
-        </div>
-      </div>
-
-      {/* Incident Details Card */}
-      <div className="bg-white border-2 border-[#E0E0E0] rounded-xl p-8 w-full max-w-md mx-auto mb-6 shadow-lg">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6 pb-6 border-b-2 border-[#E0E0E0]">
-          <div>
-            <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>Número de incidencia</p>
-            <p className="text-[#E12019]" style={{ fontSize: '24px', fontWeight: 700, letterSpacing: '0.05em' }}>
-              INC-0001
-            </p>
-          </div>
-          <span className="px-4 py-2 bg-[#FF9F55] text-white rounded-full uppercase" style={{ fontSize: '14px', fontWeight: 700 }}>
-            En proceso
-          </span>
-        </div>
-
-        {/* Details */}
-        <div className="space-y-4 mb-6">
-          <div>
-            <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>Tipo de incidencia</p>
-            <p className="text-[#333333]" style={{ fontSize: '16px', fontWeight: 500 }}>
-              Documento ilegible
-            </p>
-          </div>
-          <div>
-            <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>Fecha de reporte</p>
-            <p className="text-[#333333]" style={{ fontSize: '16px', fontWeight: 500 }}>
-              09 Nov 2025, 14:32
-            </p>
-          </div>
-          <div>
-            <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>Descripción</p>
-            <p className="text-[#333333]" style={{ fontSize: '16px', lineHeight: '1.5' }}>
-              La cédula está dañada y el escáner no puede leer el código de barras.
-            </p>
-          </div>
-        </div>
-
-        {/* Status Timeline */}
-        <div className="pt-6 border-t-2 border-[#E0E0E0]">
-          <p className="text-[#333333] mb-4" style={{ fontSize: '16px', fontWeight: 500 }}>
-            Estado actual
-          </p>
-          <div className="space-y-3">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-[#017E49] flex items-center justify-center flex-shrink-0">
-                <CheckCircle2 className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <p className="text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>
-                  Incidencia recibida
-                </p>
-                <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>
-                  09 Nov, 14:32
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-[#FF9F55] flex items-center justify-center flex-shrink-0">
-                <AlertCircle className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <p className="text-[#333333]" style={{ fontSize: '14px', fontWeight: 500 }}>
-                  En revisión por RRHH
-                </p>
-                <p className="text-[#6B6B6B]" style={{ fontSize: '12px' }}>
-                  Estimado: 24-48 hrs
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Info Note */}
-      <div className="bg-[#F8F8F8] border-2 border-[#E0E0E0] rounded-xl p-4 max-w-md mx-auto mb-8">
-        <p className="text-[#6B6B6B] text-center" style={{ fontSize: '14px', lineHeight: '1.5' }}>
-          Recibirás una notificación cuando tu incidencia sea resuelta.
-        </p>
-      </div>
-
-      {/* Action */}
-      <div className="w-full max-w-md mx-auto">
-        <button
-          onClick={onBack}
-          className="w-full px-8 py-6 bg-[#E12019] text-white rounded-xl hover:bg-[#B51810] transition-colors"
-          style={{ fontSize: '18px', fontWeight: 700, minHeight: '64px' }}
-        >
-          Volver al inicio
-        </button>
-      </div>
-    </div>
-  );
-}

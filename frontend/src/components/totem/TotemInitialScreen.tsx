@@ -5,9 +5,10 @@ import TotemScannerPanel from '@/components/TotemScannerPanel';
 
 type Props = {
     onRutDetected: (rut: string) => void;
+    onCheckIncidents?: () => void;
 };
 
-export default function TotemInitialScreen({ onRutDetected }: Props) {
+export default function TotemInitialScreen({ onRutDetected, onCheckIncidents }: Props) {
     const [rutInput, setRutInput] = React.useState('');
     const [trabajadorNombre, setTrabajadorNombre] = React.useState<string | null>(null);
     const [searching, setSearching] = React.useState(false);
@@ -27,7 +28,7 @@ export default function TotemInitialScreen({ onRutDetected }: Props) {
     const obtenerDatosTrabajador = async (rut: string) => {
         try {
             setSearching(true);
-            const response = await fetch(`/api/trabajadores-datos/${rut}/`);
+            const response = await fetch(`http://localhost:8000/api/trabajadores-datos/${rut}/`);
             const data = await response.json();
             if (data.existe) {
                 setTrabajadorNombre(data.nombre);
@@ -114,6 +115,18 @@ export default function TotemInitialScreen({ onRutDetected }: Props) {
                     )}
                 </button>
             </div>
+
+            {/* Botón de Consultar Incidencias */}
+            {onCheckIncidents && (
+                <div className="w-full max-w-lg mt-4">
+                    <button
+                        className="w-full px-6 py-4 bg-[#E12019] text-white rounded-xl font-bold hover:bg-[#B51810] transition-colors shadow-md text-lg"
+                        onClick={onCheckIncidents}
+                    >
+                        Consultar mis incidencias
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

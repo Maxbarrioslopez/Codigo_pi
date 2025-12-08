@@ -40,7 +40,8 @@ export class IncidentService {
             if (trabajador_rut) params.append('trabajador_rut', trabajador_rut);
             if (estado) params.append('estado', estado);
             if (tipo) params.append('tipo', tipo);
-            const url = `incidencias/${params.toString() ? '?' + params.toString() : ''}`;
+            const queryString = params.toString();
+            const url = queryString ? `incidencias/listar/?${queryString}` : 'incidencias/listar/';
             const { data } = await apiClient.get<IncidenciaDTO[]>(url);
             return data;
         } catch (error) {

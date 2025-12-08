@@ -6,6 +6,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Camera, CameraOff, Scan, AlertCircle, FlashlightOff, Flashlight, Maximize2, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { BrowserMultiFormatReader, IScannerControls } from '@zxing/browser';
+import { BarcodeFormat } from '@zxing/library';
 
 export interface ScannerBaseProps {
     /** Callback cuando se escanea algo exitosamente */
@@ -39,47 +41,105 @@ export function ScannerBase({
     const [brightness, setBrightness] = useState(100);
     const [contrast, setContrast] = useState(100);
     const streamRef = useRef<MediaStream | null>(null);
+    const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+    const controlsRef = useRef<IScannerControls | null>(null);
 
-    // Iniciar acceso a cámara
+    // Reproducir sonido de escaneo
+    const playBeep = useCallback(() => {
+        if (!enableSound) return;
+        try {
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            oscillator.connect(gain);
+            gain.connect(audioContext.destination);
+            oscillator.frequency.value = 800;
+            gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.1);
+        } catch {
+            console.warn('No se pudo reproducir sonido de escaneo');
+        }
+    }, [enableSound]);
+
+    // Vibración táctil
+    const triggerHaptic = useCallback(() => {
+        if (navigator.vibrate) {
+            navigator.vibrate([100, 50, 100]);
+        }
+    }, []);
+
+    // Iniciar acceso a cámara y decodificación
     useEffect(() => {
         if (!isActive || !videoRef.current) return;
 
+        let isMounted = true;
+
         const startCamera = async () => {
             try {
-                const constraints: MediaStreamConstraints = {
-                    video: {
-                        facingMode: 'environment',
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
-                        ...(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-                            ? {
-                                focusMode: { ideal: 'continuous' },
-                                zoom: { ideal: 1 },
-                            }
-                            : {}),
-                    },
-                    audio: false,
-                };
+                // Crear lector QR con formatos
+                if (!readerRef.current) {
+                    readerRef.current = new BrowserMultiFormatReader();
+                }
 
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                if (videoRef.current) {
-                    videoRef.current.srcObject = stream;
-                    streamRef.current = stream;
+                const reader = readerRef.current;
+
+                try {
+                    // Usar decodeFromVideoDevice que maneja cámara automáticamente
+                    const controls = await reader.decodeFromVideoDevice(
+                        undefined, // deviceId - usa cámara por defecto
+                        videoRef.current,
+                        (result, err) => {
+                            if (result) {
+                                const text = result.getText();
+                                console.log('✅ QR detectado:', text);
+                                playBeep();
+                                triggerHaptic();
+                                onScanResult(text);
+                            }
+                            // No mostrar errores de NotFoundException que son normales
+                        }
+                    );
+
+                    if (isMounted) {
+                        controlsRef.current = controls;
+                    }
+                } catch (err: any) {
+                    console.error('Error iniciando decodificación:', err);
+                    if (isMounted) {
+                        onError?.('Error al iniciar el escáner: ' + (err.message || 'desconocido'));
+                    }
                 }
             } catch (error: any) {
-                onError?.(error.message || 'No se pudo acceder a la cámara');
+                if (isMounted) {
+                    const message = error.name === 'NotAllowedError'
+                        ? 'Permiso de cámara denegado. Verifica los permisos del navegador.'
+                        : error.name === 'NotFoundError'
+                            ? 'No se encontró ninguna cámara disponible.'
+                            : error.message || 'No se pudo acceder a la cámara';
+
+                    console.error('❌ Camera error:', error);
+                    onError?.(message);
+                }
             }
         };
 
         startCamera();
 
         return () => {
-            if (streamRef.current) {
-                streamRef.current.getTracks().forEach(track => track.stop());
-                streamRef.current = null;
+            isMounted = false;
+            if (controlsRef.current) {
+                try {
+                    controlsRef.current.stop();
+                    console.log('Scanner detenido');
+                } catch (e) {
+                    console.warn('Error stopping controls:', e);
+                }
+                controlsRef.current = null;
             }
         };
-    }, [isActive, onError]);
+    }, [isActive, onScanResult, onError, playBeep, triggerHaptic]);
 
     // Toggle de linterna
     const toggleTorch = useCallback(async () => {
@@ -115,32 +175,6 @@ export function ScannerBase({
             console.warn('Cambio de enfoque no soportado:', e);
         }
     }, [focusMode, onError]);
-
-    // Reproducir sonido de escaneo
-    const playBeep = useCallback(() => {
-        if (!enableSound) return;
-        try {
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-            const oscillator = audioContext.createOscillator();
-            const gain = audioContext.createGain();
-            oscillator.connect(gain);
-            gain.connect(audioContext.destination);
-            oscillator.frequency.value = 800;
-            gain.gain.setValueAtTime(0.3, audioContext.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + 0.1);
-        } catch {
-            console.warn('No se pudo reproducir sonido de escaneo');
-        }
-    }, [enableSound]);
-
-    // Vibración táctil
-    const triggerHaptic = useCallback(() => {
-        if (navigator.vibrate) {
-            navigator.vibrate([100, 50, 100]);
-        }
-    }, []);
 
     return (
         <div className={`relative bg-black w-full h-full ${containerClassName}`}>

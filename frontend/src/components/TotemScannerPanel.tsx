@@ -57,7 +57,7 @@ export default function TotemScannerPanel({ onRutDetected, onError, deviceId }: 
     };
 
     return (
-        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+        <div className="w-full h-full relative">
             <ScannerBase
                 onScanResult={handleScanResult}
                 onError={onError}

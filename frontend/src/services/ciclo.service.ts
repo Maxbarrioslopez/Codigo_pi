@@ -92,6 +92,20 @@ export class CicloService {
     }
 
     /**
+     * Asignar beneficios masivamente a todos los trabajadores de un ciclo
+     * @param cicloId - ID del ciclo
+     * @param options - Opciones de asignación
+     */
+    async asignarBeneficiosMasivo(cicloId: number, options: { tipo_beneficio_id?: number; solo_sin_beneficio?: boolean }): Promise<any> {
+        try {
+            const { data } = await apiClient.post<any>(`ciclos/${cicloId}/asignar-beneficios-pendientes/`, options);
+            return data;
+        } catch (error) {
+            throw ErrorHandler.handle(error, 'CicloService.asignarBeneficiosMasivo', false);
+        }
+    }
+
+    /**
      * Obtener estadísticas del ciclo
      * @param cicloId - ID del ciclo
      */

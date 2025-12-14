@@ -7,10 +7,12 @@ import { stockService } from '@/services/stock.service';
 import { ticketsQueryService } from '@/services/tickets.query.service';
 import { useMetricasGuardia } from '../hooks/useMetricasGuardia';
 import { GuardiaQRScanner } from './guardia/GuardiaQRScanner';
+import { useAuth, User as AuthUser } from '@/contexts/AuthContext';
 
 type DashboardTab = 'scanner' | 'incidents' | 'metrics';
 
 export function GuardiaModule() {
+  const { user } = useAuth();
   const [currentTab, setCurrentTab] = useState<DashboardTab>('scanner');
   const [hasScannedTicket, setHasScannedTicket] = useState(false);
   const [isExpiredTicket, setIsExpiredTicket] = useState(false);
@@ -34,6 +36,7 @@ export function GuardiaModule() {
 
   return (
     <GuardiaDashboard
+      user={user}
       currentTab={currentTab}
       setCurrentTab={setCurrentTab}
       hasScannedTicket={hasScannedTicket}
@@ -66,6 +69,7 @@ type DeliveryHistoryItem = {
 };
 
 function GuardiaDashboard({
+  user,
   currentTab,
   setCurrentTab,
   hasScannedTicket,
@@ -84,6 +88,7 @@ function GuardiaDashboard({
   deliveryHistory,
   appendHistory
 }: {
+  user: AuthUser | null;
   currentTab: DashboardTab;
   setCurrentTab: (tab: DashboardTab) => void;
   hasScannedTicket: boolean;
@@ -108,15 +113,12 @@ function GuardiaDashboard({
     { id: 'metrics', label: 'Métricas y Gestión', icon: BarChart3 },
   ] as const;
 
+  const displayName = user?.first_name && user?.last_name 
+    ? `${user.first_name} ${user.last_name}` 
+    : user?.username || 'Usuario';
+
   return (
     <div className="space-y-8">
-      <div>
-        <h2 className="text-[#333333] mb-2">Panel de Guardia - Dashboard</h2>
-        <p className="text-[#6B6B6B]">
-          Panel principal para el personal de portería (1440×900)
-        </p>
-      </div>
-
       {/* Dashboard Layout */}
       <div className="bg-white rounded-xl border-2 border-[#E0E0E0] overflow-hidden">
         {/* Header */}
@@ -136,7 +138,7 @@ function GuardiaDashboard({
                   <User className="w-5 h-5 text-[#6B6B6B]" />
                 </div>
                 <span className="text-[#333333]" style={{ fontSize: '16px' }}>
-                  Juan Pérez (Guardia)
+                  {displayName} ({user?.rol || 'Guardia'})
                 </span>
               </div>
             </div>

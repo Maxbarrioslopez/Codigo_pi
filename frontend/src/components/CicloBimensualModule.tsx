@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Calendar, Clock, Settings, History, Unlock, AlertCircle, CheckCircle, XCircle, Package, User, Plus, Edit2, Edit, Trash2, Check, X, Boxes, List } from 'lucide-react';
+import { Calendar, Clock, Settings, History, Unlock, AlertCircle, CheckCircle, XCircle, Package, User, Plus, Edit2, Edit, Trash2, Check, X, Boxes, List, Users } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
@@ -455,6 +455,25 @@ export function CicloBimensualModule() {
     }
   };
 
+  const handleAsignarBeneficiosMasivo = async (cicloId: number) => {
+    if (!confirm('¿Asignar beneficios a los trabajadores que NO tienen beneficio en este ciclo?')) {
+      return;
+    }
+    try {
+      const response = await cicloService.asignarBeneficiosMasivo(cicloId, {
+        solo_sin_beneficio: true, // Solo a los que no tienen
+      });
+      toast.success(
+        `✓ ${response.beneficios_creados} nuevos beneficios creados. ${response.beneficios_existentes} trabajadores ya tenían beneficio.`,
+        { duration: 5000 }
+      );
+      loadData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Error al asignar beneficios masivamente');
+      console.error(error);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header con botones principales */}
@@ -583,7 +602,7 @@ export function CicloBimensualModule() {
                     </div>
                   )}
 
-                  <div className="flex gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     <Button
                       onClick={async () => {
                         setSelectedCiclo(ciclo);
@@ -605,22 +624,30 @@ export function CicloBimensualModule() {
 
                         setShowAgregarBeneficioModal(true);
                       }}
-                      className="flex-1 bg-[#017E49] text-white hover:bg-[#016339]"
+                      className="bg-[#017E49] text-white hover:bg-[#016339]"
                       disabled={!ciclo.activo}
                     >
                       <Plus className="w-4 h-4 mr-2" />
                       Agregar Beneficio
                     </Button>
+                    <Button
+                      onClick={() => handleAsignarBeneficiosMasivo(ciclo.id)}
+                      className="bg-blue-600 text-white hover:bg-blue-700 font-bold"
+                      disabled={!ciclo.activo}
+                    >
+                      <Users className="w-4 h-4 mr-2" />
+                      Asignar Faltantes
+                    </Button>
                     {ciclo.activo ? (
                       <Button
                         onClick={() => handleCerrarCiclo(ciclo.id)}
-                        className="flex-1 bg-[#FF9F55] text-white hover:bg-[#E68843]"
+                        className="col-span-2 bg-[#FF9F55] text-white hover:bg-[#E68843]"
                       >
                         <X className="w-4 h-4 mr-2" />
                         Cerrar Ciclo
                       </Button>
                     ) : (
-                      <Button variant="outline" className="flex-1" disabled>
+                      <Button variant="outline" className="col-span-2" disabled>
                         Ciclo Cerrado
                       </Button>
                     )}

@@ -4,8 +4,9 @@ import { listarIncidencias, listarAgendamientosPorRut, listarTickets, reportesRe
 import { useCicloActivo } from '../hooks/useCicloActivo';
 import RRHHCrearTipoBeneficio from './rrhh/RRHHCrearTipoBeneficio';
 import RRHHAsignarBeneficio from './rrhh/RRHHAsignarBeneficio';
+import RRHHAsignarBeneficiosMasivo from './rrhh/RRHHAsignarBeneficiosMasivo';
 
-type DashboardTab = 'dashboard' | 'nomina' | 'retiros' | 'incidencias' | 'crear-tipo' | 'asignar';
+type DashboardTab = 'dashboard' | 'nomina' | 'retiros' | 'incidencias' | 'crear-tipo' | 'asignar' | 'asignar-masivo';
 
 export function RRHHModule() {
   const [currentTab, setCurrentTab] = useState<DashboardTab>('dashboard');
@@ -77,6 +78,7 @@ function RRHHDashboard({
     { id: 'nomina', label: 'Nómina', icon: Users },
     { id: 'crear-tipo', label: 'Crear Tipo Beneficio', icon: Package },
     { id: 'asignar', label: 'Asignar Beneficio', icon: Gift },
+    { id: 'asignar-masivo', label: 'Asignar Masivo', icon: Users },
     { id: 'retiros', label: 'Detalle de retiros', icon: FileText },
     { id: 'incidencias', label: 'Incidencias', icon: AlertCircle },
   ] as const;
@@ -183,6 +185,7 @@ function RRHHDashboard({
           {currentTab === 'nomina' && <NominaView />}
           {currentTab === 'crear-tipo' && <RRHHCrearTipoBeneficio />}
           {currentTab === 'asignar' && <RRHHAsignarBeneficio />}
+          {currentTab === 'asignar-masivo' && <RRHHAsignarBeneficiosMasivo />}
           {currentTab === 'retiros' && <RetirosView />}
           {currentTab === 'incidencias' && <IncidenciasView />}
         </main>

@@ -70,6 +70,7 @@ urlpatterns = [
     path('ciclos/<int:ciclo_id>/', ciclos_views.ciclo_detail_update, name='ciclo_detail_update'),
     path('ciclos/<int:ciclo_id>/cerrar/', ciclos_views.ciclo_cerrar, name='ciclo_cerrar'),
     path('ciclos/<int:ciclo_id>/estadisticas/', ciclos_views.ciclo_estadisticas, name='ciclo_estadisticas'),
+    path('ciclos/<int:ciclo_id>/asignar-beneficios-pendientes/', ciclos_views.ciclo_asignar_beneficios_pendientes, name='ciclo_asignar_beneficios_pendientes'),
     
     # Tipos de Beneficios
     path('tipos-beneficio/', ciclos_views.tipos_beneficio_list_create, name='tipos_beneficio_list_create'),

@@ -2,9 +2,13 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
 from django.utils import timezone
-from .models import Ciclo, Ticket, TipoBeneficio
+from django.db import transaction
+from .models import Ciclo, Ticket, TipoBeneficio, BeneficioTrabajador, Trabajador
 from .serializers import CicloSerializer, TipoBeneficioSerializer
 from .permissions import IsRRHHOrSupervisor
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @api_view(['GET', 'POST'])
@@ -400,3 +404,137 @@ def tipo_beneficio_detail(request, tipo_id):
     elif request.method == 'DELETE':
         tipo.delete()
         return Response(status=204)
+
+
+@api_view(['POST'])
+@permission_classes([IsRRHHOrSupervisor])
+def ciclo_asignar_beneficios_pendientes(request, ciclo_id):
+    """
+    POST /api/ciclos/{id}/asignar-beneficios-pendientes/
+    
+    Asigna beneficios del ciclo a todos los trabajadores que aún no tienen
+    beneficio asignado en este ciclo. Útil cuando se agregan trabajadores
+    después de iniciar el ciclo.
+    
+    ENDPOINT: POST /api/ciclos/{id}/asignar-beneficios-pendientes/
+    MÉTODO: POST
+    PERMISOS: IsRRHHOrSupervisor
+    AUTENTICACIÓN: JWT requerido
+    
+    BODY (JSON) - Opcional:
+        {
+            "tipo_beneficio_id": 1,  # ID del tipo de beneficio a asignar
+                                     # Si no se especifica, usa el primer beneficio activo del ciclo
+            "solo_sin_beneficio": true  # true: solo trabajadores sin beneficio (default)
+                                        # false: reasignar a todos
+        }
+    
+    RESPUESTA (200):
+        {
+            "ciclo_id": 1,
+            "tipo_beneficio": "Caja Diaria",
+            "trabajadores_procesados": 45,
+            "beneficios_creados": 12,
+            "beneficios_existentes": 33,
+            "errores": []
+        }
+    
+    ERRORES:
+        404: Ciclo no encontrado
+        400: No hay tipo de beneficio especificado y el ciclo no tiene beneficios activos
+        401: No autenticado
+        403: Sin permisos
+    """
+    try:
+        ciclo = Ciclo.objects.get(id=ciclo_id)
+    except Ciclo.DoesNotExist:
+        return Response({'detail': 'Ciclo no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Obtener tipo de beneficio
+    tipo_beneficio_id = request.data.get('tipo_beneficio_id')
+    solo_sin_beneficio = request.data.get('solo_sin_beneficio', True)
+    
+    if tipo_beneficio_id:
+        try:
+            tipo_beneficio = TipoBeneficio.objects.get(id=tipo_beneficio_id)
+        except TipoBeneficio.DoesNotExist:
+            return Response(
+                {'detail': 'Tipo de beneficio no encontrado'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    else:
+        # Usar el primer beneficio activo del ciclo
+        tipo_beneficio = ciclo.beneficios_activos.filter(activo=True).first()
+        if not tipo_beneficio:
+            return Response(
+                {'detail': 'El ciclo no tiene beneficios activos. Especifique tipo_beneficio_id.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    trabajadores_procesados = 0
+    beneficios_creados = 0
+    beneficios_existentes = 0
+    errores = []
+    
+    try:
+        with transaction.atomic():
+            # Obtener todos los trabajadores
+            trabajadores = Trabajador.objects.all()
+            
+            for trabajador in trabajadores:
+                trabajadores_procesados += 1
+                
+                # Verificar si ya tiene beneficio en este ciclo
+                beneficio_existente = BeneficioTrabajador.objects.filter(
+                    trabajador=trabajador,
+                    ciclo=ciclo
+                ).exists()
+                
+                if beneficio_existente:
+                    if solo_sin_beneficio:
+                        beneficios_existentes += 1
+                        continue
+                    else:
+                        # Si no es solo_sin_beneficio, eliminar el existente
+                        BeneficioTrabajador.objects.filter(
+                            trabajador=trabajador,
+                            ciclo=ciclo
+                        ).delete()
+                
+                # Crear nuevo beneficio
+                try:
+                    BeneficioTrabajador.objects.create(
+                        trabajador=trabajador,
+                        tipo_beneficio=tipo_beneficio,
+                        ciclo=ciclo,
+                        estado='pendiente'
+                    )
+                    beneficios_creados += 1
+                    logger.info(
+                        f"Beneficio creado para trabajador {trabajador.rut} en ciclo {ciclo.id}"
+                    )
+                except Exception as e:
+                    errores.append({
+                        'trabajador_rut': trabajador.rut,
+                        'error': str(e)
+                    })
+                    logger.error(
+                        f"Error creando beneficio para {trabajador.rut}: {e}"
+                    )
+        
+        return Response({
+            'ciclo_id': ciclo.id,
+            'ciclo_nombre': str(ciclo),
+            'tipo_beneficio': tipo_beneficio.nombre,
+            'trabajadores_procesados': trabajadores_procesados,
+            'beneficios_creados': beneficios_creados,
+            'beneficios_existentes': beneficios_existentes,
+            'errores': errores
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Error en asignación masiva de beneficios: {e}", exc_info=True)
+        return Response(
+            {'detail': f'Error al asignar beneficios: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

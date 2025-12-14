@@ -33,6 +33,8 @@ urlpatterns = [
     # Tickets
     path('tickets/', views.crear_ticket, name='crear_ticket'),
     path('tickets/listar/', rrhh_views.listar_tickets, name='listar_tickets'),
+    path('tickets/por-codigo/<str:codigo>/', views.ticket_por_codigo, name='ticket_por_codigo'),
+    path('tickets/por-codigo/<str:codigo>/validar_guardia/', views.validar_guardia_por_codigo, name='validar_guardia_por_codigo'),
     path('reportes/retiros_por_dia/', rrhh_views.retiros_por_dia, name='retiros_por_dia'),
     path('tickets/<str:uuid>/estado/', views.estado_ticket, name='estado_ticket'),
     path('tickets/<str:uuid>/validar_guardia/', guardia_views.validar_ticket_guardia, name='validar_ticket_guardia'),
@@ -101,4 +103,10 @@ urlpatterns = [
     path('validaciones-caja/estadisticas/', cajas_views.validacion_caja_estadisticas, name='validacion_caja_estadisticas'),
 
     # Debug (removido: views_debug no disponible)
+]
+
+# UI para lector QR (tótem)
+urlpatterns += [
+    path('qr-reader/', views.qr_reader, name='qr_reader'),
+    path('qr-reader/submit-run/', views.qr_receive_run, name='qr_receive_run'),
 ]

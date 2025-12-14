@@ -6,6 +6,7 @@ Consolida operaciones CRUD, validaciones y queries complejas.
 import structlog
 from django.db import transaction
 from django.db.models import Q, Count, Prefetch
+from django.utils import timezone
 from ..models import Trabajador, Ticket, Incidencia, Agendamiento, TicketEvent
 from ..utils_rut import clean_rut, valid_rut
 

@@ -1,0 +1,47 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Escáner QR - Tótem</title>
+    <link rel="stylesheet" href="{% static 'totem/css/style.css' %}">
+  </head>
+  <body>
+    <main>
+      <h1>Escáner QR - Tótem</h1>
+
+      <div class="video-wrap">
+        <video id="video" playsinline autoplay></video>
+        <canvas id="canvas" ></canvas>
+      </div>
+
+      <div class="controls">
+        <button id="startBtn">Iniciar cámara</button>
+        <button id="stopBtn" disabled>Detener</button>
+        <label>
+          <input type="checkbox" id="flipCamera"> Usar cámara trasera (si aplica)
+        </label>
+      </div>
+
+      <div class="result">
+        <strong>Resultado:</strong>
+        <div id="output">—</div>
+        <div class="run-block">
+          <strong>RUN detectado:</strong>
+          <div id="runOutput">—</div>
+          <div class="run-actions">
+            <button id="copyRunBtn" disabled>Copiar RUN</button>
+            <input id="endpointInput" placeholder="/api/qr-reader/submit-run/" style="width:60%" value="/api/qr-reader/submit-run/" />
+            <button id="sendRunBtn" disabled>Enviar al servidor</button>
+          </div>
+          <div id="runStatus" aria-live="polite"></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Biblioteca jsQR desde CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script src="{% static 'totem/js/app.js' %}"></script>
+  </body>
+</html>

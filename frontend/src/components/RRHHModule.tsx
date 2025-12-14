@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { BarChart3, Users, FileText, AlertCircle, Upload, UserPlus, User, Eye, EyeOff, Download, Filter, CheckCircle2, Info } from 'lucide-react';
+import { BarChart3, Users, FileText, AlertCircle, Upload, UserPlus, User, Eye, EyeOff, Download, Filter, CheckCircle2, Info, Package, Gift } from 'lucide-react';
 import { listarIncidencias, listarAgendamientosPorRut, listarTickets, reportesRetirosPorDia, resolverIncidencia, cambiarEstadoIncidencia, TicketDTO, IncidenciaDTO, AgendamientoDTO, CicloDTO, RetirosDiaDTO } from '../services/api';
 import { useCicloActivo } from '../hooks/useCicloActivo';
+import RRHHCrearTipoBeneficio from './rrhh/RRHHCrearTipoBeneficio';
+import RRHHAsignarBeneficio from './rrhh/RRHHAsignarBeneficio';
 
-type DashboardTab = 'dashboard' | 'nomina' | 'retiros' | 'incidencias';
+type DashboardTab = 'dashboard' | 'nomina' | 'retiros' | 'incidencias' | 'crear-tipo' | 'asignar';
 
 export function RRHHModule() {
   const [currentTab, setCurrentTab] = useState<DashboardTab>('dashboard');
@@ -73,6 +75,8 @@ function RRHHDashboard({
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
     { id: 'nomina', label: 'Nómina', icon: Users },
+    { id: 'crear-tipo', label: 'Crear Tipo Beneficio', icon: Package },
+    { id: 'asignar', label: 'Asignar Beneficio', icon: Gift },
     { id: 'retiros', label: 'Detalle de retiros', icon: FileText },
     { id: 'incidencias', label: 'Incidencias', icon: AlertCircle },
   ] as const;
@@ -152,12 +156,33 @@ function RRHHDashboard({
               );
             })}
           </div>
+          {/* Quick actions: Nuevo Beneficio (crear tipo) y Asignar Beneficio */}
+          <div className="flex items-center gap-3 mt-3 pb-4">
+            <button
+              onClick={() => setCurrentTab('crear-tipo')}
+              className="flex items-center gap-2 px-4 py-2 bg-[#FDF2E9] text-[#333333] border-2 border-[#D9D9D9] rounded-lg hover:bg-[#FFF7F2] transition-colors font-semibold"
+              style={{ fontSize: '14px', letterSpacing: '0.2px' }}
+            >
+              <Package className="w-4 h-4 text-[#9C27B0]" />
+              Nuevo Beneficio
+            </button>
+            <button
+              onClick={() => setCurrentTab('asignar')}
+              className="flex items-center gap-2 px-4 py-2 bg-[#E8F5F1] text-[#017E49] border-2 border-[#CFE9E1] rounded-lg hover:bg-[#F2FBF7] transition-colors font-semibold"
+              style={{ fontSize: '14px', letterSpacing: '0.2px' }}
+            >
+              <Gift className="w-4 h-4" />
+              Crear Beneficio
+            </button>
+          </div>
         </div>
 
         {/* Tab Content */}
         <main className="p-8">
           {currentTab === 'dashboard' && <DashboardView ciclo={ciclo} tickets={tickets} incidencias={incidencias} retirosDia={retirosDia} />}
           {currentTab === 'nomina' && <NominaView />}
+          {currentTab === 'crear-tipo' && <RRHHCrearTipoBeneficio />}
+          {currentTab === 'asignar' && <RRHHAsignarBeneficio />}
           {currentTab === 'retiros' && <RetirosView />}
           {currentTab === 'incidencias' && <IncidenciasView />}
         </main>

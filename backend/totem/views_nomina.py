@@ -31,9 +31,9 @@ def nomina_preview(request):
     
     FORMATO CSV ESPERADO:
         rut,nombre,seccion,contrato,sucursal,beneficio,observaciones
-        12345678-9,Juan Pérez,Producción,Indefinido,Central,Caja Estándar,
-        87654321-K,María González,Logística,Plazo Fijo,Norte,Caja Premium,VIP
-        11111111-1,Pedro Soto,Administración,Indefinido,Central,SIN_BENEFICIO,Suspendido
+        12345678-9,Juan Pérez,Producción,Indefinido,Casablanca,Caja Estándar,
+        87654321-K,María González,Logística,Plazo Fijo,Valparaiso Planta BIF,Caja Premium,VIP
+        11111111-1,Pedro Soto,Administración,Part Time,Valparaiso Planta BIC,SIN_BENEFICIO,Suspendido
     
     RESPUESTA (200):
         {
@@ -71,6 +71,8 @@ def nomina_preview(request):
         - Codificación CSV recomendada: UTF-8
         - actualizar="1": permite sobrescribir trabajadores existentes
         - Revise logs del servidor para detalle completo de validación
+        - Contratos permitidos: Indefinido, Plazo Fijo, Part Time, Honorarios, Externos
+        - Sucursales canónicas: Casablanca, Valparaiso Planta BIF, Valparaiso Planta BIC
     """
     f = request.FILES.get('archivo')
     if not f:
@@ -126,8 +128,8 @@ def nomina_confirmar(request):
     
     FORMATO CSV ESPERADO:
         rut,nombre,seccion,contrato,sucursal,beneficio,observaciones
-        12345678-9,Juan Pérez,Producción,Indefinido,Central,Caja Estándar,
-        87654321-K,María González,Logística,Plazo Fijo,Norte,Caja Premium,VIP
+        12345678-9,Juan Pérez,Producción,Indefinido,Casablanca,Caja Estándar,
+        87654321-K,María González,Logística,Plazo Fijo,Valparaiso Planta BIF,Caja Premium,VIP
     
     RESPUESTA (200):
         {
@@ -164,6 +166,8 @@ def nomina_confirmar(request):
           - beneficio: se parsea a estructura JSON
           - observaciones: texto libre
         - Revise logs del servidor para resumen detallado
+                - Contratos permitidos: Indefinido, Plazo Fijo, Part Time, Honorarios, Externos
+                - Sucursales canónicas: Casablanca, Valparaiso Planta BIF, Valparaiso Planta BIC
     """
     f = request.FILES.get('archivo')
     if not f:

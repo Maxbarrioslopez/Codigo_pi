@@ -78,6 +78,12 @@ export function ScannerBase({
 
         const startCamera = async () => {
             try {
+                // Verificar soporte/permiso básico antes de invocar ZXing (evita TypeError en contextos inseguros)
+                if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+                    onError?.('El navegador bloqueó el acceso a la cámara. Usa HTTPS o localhost y permite el permiso de cámara.');
+                    return;
+                }
+
                 // Crear lector QR con formatos
                 if (!readerRef.current) {
                     readerRef.current = new BrowserMultiFormatReader();

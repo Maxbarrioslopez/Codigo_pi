@@ -73,11 +73,24 @@ class Trabajador(models.Model):
     Representa un trabajador/beneficiario.
     - rut: string sin formatear (ej: 12345678-9)
     - nombre: nombre completo
+    - contrato: tipo de contrato (indefinido, plazo_fijo, part_time, honorarios, externos)
+    - sucursal: sucursal asignada (Casablanca, Valparaiso Planta BIF, Valparaiso Planta BIC)
     - beneficio_disponible: texto o JSON con info del beneficio
     """
+    CONTRATO_CHOICES = [
+        ('indefinido', 'Indefinido'),
+        ('plazo_fijo', 'Plazo Fijo'),
+        ('part_time', 'Part Time'),
+        ('honorarios', 'Honorarios'),
+        ('externos', 'Externos'),
+    ]
+    
     rut = models.CharField(max_length=12, unique=True, db_index=True)
     nombre = models.CharField(max_length=200)
+    contrato = models.CharField(max_length=50, choices=CONTRATO_CHOICES, blank=True, null=True, default=None)
+    sucursal = models.CharField(max_length=100, blank=True, null=True, default=None)
     beneficio_disponible = models.JSONField(default=dict, blank=True)
+    seccion = models.CharField(max_length=120, blank=True, null=True, default=None)
 
     class Meta:
         indexes = [
@@ -97,6 +110,10 @@ class StockSucursal(models.Model):
     sucursal = models.CharField(max_length=100)
     producto = models.CharField(max_length=100)
     cantidad = models.IntegerField(default=0)
+    # Campos adicionales usados en tests avanzados
+    tipo_caja = models.CharField(max_length=50, blank=True, null=True)
+    cantidad_actual = models.IntegerField(default=0)
+    cantidad_minima = models.IntegerField(default=0)
 
     def __str__(self):
         return f"{self.sucursal} - {self.producto}: {self.cantidad}"
@@ -178,6 +195,16 @@ class Ticket(models.Model):
     def __str__(self):
         return f"Ticket {self.uuid} - {self.trabajador.rut}"
 
+    def save(self, *args, **kwargs):
+        # Generar UUID único si está vacío
+        if not self.uuid:
+            import uuid as _uuid
+            self.uuid = str(_uuid.uuid4())
+        # Calcular TTL por defecto (30 minutos) si falta
+        if not self.ttl_expira_at:
+            self.ttl_expira_at = timezone.now() + timezone.timedelta(minutes=30)
+        super().save(*args, **kwargs)
+
 
 class Sucursal(models.Model):
     nombre = models.CharField(max_length=120)
@@ -191,18 +218,24 @@ class TipoBeneficio(models.Model):
     """Tipos de beneficios disponibles en el sistema."""
     TIPO_CONTRATO_CHOICES = [
         ('todos', 'Todos los contratos'),
-        ('planta', 'Planta'),
-        ('contrata', 'Contrata'),
+        ('indefinido', 'Indefinido'),
+        ('plazo_fijo', 'Plazo Fijo'),
+        ('part_time', 'Part Time'),
         ('honorarios', 'Honorarios'),
+        ('externos', 'Externos'),
     ]
     
     nombre = models.CharField(max_length=100, unique=True)
     descripcion = models.TextField(blank=True)
     activo = models.BooleanField(default=True)
+    es_caja = models.BooleanField(
+        default=False,
+        help_text="Si es True, este beneficio es una caja física que requiere validación con guardia"
+    )
     tipos_contrato = models.JSONField(
         default=list,
         blank=True,
-        help_text="Lista de tipos de contrato que reciben este beneficio (ej: ['planta', 'contrata'])"
+        help_text="Lista de tipos de contrato que reciben este beneficio (ej: ['indefinido', 'plazo_fijo'])"
     )
     requiere_validacion_guardia = models.BooleanField(
         default=False,
@@ -311,6 +344,18 @@ class BeneficioTrabajador(models.Model):
     codigo_verificacion = models.CharField(max_length=100, unique=True, db_index=True)
     qr_data = models.TextField(blank=True, help_text="Datos del QR generado")
     
+    # HMAC Security: payload y firma persistidas para validación segura
+    qr_payload = models.JSONField(
+        default=dict, 
+        blank=True,
+        help_text="Payload del QR serializado (JSON: beneficio_id, trabajador_rut, timestamp, tipo_beneficio)"
+    )
+    qr_signature = models.CharField(
+        max_length=64,
+        blank=True,
+        help_text="Firma HMAC-SHA256 del payload (hex encoded, 64 caracteres)"
+    )
+    
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='pendiente')
     bloqueado = models.BooleanField(default=False, help_text="Si está bloqueado, no puede retirar")
     motivo_bloqueo = models.TextField(blank=True)
@@ -326,6 +371,24 @@ class BeneficioTrabajador(models.Model):
     
     def __str__(self):
         return f"{self.trabajador.nombre} - {self.tipo_beneficio.nombre} ({self.ciclo})"
+    
+    @property
+    def puede_retirarse(self):
+        """
+        Un beneficio puede retirarse solo si:
+        - Estado es VALIDADO (no PENDIENTE)
+        - No está bloqueado
+        - El ciclo aún está activo (no expirado)
+        """
+        if self.estado != 'validado' or self.bloqueado:
+            return False
+        # Verificar que ciclo aún está activo
+        if self.ciclo and not self.ciclo.activo:
+            return False
+        # Verificar que la fecha_fin del ciclo aún no ha pasado
+        if self.ciclo and self.ciclo.fecha_fin < timezone.now().date():
+            return False
+        return True
 
 
 class ValidacionCaja(models.Model):

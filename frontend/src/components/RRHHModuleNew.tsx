@@ -738,11 +738,9 @@ export function RRHHModuleNew() {
                                                             <SelectValue placeholder="Seleccionar sucursal..." />
                                                         </SelectTrigger>
                                                         <SelectContent>
-                                                            <SelectItem value="Central">Central</SelectItem>
-                                                            <SelectItem value="Norte">Norte</SelectItem>
-                                                            <SelectItem value="Sur">Sur</SelectItem>
-                                                            <SelectItem value="Oriente">Oriente</SelectItem>
-                                                            <SelectItem value="Poniente">Poniente</SelectItem>
+                                                            <SelectItem value="Casablanca">Casablanca</SelectItem>
+                                                            <SelectItem value="Valparaiso Planta BIF">Valparaiso Planta BIF</SelectItem>
+                                                            <SelectItem value="Valparaiso Planta BIC">Valparaiso Planta BIC</SelectItem>
                                                         </SelectContent>
                                                     </Select>
                                                 </div>

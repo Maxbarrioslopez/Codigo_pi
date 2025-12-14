@@ -58,6 +58,7 @@ export default function TotemInitialScreen({ onRutDetected, onCheckIncidents }: 
             <div className="w-full max-w-lg bg-black rounded-md overflow-hidden border-2 border-gray-300" style={{ minHeight: '300px' }}>
                 <TotemScannerPanel
                     onRutDetected={async (rut) => {
+                        setRutInput(rut); // Rellenar input automáticamente
                         await obtenerDatosTrabajador(rut);
                         // Pequeña pausa para mostrar el nombre antes de transicionar
                         await new Promise(r => setTimeout(r, 800));

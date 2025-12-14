@@ -10,7 +10,7 @@ Formatos soportados:
 
 CSV:
     rut,nombre,seccion,contrato,sucursal,beneficio,ciclo_id,observaciones,email,telefono
-    12345678-9,Juan Pérez,Operaciones,INDEFINIDO,CENTRAL,CAJA,8,,,+56912345678
+    12345678-9,Juan Pérez,Operaciones,INDEFINIDO,CASABLANCA,CAJA,8,,,+56912345678
 
 Excel (.xlsx):
     Mismo formato que CSV, se lee de la hoja "Nomina" por defecto
@@ -29,7 +29,7 @@ JSON (nomina_estructura.json):
                 "nombre": "Juan Pérez",
                 "seccion": "Operaciones",
                 "contrato": "INDEFINIDO",
-                "sucursal": "CENTRAL",
+                "sucursal": "Casablanca",
                 "beneficio": {
                     "tipo": "Caja",
                     "categoria": "Estándar",
@@ -71,6 +71,34 @@ import json
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Conjuntos canonicos para estandarizar contratos y sucursales
+CONTRATOS_CANONICOS = {
+    'indefinido': 'Indefinido',
+    'plazo fijo': 'Plazo Fijo',
+    'plazo_fijo': 'Plazo Fijo',
+    'plazo-fijo': 'Plazo Fijo',
+    'plazofijo': 'Plazo Fijo',
+    'part time': 'Part Time',
+    'part_time': 'Part Time',
+    'part-time': 'Part Time',
+    'parttime': 'Part Time',
+    'honorario': 'Honorarios',
+    'honorarios': 'Honorarios',
+    'externo': 'Externos',
+    'externos': 'Externos',
+}
+
+SUCURSALES_CANONICAS = {
+    'casablanca': 'Casablanca',
+    'casa blanca': 'Casablanca',
+    'valparaiso planta bif': 'Valparaiso Planta BIF',
+    'valparaiso bif': 'Valparaiso Planta BIF',
+    'bif': 'Valparaiso Planta BIF',
+    'valparaiso planta bic': 'Valparaiso Planta BIC',
+    'valparaiso bic': 'Valparaiso Planta BIC',
+    'bic': 'Valparaiso Planta BIC',
+}
 
 
 class Command(BaseCommand):
@@ -327,6 +355,20 @@ class Command(BaseCommand):
         
         return trabajadores
 
+    def _normalizar_contrato(self, contrato):
+        """Devuelve el contrato canonico o None si no matchea."""
+        if not contrato:
+            return None
+        key = ' '.join(contrato.lower().replace('_', ' ').replace('-', ' ').split())
+        return CONTRATOS_CANONICOS.get(key)
+
+    def _normalizar_sucursal(self, sucursal):
+        """Devuelve la sucursal canonica o None si no matchea."""
+        if not sucursal:
+            return None
+        key = ' '.join(sucursal.lower().split())
+        return SUCURSALES_CANONICAS.get(key)
+
     def _parsear_fila(self, row, linea):
         """Parsea y valida una fila del archivo.
         
@@ -362,12 +404,30 @@ class Command(BaseCommand):
             seccion = InputSanitizer.sanitize_string(
                 str(row.get('seccion', '')).strip(), max_length=100
             )
-            contrato = InputSanitizer.sanitize_string(
+            contrato_raw = InputSanitizer.sanitize_string(
                 str(row.get('contrato', '')).strip(), max_length=50
             )
-            sucursal_codigo = InputSanitizer.sanitize_string(
+            sucursal_raw = InputSanitizer.sanitize_string(
                 str(row.get('sucursal', '')).strip(), max_length=50
             )
+
+            contrato = self._normalizar_contrato(contrato_raw)
+            if contrato_raw and not contrato:
+                contrato = contrato_raw
+                self.stdout.write(
+                    self.style.WARNING(
+                        f'Línea {linea}: Tipo de contrato no reconocido "{contrato_raw}". Use uno de: Indefinido, Plazo Fijo, Part Time, Honorarios, Externos.'
+                    )
+                )
+
+            sucursal_codigo = self._normalizar_sucursal(sucursal_raw)
+            if sucursal_raw and not sucursal_codigo:
+                sucursal_codigo = sucursal_raw
+                self.stdout.write(
+                    self.style.WARNING(
+                        f'Línea {linea}: Sucursal no reconocida "{sucursal_raw}". Use una de: Casablanca, Valparaiso Planta BIF, Valparaiso Planta BIC.'
+                    )
+                )
             
             # CICLO ID - REQUERIDO para asociar beneficio a ciclo específico
             ciclo_id = row.get('ciclo_id', '')
@@ -608,4 +668,16 @@ class Command(BaseCommand):
         if not dry_run and (creados + actualizados) > 0:
             self.stdout.write('\nTrabajadores cargados exitosamente en el sistema')
             self.stdout.write('   Los que tienen beneficio pueden generar tickets en el tótem')
+
+        # Crear sucursales por defecto si no existen
+        for nombre, codigo in [
+            ('Casablanca', 'CASA'),
+            ('Valparaiso Planta BIF', 'BIF'),
+            ('Valparaiso Planta BIC', 'BIC')
+        ]:
+            sucursal, creado = Sucursal.objects.get_or_create(nombre=nombre, codigo=codigo)
+            if creado:
+                self.stdout.write(self.style.SUCCESS(f'Sucursal creada: {nombre} ({codigo})'))
+            else:
+                self.stdout.write(self.style.NOTICE(f'Sucursal ya existe: {nombre} ({codigo})'))
 

@@ -17,6 +17,7 @@ export function GuardiaModule() {
   const [ticketUUID, setTicketUUID] = useState('');
   const [ticketData, setTicketData] = useState<TicketDTO | null>(null);
   const [validating, setValidating] = useState(false);
+  const [validationFeedback, setValidationFeedback] = useState<{ status: 'success' | 'error'; message: string } | null>(null);
   const [deliveryHistory, setDeliveryHistory] = useState<DeliveryHistoryItem[]>([]);
   // Persistencia local de historial entregas
   useEffect(() => {
@@ -45,6 +46,8 @@ export function GuardiaModule() {
       setTicketData={setTicketData}
       validating={validating}
       setValidating={setValidating}
+      validationFeedback={validationFeedback}
+      setValidationFeedback={setValidationFeedback}
       metrics={metricas}
       deliveryHistory={deliveryHistory}
       appendHistory={(item) => setDeliveryHistory(prev => [item, ...prev])}
@@ -75,6 +78,8 @@ function GuardiaDashboard({
   setTicketData,
   validating,
   setValidating,
+  validationFeedback,
+  setValidationFeedback,
   metrics,
   deliveryHistory,
   appendHistory
@@ -91,6 +96,8 @@ function GuardiaDashboard({
   setTicketData: (d: TicketDTO | null) => void;
   validating: boolean;
   setValidating: (b: boolean) => void;
+  validationFeedback: { status: 'success' | 'error'; message: string } | null;
+  setValidationFeedback: (v: { status: 'success' | 'error'; message: string } | null) => void;
   metrics: MetricasGuardiaDTO | null;
   deliveryHistory: DeliveryHistoryItem[];
   appendHistory: (item: DeliveryHistoryItem) => void;
@@ -172,16 +179,45 @@ function GuardiaDashboard({
                 setHasScannedTicket={setHasScannedTicket}
                 setIsExpiredTicket={setIsExpiredTicket}
                 validating={validating}
+                validationFeedback={validationFeedback}
+                setValidationFeedback={setValidationFeedback}
                 onValidate={async () => {
-                  if (!ticketUUID) return;
+                  const raw = (ticketUUID || '').trim();
+                  if (!raw) {
+                    setValidationFeedback({ status: 'error', message: 'Debe ingresar un código de ticket o beneficio.' });
+                    return;
+                  }
                   setValidating(true);
+                  setValidationFeedback(null);
                   try {
-                    const data = await ticketService.validarGuardia(ticketUUID);
-                    setTicketData(data);
-                    setHasScannedTicket(true);
+                    console.log('[GuardiaModule] Iniciando validación de:', raw);
+                    // validarGuardia ya acepta códigos BEN- directamente
+                    const response = await ticketService.validarGuardia(raw);
+                    console.log('[GuardiaModule] Respuesta de validación:', response);
+                    
+                    // No asignamos directamente a ticketData porque la respuesta es diferente
+                    // NO actualizamos hasScannedTicket para que siga mostrando el formulario
                     setIsExpiredTicket(false);
+                    
+                    const trabajador = response?.trabajador?.nombre || 'Trabajador';
+                    const beneficio = response?.beneficio?.tipo || 'beneficio';
+                    const mensaje = response?.mensaje || 'Validado correctamente';
+                    
+                    console.log('[GuardiaModule] Mostrando feedback:', { trabajador, beneficio, mensaje });
+                    setValidationFeedback({ status: 'success', message: `✓ ${trabajador} - ${beneficio}: ${mensaje}` });
                   } catch (e: any) {
-                    if (e.detail?.includes('expirado')) {
+                    console.error('[GuardiaModule] Error validación guardia:', e);
+                    console.error('[GuardiaModule] Error detalles:', { 
+                      detail: e?.detail, 
+                      message: e?.message,
+                      response: e?.response,
+                      status: e?.response?.status
+                    });
+                    
+                    const detail = e?.response?.data?.detail || e?.detail || e?.message || 'No se pudo validar el ticket.';
+                    setValidationFeedback({ status: 'error', message: `✗ ${detail}` });
+                    
+                    if (e?.detail?.includes('expirado')) {
                       setIsExpiredTicket(true);
                     }
                   } finally {
@@ -189,9 +225,18 @@ function GuardiaDashboard({
                   }
                 }}
                 onFetchEstado={async () => {
-                  if (!ticketUUID) return;
+                  const raw = (ticketUUID || '').trim();
+                  if (!raw) return;
+                  setValidationFeedback(null);
                   try {
-                    const data = await ticketService.getEstado(ticketUUID);
+                    // Resolver código de beneficio a UUID si aplica
+                    let uuid = raw;
+                    if (uuid.startsWith('BEN-')) {
+                      uuid = await ticketService.resolverCodigoATicket(uuid);
+                      setTicketUUID(uuid); // persistimos el UUID real
+                    }
+                    if (!uuid) return;
+                    const data = await ticketService.getEstado(uuid);
                     setTicketData(data);
                     setHasScannedTicket(true);
                     if (data.estado === 'expirado') setIsExpiredTicket(true);
@@ -204,6 +249,7 @@ function GuardiaDashboard({
                   setIsExpiredTicket(false);
                   setTicketUUID('');
                   setTicketData(null);
+                  setValidationFeedback(null);
                 }}
                 onRegisterDelivery={(cajaCodigo) => {
                   if (!ticketData) return;
@@ -260,6 +306,8 @@ function ScannerView({
   setHasScannedTicket,
   setIsExpiredTicket,
   validating,
+  validationFeedback,
+  setValidationFeedback,
   onValidate,
   onFetchEstado,
   onReset,
@@ -275,6 +323,8 @@ function ScannerView({
   setHasScannedTicket: (b: boolean) => void;
   setIsExpiredTicket: (b: boolean) => void;
   validating: boolean;
+  validationFeedback: { status: 'success' | 'error'; message: string } | null;
+  setValidationFeedback: (v: { status: 'success' | 'error'; message: string } | null) => void;
   onValidate: () => void;
   onFetchEstado: () => void;
   onReset: () => void;
@@ -464,11 +514,16 @@ function ScannerView({
               <div className="w-full max-w-3xl h-[600px]">
                 <GuardiaQRScanner
                   onTicketScanned={async (uuid) => {
-                    setTicketUUID(uuid);
                     setShowQRScanner(false);
-                    // Auto-fetch estado después de escanear
                     try {
-                      const data = await ticketService.getEstado(uuid);
+                      // Resolver código de beneficio si viene con formato BEN-
+                      let resolvedUUID = uuid;
+                      if (uuid.startsWith('BEN-')) {
+                        resolvedUUID = await ticketService.resolverCodigoATicket(uuid);
+                      }
+                      if (!resolvedUUID) return;
+                      setTicketUUID(resolvedUUID);
+                      const data = await ticketService.getEstado(resolvedUUID);
                       setTicketData(data);
                       setHasScannedTicket(true);
                       if (data.estado === 'expirado') setIsExpiredTicket(true);
@@ -483,6 +538,22 @@ function ScannerView({
             </div>
           )}
 
+          {validationFeedback && (
+            <div className={`mb-4 px-4 py-3 rounded-xl border-2 flex items-start gap-3 ${validationFeedback.status === 'success' ? 'bg-[#E8FFF3] border-[#017E49]' : 'bg-[#FFECEC] border-[#E12019]'}`}>
+              {validationFeedback.status === 'success' ? (
+                <CheckCircle2 className="w-5 h-5 text-[#017E49] mt-0.5" />
+              ) : (
+                <AlertOctagon className="w-5 h-5 text-[#E12019] mt-0.5" />
+              )}
+              <div>
+                <p className="text-[#333333]" style={{ fontSize: '14px', fontWeight: 600 }}>
+                  {validationFeedback.status === 'success' ? 'Validación exitosa' : 'Validación rechazada'}
+                </p>
+                <p className="text-[#6B6B6B]" style={{ fontSize: '13px' }}>{validationFeedback.message}</p>
+              </div>
+            </div>
+          )}
+
           {/* Manual Code Entry */}
           <div className="bg-white border-2 border-[#E0E0E0] rounded-xl p-6 mb-6">
             <p className="text-[#333333] mb-4" style={{ fontSize: '18px', fontWeight: 500 }}>
@@ -492,7 +563,7 @@ function ScannerView({
               <input
                 type="text"
                 value={ticketUUID}
-                onChange={(e) => setTicketUUID(e.target.value.trim())}
+                onChange={(e) => setTicketUUID(e.target.value)}
                 placeholder="UUID Ticket"
                 className="flex-1 px-4 py-3 bg-white border-2 border-[#E0E0E0] rounded-xl text-[#333333] placeholder:text-[#6B6B6B] focus:border-[#017E49] focus:outline-none"
                 style={{ fontSize: '14px', fontWeight: 500, letterSpacing: '0.05em' }}

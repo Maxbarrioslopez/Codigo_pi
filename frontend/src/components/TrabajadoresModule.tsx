@@ -87,7 +87,7 @@ export function TrabajadoresModule() {
         nombre: registerForm.nombre,
         seccion: registerForm.seccion,
         contrato: registerForm.contrato,
-        sucursal: registerForm.sucursal || 'Santiago',
+        sucursal: registerForm.sucursal,
         beneficio: registerForm.beneficio || 'Estándar',
       });
       setWorkers([...workers, newWorker]);
@@ -566,12 +566,12 @@ export function TrabajadoresModule() {
                     <SelectValue placeholder="Seleccionar contrato" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Indefinido">Indefinido</SelectItem>
-                    <SelectItem value="Plazo fijo">Plazo fijo</SelectItem>
-                    <SelectItem value="Part time">Part time</SelectItem>
-                    <SelectItem value="Honorarios">Honorarios</SelectItem>
-                    <SelectItem value="Practicante">Practicante</SelectItem>
-                  </SelectContent>
+                      <SelectItem value="indefinido">Indefinido</SelectItem>
+                      <SelectItem value="plazo_fijo">Plazo Fijo</SelectItem>
+                      <SelectItem value="part_time">Part Time</SelectItem>
+                      <SelectItem value="honorarios">Honorarios</SelectItem>
+                      <SelectItem value="externos">Externos</SelectItem>
+                    </SelectContent>
                 </Select>
               </div>
             </div>
@@ -583,8 +583,9 @@ export function TrabajadoresModule() {
                     <SelectValue placeholder="Seleccionar sucursal" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Santiago">Planta Santiago</SelectItem>
-                    <SelectItem value="Rancagua">Planta Rancagua</SelectItem>
+                    <SelectItem value="Casablanca">Casablanca</SelectItem>
+                    <SelectItem value="Valparaiso Planta BIF">Valparaiso Planta BIF</SelectItem>
+                    <SelectItem value="Valparaiso Planta BIC">Valparaiso Planta BIC</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

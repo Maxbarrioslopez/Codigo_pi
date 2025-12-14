@@ -286,3 +286,203 @@ def verificar_tiempo_restante(request, uuid):
     except Exception as e:
         logger.error(f"Error inesperado en verificar_tiempo_restante: {e}")
         return Response({'detail': 'Error interno del servidor'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ============================================================================
+# NUEVAS VISTAS: Validación y Entrega de Beneficios (BeneficioTrabajador)
+# ============================================================================
+
+@api_view(['POST'])
+@permission_classes([IsGuardia])
+def validar_beneficio(request, beneficio_id):
+    """
+    POST /api/guardia/beneficios/{beneficio_id}/validar/
+    
+    Valida un beneficio escaneado por el guardia.
+    Verifica firma HMAC contra payload persistido.
+    Cambia estado de PENDIENTE a VALIDADO si es exitoso.
+    
+    PERMISOS: IsGuardia
+    
+    BODY (JSON):
+        {
+            "codigo_escaneado": "ABC123"  # Código del QR escaneado
+        }
+    
+    RESPUESTA (200):
+        {
+            "exitoso": true,
+            "beneficio_id": 5,
+            "estado": "validado",
+            "trabajador": {
+                "rut": "12345678-9",
+                "nombre": "Juan Pérez López"
+            },
+            "tipo_beneficio": "Caja de Navidad",
+            "message": "Beneficio validado exitosamente"
+        }
+    
+    RESPUESTA (400):
+        {
+            "exitoso": false,
+            "beneficio_id": 5,
+            "razones": ["Firma HMAC inválida", "..."]
+        }
+    
+    ERRORES:
+        401: No autenticado
+        403: Sin permisos
+        404: Beneficio no encontrado
+        500: Error interno
+    """
+    from totem.models import BeneficioTrabajador
+    from totem.services.beneficio_service import BeneficioService
+    from django.core.exceptions import ValidationError
+    
+    try:
+        # Obtener beneficio
+        try:
+            beneficio = BeneficioTrabajador.objects.get(id=beneficio_id)
+        except BeneficioTrabajador.DoesNotExist:
+            return Response(
+                {'detail': 'Beneficio no encontrado'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Obtener código escaneado del request
+        codigo_escaneado = request.data.get('codigo_escaneado', '')
+        if not codigo_escaneado:
+            return Response(
+                {'detail': 'codigo_escaneado es requerido'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validar beneficio usando servicio
+        exitoso, resultado = BeneficioService.validar_beneficio(
+            beneficio=beneficio,
+            codigo_escaneado=codigo_escaneado,
+            guardia_usuario=request.user
+        )
+        
+        if not exitoso:
+            return Response(resultado, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Preparar respuesta exitosa
+        respuesta = {
+            'exitoso': True,
+            'beneficio_id': beneficio.id,
+            'estado': beneficio.estado,
+            'trabajador': {
+                'rut': beneficio.trabajador.rut,
+                'nombre': beneficio.trabajador.nombre
+            },
+            'tipo_beneficio': beneficio.tipo_beneficio.nombre,
+            'ciclo': beneficio.ciclo.nombre if beneficio.ciclo.nombre else f"Ciclo {beneficio.ciclo.id}",
+            'message': 'Beneficio validado exitosamente. Proceder a confirmar-entrega.'
+        }
+        
+        return Response(respuesta, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Error en validar_beneficio: {e}", exc_info=True)
+        return Response(
+            {'detail': 'Error interno del servidor'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsGuardia])
+def confirmar_entrega(request, beneficio_id):
+    """
+    POST /api/guardia/beneficios/{beneficio_id}/confirmar-entrega/
+    
+    Confirma la entrega física del beneficio.
+    Solo posible si estado es VALIDADO (transición VALIDADO → RETIRADO).
+    
+    PERMISOS: IsGuardia
+    
+    BODY (JSON):
+        {
+            "caja_fisica_codigo": "CAJA001"  # OPCIONAL: código de caja física entregada
+        }
+    
+    RESPUESTA (200):
+        {
+            "exitoso": true,
+            "beneficio_id": 5,
+            "estado_anterior": "validado",
+            "estado_final": "retirado",
+            "trabajador": {
+                "rut": "12345678-9",
+                "nombre": "Juan Pérez López"
+            },
+            "type_beneficio": "Caja de Navidad",
+            "message": "Entrega confirmada. Beneficio retirado."
+        }
+    
+    RESPUESTA (400):
+        {
+            "exitoso": false,
+            "beneficio_id": 5,
+            "razones": ["Estado debe ser VALIDADO (actual: pendiente)", "..."]
+        }
+    
+    ERRORES:
+        401: No autenticado
+        403: Sin permisos
+        404: Beneficio no encontrado
+        500: Error interno
+    """
+    from totem.models import BeneficioTrabajador
+    from totem.services.beneficio_service import BeneficioService
+    
+    try:
+        # Obtener beneficio
+        try:
+            beneficio = BeneficioTrabajador.objects.get(id=beneficio_id)
+        except BeneficioTrabajador.DoesNotExist:
+            return Response(
+                {'detail': 'Beneficio no encontrado'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        estado_anterior = beneficio.estado
+        
+        # Obtener código de caja opcional
+        caja_fisica_codigo = request.data.get('caja_fisica_codigo', '')
+        
+        # Confirmar entrega usando servicio
+        exitoso, resultado = BeneficioService.confirmar_entrega(
+            beneficio=beneficio,
+            guardia_usuario=request.user,
+            caja_fisica_codigo=caja_fisica_codigo
+        )
+        
+        if not exitoso:
+            return Response(resultado, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Preparar respuesta exitosa
+        respuesta = {
+            'exitoso': True,
+            'beneficio_id': beneficio.id,
+            'estado_anterior': estado_anterior,
+            'estado_final': beneficio.estado,
+            'trabajador': {
+                'rut': beneficio.trabajador.rut,
+                'nombre': beneficio.trabajador.nombre
+            },
+            'tipo_beneficio': beneficio.tipo_beneficio.nombre,
+            'ciclo': beneficio.ciclo.nombre if beneficio.ciclo.nombre else f"Ciclo {beneficio.ciclo.id}",
+            'caja_entregada': caja_fisica_codigo,
+            'message': 'Entrega confirmada. Beneficio retirado.'
+        }
+        
+        return Response(respuesta, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Error en confirmar_entrega: {e}", exc_info=True)
+        return Response(
+            {'detail': 'Error interno del servidor'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

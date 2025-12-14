@@ -35,7 +35,7 @@ def trabajadores_list_create(request):
         ?q=juan              # Búsqueda por nombre o RUT (texto libre)
         ?rut=12345678-9      # Filtro exacto por RUT
         ?seccion=Producción  # Filtro por sección
-        ?contrato=Indefinido # Filtro por tipo de contrato
+        ?contrato=Indefinido # Filtro por tipo de contrato (Indefinido, Plazo Fijo, Part Time, Honorarios, Externos)
     
     RESPUESTA GET (200):
         [
@@ -45,7 +45,7 @@ def trabajadores_list_create(request):
                 "nombre": "Juan Pérez López",
                 "seccion": "Producción",
                 "contrato": "Indefinido",
-                "sucursal": "Central",
+                "sucursal": "Casablanca",
                 "beneficio_disponible": {
                     "tipo": "Caja",
                     "categoria": "Estándar",
@@ -63,8 +63,8 @@ def trabajadores_list_create(request):
             "rut": "12345678-9",              # REQUERIDO: RUT único del trabajador
             "nombre": "Juan Pérez López",     # REQUERIDO: Nombre completo
             "seccion": "Producción",          # OPCIONAL: Sección de trabajo
-            "contrato": "Indefinido",         # OPCIONAL: Tipo de contrato
-            "sucursal": "Central",            # OPCIONAL: Sucursal asignada
+            "contrato": "Indefinido",         # OPCIONAL: Tipo de contrato (Indefinido, Plazo Fijo, Part Time, Honorarios, Externos)
+            "sucursal": "Casablanca",         # OPCIONAL: Sucursal asignada (Casablanca, Valparaiso Planta BIF, Valparaiso Planta BIC)
             "beneficio_disponible": {         # OPCIONAL: Beneficio asignado
                 "tipo": "Caja",
                 "categoria": "Estándar",
@@ -92,6 +92,8 @@ def trabajadores_list_create(request):
         - RUT se valida con dígito verificador
         - Búsqueda "q" busca en nombre y RUT simultáneamente
         - POST valida unicidad de RUT antes de crear
+        - Contratos permitidos: Indefinido, Plazo Fijo, Part Time, Honorarios, Externos
+        - Sucursales canónicas: Casablanca, Valparaiso Planta BIF, Valparaiso Planta BIC
     """
     if request.method == 'GET':
         q = request.GET.get('q')
@@ -126,6 +128,10 @@ def trabajadores_list_create(request):
     if trabajador_existente:
         # Trabajador existe - actualizar datos y beneficio del ciclo actual
         trabajador_existente.nombre = nombre  # Actualizar nombre por si cambió
+        if contrato:
+            trabajador_existente.contrato = contrato
+        if sucursal:
+            trabajador_existente.sucursal = sucursal
         
         # El campo beneficio_disponible ahora representa el beneficio del ciclo actual
         # Se sobrescribe con el nuevo beneficio para el ciclo especificado
@@ -140,7 +146,9 @@ def trabajadores_list_create(request):
     # Trabajador nuevo - crear
     t = Trabajador.objects.create(
         rut=rut, 
-        nombre=nombre, 
+        nombre=nombre,
+        contrato=contrato,
+        sucursal=sucursal,
         beneficio_disponible=beneficio
     )
     return Response(TrabajadorSerializer(t).data, status=201)

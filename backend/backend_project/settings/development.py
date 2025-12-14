@@ -7,7 +7,7 @@ from .base import *
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = get_env_bool('DEBUG', True)
 
-ALLOWED_HOSTS = get_env_list('ALLOWED_HOSTS', ['localhost', '127.0.0.1', '0.0.0.0'])
+ALLOWED_HOSTS = get_env_list('ALLOWED_HOSTS', ['localhost', '127.0.0.1', '0.0.0.0', '192.168.1.91'])
 
 # Database - SQLite for development
 if not get_env_bool('USE_POSTGRES', False):
@@ -60,7 +60,7 @@ CORS_ALLOW_HEADERS = [
     'x-requested-with',
 ]
 
-print("🔧 CORS Configuration Applied in Development Settings")
+print("[CORS] Configuration Applied in Development Settings")
 print(f"CORS_ALLOW_ALL_ORIGINS: {CORS_ALLOW_ALL_ORIGINS}")
 
 # Email backend for development (console)

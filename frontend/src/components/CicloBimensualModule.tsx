@@ -14,6 +14,7 @@ import { cicloService } from '@/services/ciclo.service';
 import { cajasService } from '@/services/cajas.service';
 import { CicloDTO, TipoBeneficioDTO } from '@/types';
 import { toast } from 'sonner';
+import RRHHCrearTipoBeneficio from './rrhh/RRHHCrearTipoBeneficio';
 
 
 
@@ -34,6 +35,7 @@ export function CicloBimensualModule() {
   const [showCreateCicloModal, setShowCreateCicloModal] = useState(false);
   const [showCreateBeneficioModal, setShowCreateBeneficioModal] = useState(false);
   const [showCreateCajaModal, setShowCreateCajaModal] = useState(false);
+  const [showCreateBeneficioTipoModal, setShowCreateBeneficioTipoModal] = useState(false);
   const [showEditBeneficioModal, setShowEditBeneficioModal] = useState(false);
   const [showEditCajaModal, setShowEditCajaModal] = useState(false);
   const [showAgregarBeneficioModal, setShowAgregarBeneficioModal] = useState(false);
@@ -476,23 +478,35 @@ export function CicloBimensualModule() {
             Crear Ciclo
           </Button>
           <Button
-            onClick={() => setShowCreateBeneficioModal(true)}
-            className="bg-[#017E49] text-white hover:bg-[#016339] h-11 px-6 rounded-xl"
+            onClick={() => setShowCreateBeneficioTipoModal(true)}
+            className="bg-[#FDF2E9] text-[#333333] hover:bg-[#FFF7F2] h-11 px-6 rounded-xl border-2 border-[#D9D9D9] font-semibold"
+            style={{ letterSpacing: '0.2px' }}
           >
-            <Package className="w-4 h-4 mr-2" />
-            Crear Beneficio
-          </Button>
-          <Button
-            onClick={() => setShowCreateCajaModal(true)}
-            className="text-white h-11 px-6 rounded-xl"
-            style={{ backgroundColor: '#FF8C00' }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#E67E00'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#FF8C00'}
-          >
-            <Package className="w-4 h-4 mr-2" />
-            Crear Caja
+            <Package className="w-4 h-4 mr-2 text-[#9C27B0]" />
+            Nuevo Beneficio
           </Button>
         </div>
+            {showCreateBeneficioTipoModal && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-xl p-6 w-full max-w-4xl mx-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-[#333333]" style={{ fontSize: '20px', fontWeight: 700 }}>
+                      Nuevo Beneficio
+                    </h3>
+                    <button
+                      onClick={() => setShowCreateBeneficioTipoModal(false)}
+                      className="px-3 py-1 border-2 border-[#E0E0E0] rounded-lg hover:bg-[#F8F8F8]"
+                      style={{ fontSize: '14px', fontWeight: 600 }}
+                    >
+                      Cerrar
+                    </button>
+                  </div>
+                  <div className="text-[#333333]">
+                    <RRHHCrearTipoBeneficio />
+                  </div>
+                </div>
+              </div>
+            )}
       </div>
 
       {/* Tabs para ver Ciclos y Beneficios */}
@@ -1522,7 +1536,7 @@ export function CicloBimensualModule() {
             </p>
 
             <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-              {beneficiosConCajas.filter(ben => ben.activo).map((beneficio: any) => (
+              {beneficios.filter(ben => ben.activo).map((beneficio: any) => (
                 <div
                   key={beneficio.id}
                   className="border-2 border-[#E0E0E0] rounded-lg p-4 hover:border-[#FF9F55] transition-colors"

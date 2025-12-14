@@ -4,6 +4,7 @@ import uuid
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils import timezone
+from django.shortcuts import render
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
@@ -118,20 +119,38 @@ def obtener_beneficio(request, rut):
         
         beneficio_trabajador = beneficio_qs.order_by('-created_at').first()
         
-        # Si hay BeneficioTrabajador, usar sus datos
-        if beneficio_trabajador and beneficio_data and beneficio_data.get('tipo') not in ['SIN_BENEFICIO', 'BLOQUEADO']:
-            beneficio_data['requiere_validacion_guardia'] = beneficio_trabajador.tipo_beneficio.requiere_validacion_guardia
+        # Si hay BeneficioTrabajador, construir beneficio_disponible desde ahí
+        if beneficio_trabajador:
+            # Determinar si puede retirarse según estado y validación requerida
+            puede_retirarse = False
+            if beneficio_trabajador.tipo_beneficio.requiere_validacion_guardia:
+                # Si requiere validación, solo puede retirarse si está validado
+                puede_retirarse = (beneficio_trabajador.estado == 'validado')
+            else:
+                # Si no requiere validación, puede retirarse si está pendiente o validado
+                puede_retirarse = (beneficio_trabajador.estado in ['pendiente', 'validado'])
+            
+            # Construir beneficio_data desde BeneficioTrabajador
+            beneficio_data = {
+                'tipo': beneficio_trabajador.tipo_beneficio.nombre,
+                'categoria': beneficio_trabajador.tipo_beneficio.nombre,
+                'descripcion': beneficio_trabajador.tipo_beneficio.descripcion,
+                'codigo': beneficio_trabajador.codigo_verificacion,
+                'requiere_validacion_guardia': beneficio_trabajador.tipo_beneficio.requiere_validacion_guardia,
+                'estado': beneficio_trabajador.estado,
+                'ciclo_id': beneficio_trabajador.ciclo.id,
+                'puede_retirarse': puede_retirarse,
+            }
             
             if beneficio_trabajador.tipo_beneficio.requiere_validacion_guardia:
                 beneficio_data['codigo_guardia'] = beneficio_trabajador.codigo_verificacion
                 beneficio_data['codigo_verificacion'] = beneficio_trabajador.codigo_verificacion
             
             result['beneficio_disponible'] = beneficio_data
-        # Si no hay BeneficioTrabajador pero hay beneficio, generar código simple
+        # Si hay beneficio_data pero no BeneficioTrabajador, usar lo que ya estaba
         elif beneficio_data and beneficio_data.get('tipo') not in ['SIN_BENEFICIO', 'BLOQUEADO']:
-            # Generar código simple basado en RUT + timestamp
+            beneficio_data['requiere_validacion_guardia'] = True
             codigo_simple = f"BEN-{rut_c}-{timezone.now().strftime('%Y%m%d')}"
-            beneficio_data['requiere_validacion_guardia'] = True  # Asumir que requiere validación
             beneficio_data['codigo_guardia'] = codigo_simple
             beneficio_data['codigo_verificacion'] = codigo_simple
             result['beneficio_disponible'] = beneficio_data
@@ -220,6 +239,165 @@ def obtener_datos_trabajador(request, rut):
             'nombre': None,
             'error': 'Error interno del servidor'
         }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([AllowTotem])
+@ratelimit(key='ip', rate='30/m', method='GET')
+def ticket_por_codigo(request, codigo):
+    """
+    Resuelve un código de beneficio/verificación a su ticket UUID.
+    Usado por el módulo guardia para buscar tickets por código escaneable.
+    
+    ENDPOINT: GET /api/tickets/por-codigo/{codigo}/
+    PERMISOS: Público (guardia sin autenticación)
+    
+    PARÁMETROS:
+        codigo (str): Código de verificación del beneficio (ej: BEN-0020-000018-778BEB33)
+    
+    RESPUESTA EXITOSA (200):
+        {
+            "uuid": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+            "encontrado": true
+        }
+    
+    RESPUESTA SI NO EXISTE (200):
+        {
+            "encontrado": false,
+            "error": "Código de beneficio no encontrado"
+        }
+    """
+    try:
+        # Buscar en BeneficioTrabajador por código de verificación
+        beneficio = BeneficioTrabajador.objects.filter(
+            codigo_verificacion__iexact=codigo
+        ).select_related('trabajador').first()
+        
+        if not beneficio:
+            return Response({
+                'encontrado': False,
+                'error': 'Código de beneficio no encontrado'
+            }, status=status.HTTP_200_OK)
+        
+        # Buscar el ticket asociado
+        # Primero intentar obtener el ticket pendiente/validado de este beneficio
+        ticket = Ticket.objects.filter(
+            trabajador=beneficio.trabajador,
+            estado__in=['pendiente', 'validado']
+        ).order_by('-created_at').first()
+        
+        if not ticket:
+            # Si no hay ticket, crear uno automáticamente para que el guardia pueda validar
+            ticket = Ticket.objects.create(
+                trabajador=beneficio.trabajador,
+                ciclo=beneficio.ciclo,
+                estado='pendiente',
+                data={'codigo_beneficio': codigo}
+            )
+        
+        return Response({
+            'uuid': str(ticket.uuid),
+            'encontrado': True
+        }, status=status.HTTP_200_OK)
+    except Exception as e:
+        logger.error(f"Error en ticket_por_codigo: {e}")
+        return Response({
+            'encontrado': False,
+            'error': 'Error interno del servidor'
+        }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([AllowTotem])
+@ratelimit(key='ip', rate='30/m', method='POST')
+def validar_guardia_por_codigo(request, codigo):
+    """
+    Valida un beneficio por código (flujo guardia cuando se escanea código BEN-...).
+    Marca el BeneficioTrabajador como validado y retorna el trabajador y beneficio.
+
+    ENDPOINT: POST /api/tickets/por-codigo/{codigo}/validar_guardia/
+    PERMISOS: Público (guardia sin JWT en este flujo simplificado)
+    """
+    try:
+        beneficio = BeneficioTrabajador.objects.filter(
+            codigo_verificacion__iexact=codigo
+        ).select_related('trabajador', 'tipo_beneficio', 'ciclo').first()
+
+        if not beneficio:
+            return Response({
+                'detail': f'Código {codigo} no encontrado. Verifique que el código sea correcto.'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        # Marcar como validado si estaba pendiente
+        estado_anterior = beneficio.estado
+        if beneficio.estado == 'pendiente':
+            beneficio.estado = 'validado'
+            beneficio.save()
+            logger.info(f"Beneficio {codigo} validado por guardia. Trabajador: {beneficio.trabajador.rut}")
+        
+        mensaje = 'Beneficio validado correctamente' if estado_anterior == 'pendiente' else 'Beneficio ya había sido validado previamente'
+
+        return Response({
+            'trabajador': {
+                'rut': beneficio.trabajador.rut,
+                'nombre': beneficio.trabajador.nombre,
+            },
+            'beneficio': {
+                'tipo': beneficio.tipo_beneficio.nombre,
+                'descripcion': beneficio.tipo_beneficio.descripcion,
+                'estado': beneficio.estado,
+                'codigo': codigo,
+            },
+            'estado': beneficio.estado,
+            'mensaje': mensaje,
+        }, status=status.HTTP_200_OK)
+    except Exception as e:
+        logger.error(f"Error en validar_guardia_por_codigo: {e}", exc_info=True)
+        return Response({
+            'detail': f'Error al validar: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ----- QR Reader UI + Endpoint -----
+def qr_reader(request):
+    """Renderiza la página del lector QR (UI simple para tótem)."""
+    return render(request, 'totem/qr_reader.html')
+
+
+@api_view(['POST'])
+@permission_classes([AllowTotem])
+@ratelimit(key='ip', rate='30/m', method='POST')
+def qr_receive_run(request):
+    """Recibe un POST con JSON {"run": "..."} y devuelve datos del trabajador si existe.
+
+    Endpoint pensado para uso interno del tótem: /api/qr-reader/submit-run/ (POST)
+    """
+    try:
+        run = request.data.get('run') if isinstance(request.data, dict) else None
+        if not run:
+            return Response({'detail': 'run missing'}, status=status.HTTP_400_BAD_REQUEST)
+
+        run_c = str(run).strip().upper().replace(' ', '')
+        # insertar guión si falta (ej: 123456785 -> 12345678-5)
+        if '-' not in run_c and len(run_c) >= 2:
+            run_c = run_c[:-1] + '-' + run_c[-1]
+
+        rut_clean = clean_rut(run_c)
+        if not valid_rut(rut_clean):
+            return Response({'detail': 'RUN inválido'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            trabajador = Trabajador.objects.get(rut__iexact=rut_clean)
+            data = TrabajadorSerializer(trabajador).data
+            return Response({'found': True, 'trabajador': data}, status=status.HTTP_200_OK)
+        except Trabajador.DoesNotExist:
+            return Response({'found': False}, status=status.HTTP_200_OK)
+
+    except TotemBaseException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error inesperado en qr_receive_run: {e}")
+        return Response({'detail': 'Error interno del servidor'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['POST'])

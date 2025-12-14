@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Scan, CheckCircle2, XCircle, FileText, AlertCircle, ArrowLeft, Printer, AlertTriangle, Calendar, ChevronLeft, ChevronRight, Info, Search, Camera, X, Star } from 'lucide-react';
 import { trabajadorService } from '@/services/trabajador.service';
+import { beneficioService } from '@/services/beneficio.service';
 import { ticketService } from '@/services/ticket.service';
 import { incidentService } from '@/services/incident.service';
 import { scheduleService } from '@/services/schedule.service';
@@ -66,8 +67,10 @@ export function TotemModule() {
       setErrorMsg('');
       setValidationSteps(prev => prev.map((s, i) => ({ ...s, status: i === 0 ? 'active' : 'pending' })));
       try {
-        // Paso único: obtener beneficio (incluye identidad y stock)
+        // Paso único: obtener beneficio del ciclo activo actual
         const formattedRut = formatRut(rutEscaneado);
+        
+        // Usar trabajadorService para obtener datos completos (mantiene compatibilidad con código antiguo)
         const res = await trabajadorService.getBeneficio(formattedRut);
         if (cancelled) return;
         setBeneficio(res.beneficio);
@@ -93,6 +96,32 @@ export function TotemModule() {
     return () => { cancelled = true; };
   }, [currentScreen, rutEscaneado]);
 
+  // Polling para refrescar beneficio cuando requiere validación de guardia
+  useEffect(() => {
+    if (currentScreen !== 'benefit') return;
+    if (!beneficio?.beneficio_disponible?.requiere_validacion_guardia) return;
+    if (beneficio?.beneficio_disponible?.puede_retirarse) return; // Ya validado
+
+    let cancelled = false;
+    const interval = setInterval(async () => {
+      if (cancelled) return;
+      try {
+        const formattedRut = formatRut(rutEscaneado);
+        const res = await trabajadorService.getBeneficio(formattedRut);
+        if (!cancelled) {
+          setBeneficio(res.beneficio);
+        }
+      } catch (e) {
+        // Ignorar errores en polling silencioso
+      }
+    }, 5000); // Refrescar cada 5 segundos
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [currentScreen, beneficio?.beneficio_disponible?.requiere_validacion_guardia, beneficio?.beneficio_disponible?.puede_retirarse, rutEscaneado]);
+
   const generarTicket = async () => {
     if (!rutEscaneado) return;
     setLoading(true); setErrorMsg('');
@@ -108,7 +137,7 @@ export function TotemModule() {
         throw new Error('No hay ciclo de beneficios activo en este momento. Contacta a RRHH.');
       }
 
-      const t = await ticketService.create(rutEscaneado, 'Central');
+      const t = await ticketService.create(rutEscaneado, undefined);
       setTicket(t);
       setCurrentScreen('success');
     } catch (e: any) {
@@ -935,7 +964,7 @@ function TotemErrorScreen({ onReportIncident, onRetry }: { onReportIncident: () 
               Motivo del rechazo:
             </p>
             <p className="text-[#6B6B6B]" style={{ fontSize: '16px', lineHeight: '1.5' }}>
-              El trabajador se encuentra fuera de su turno asignado. El beneficio solo puede ser retirado durante el horario de trabajo.
+              El trabajador no está registrado en el ciclo actual de beneficios.
             </p>
           </div>
         </div>

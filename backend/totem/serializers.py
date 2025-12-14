@@ -25,7 +25,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 class TrabajadorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Trabajador
-        fields = ['id', 'rut', 'nombre', 'beneficio_disponible']
+        fields = ['id', 'rut', 'nombre', 'contrato', 'sucursal', 'beneficio_disponible']
 
 
 class StockSucursalSerializer(serializers.ModelSerializer):
@@ -76,7 +76,7 @@ class TipoBeneficioSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = TipoBeneficio
-        fields = ['id', 'nombre', 'descripcion', 'activo', 'tipos_contrato', 'requiere_validacion_guardia', 'cajas', 'created_at']
+        fields = ['id', 'nombre', 'descripcion', 'activo', 'es_caja', 'tipos_contrato', 'requiere_validacion_guardia', 'cajas', 'created_at']
         read_only_fields = ['created_at']
     
     def get_cajas(self, obj):

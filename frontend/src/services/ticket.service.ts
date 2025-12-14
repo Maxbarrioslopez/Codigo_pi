@@ -26,7 +26,7 @@ export class TicketService {
     /**
      * Crear un nuevo ticket de retiro
      * @param trabajadorRut - RUT del trabajador (formato: 12345678-9)
-     * @param sucursal - Sucursal de retiro (opcional, default: 'Central')
+    * @param sucursal - Sucursal de retiro (opcional, usa canónicas: Casablanca, Valparaiso Planta BIF, Valparaiso Planta BIC)
      */
     async create(trabajadorRut: string, sucursal?: string): Promise<TicketDTO> {
         try {
@@ -38,7 +38,7 @@ export class TicketService {
             const idempotencyKey = `tk_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
             const { data } = await apiClient.post<TicketDTO>('tickets/', {
                 trabajador_rut: trabajadorRut,
-                data: { sucursal: sucursal || 'Central' },
+                data: { sucursal },
             }, { headers: { 'Idempotency-Key': idempotencyKey } });
             return data;
         } catch (error) {
@@ -60,12 +60,36 @@ export class TicketService {
     }
 
     /**
+     * Resolver código de beneficio a UUID de ticket
+     * @param codigo - Código de verificación del beneficio (ej: BEN-0020-000018-778BEB33)
+     */
+    async resolverCodigoATicket(codigo: string): Promise<string> {
+        try {
+            const { data } = await apiClient.get<{ uuid: string; encontrado: boolean }>(`tickets/por-codigo/${codigo}/`);
+            if (!data.encontrado) {
+                throw new Error('Código de beneficio no encontrado');
+            }
+            return data.uuid;
+        } catch (error) {
+            throw ErrorHandler.handle(error, 'TicketService.resolverCodigoATicket', false);
+        }
+    }
+
+    /**
      * Validar ticket en portería (módulo guardia)
      * @param uuid - UUID del ticket
      * @param codigoCaja - Código de la caja entregada (opcional)
      */
     async validarGuardia(uuid: string, codigoCaja?: string): Promise<TicketDTO> {
         try {
+            // Si viene un código de beneficio (BEN-...), usar el endpoint de código
+            if (uuid.startsWith('BEN-')) {
+                const { data } = await apiClient.post<any>(
+                    `tickets/por-codigo/${uuid}/validar_guardia/`,
+                    { codigo_caja: codigoCaja }
+                );
+                return data as unknown as TicketDTO;
+            }
             const { data } = await apiClient.post<TicketDTO>(
                 `tickets/${uuid}/validar_guardia/`,
                 { codigo_caja: codigoCaja }

@@ -176,6 +176,14 @@ function RRHHDashboard({
               <Gift className="w-4 h-4" />
               Crear Beneficio
             </button>
+            <button
+              onClick={() => setCurrentTab('asignar-masivo')}
+              className="flex items-center gap-2 px-4 py-2 bg-[#EEF2FF] text-[#4F46E5] border-2 border-[#C7D2FE] rounded-lg hover:bg-[#E0E7FF] transition-colors font-semibold"
+              style={{ fontSize: '14px', letterSpacing: '0.2px' }}
+            >
+              <Users className="w-4 h-4" />
+              Asignar Masivo
+            </button>
           </div>
         </div>
 

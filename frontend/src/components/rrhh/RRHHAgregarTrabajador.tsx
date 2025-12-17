@@ -5,7 +5,7 @@ import { trabajadorService } from '@/services/trabajador.service';
 interface TrabajadorFormData {
     rut: string;
     nombre: string;
-    tipo_contrato: 'planta' | 'contrata' | 'honorarios';
+    tipo_contrato: 'planta' | 'contrata' | 'honorarios' | 'indefinido';
 }
 interface FormData {
     rut: string;

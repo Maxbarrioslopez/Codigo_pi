@@ -258,7 +258,7 @@ export function UserManagementDialog({ type, existingUsername, availableUsers = 
                         {type === 'create' ? (
                             <>
                                 <div className="space-y-2">
-                                    <Label htmlFor="rut" className="text-sm font-medium text-[#333333]">
+                                    <Label htmlFor="rut" className="text-base font-semibold text-[#333333]">
                                         RUT (sin puntos, con guión)
                                     </Label>
                                     <Input
@@ -278,7 +278,7 @@ export function UserManagementDialog({ type, existingUsername, availableUsers = 
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="email" className="text-sm font-medium text-[#333333]">
+                                    <Label htmlFor="email" className="text-base font-semibold text-[#333333]">
                                         Email
                                     </Label>
                                     <Input
@@ -294,7 +294,7 @@ export function UserManagementDialog({ type, existingUsername, availableUsers = 
 
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-2">
-                                        <Label htmlFor="first-name" className="text-sm font-medium text-[#333333]">
+                                        <Label htmlFor="first-name" className="text-base font-semibold text-[#333333]">
                                             Nombre
                                         </Label>
                                         <Input
@@ -308,7 +308,7 @@ export function UserManagementDialog({ type, existingUsername, availableUsers = 
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="last-name" className="text-sm font-medium text-[#333333]">
+                                        <Label htmlFor="last-name" className="text-base font-semibold text-[#333333]">
                                             Apellido
                                         </Label>
                                         <Input
@@ -324,7 +324,7 @@ export function UserManagementDialog({ type, existingUsername, availableUsers = 
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="rol" className="text-sm font-medium text-[#333333]">
+                                    <Label htmlFor="rol" className="text-base font-semibold text-[#333333]">
                                         Rol
                                     </Label>
                                     <Select value={rol} onValueChange={(value: any) => setRol(value)} disabled={loading}>
@@ -342,7 +342,7 @@ export function UserManagementDialog({ type, existingUsername, availableUsers = 
                         ) : (
                             <>
                                 <div className="space-y-2">
-                                    <Label htmlFor="reset-username" className="text-sm font-medium text-[#333333]">
+                                    <Label htmlFor="reset-username" className="text-base font-semibold text-[#333333]">
                                         Usuario
                                     </Label>
                                     <Select value={username} onValueChange={(value) => setUsername(value)} disabled={loading}>
@@ -360,7 +360,7 @@ export function UserManagementDialog({ type, existingUsername, availableUsers = 
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="new-password" className="text-sm font-medium text-[#333333]">
+                                    <Label htmlFor="new-password" className="text-base font-semibold text-[#333333]">
                                         Nueva Contraseña Temporal
                                     </Label>
                                     <div className="relative">
@@ -382,7 +382,7 @@ export function UserManagementDialog({ type, existingUsername, availableUsers = 
                                             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                         </button>
                                     </div>
-                                    <p className="text-xs text-[#6B6B6B]">Min. 8 caracteres, mayúsculas, minúsculas y números</p>
+                                    <p className="text-sm text-[#555555] mt-2">Min. 8 caracteres, mayúsculas, minúsculas y números</p>
                                 </div>
                             </>
                         )}

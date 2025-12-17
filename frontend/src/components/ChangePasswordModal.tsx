@@ -129,7 +129,7 @@ export function ChangePasswordModal({ isOpen, onSuccess, requireChange = false }
                     )}
 
                     <div className="space-y-2">
-                        <Label htmlFor="current-password" className="text-sm font-medium text-[#333333]">
+                        <Label htmlFor="current-password" className="text-base font-semibold text-[#333333]">
                             Contraseña Actual
                         </Label>
                         <div className="relative">
@@ -154,7 +154,7 @@ export function ChangePasswordModal({ isOpen, onSuccess, requireChange = false }
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="new-password" className="text-sm font-medium text-[#333333]">
+                        <Label htmlFor="new-password" className="text-base font-semibold text-[#333333]">
                             Nueva Contraseña
                         </Label>
                         <div className="relative">
@@ -191,7 +191,7 @@ export function ChangePasswordModal({ isOpen, onSuccess, requireChange = false }
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="confirm-password" className="text-sm font-medium text-[#333333]">
+                        <Label htmlFor="confirm-password" className="text-base font-semibold text-[#333333]">
                             Confirmar Contraseña
                         </Label>
                         <div className="relative">

@@ -21,6 +21,14 @@ export interface NominaPreviewResponse {
         beneficio_asignado: number;
         estado: string;
     }>;
+    // Campos opcionales usados en UI
+    resumen?: {
+        total_registros: number;
+        validos: number;
+        a_crear: number;
+        a_actualizar: number;
+    };
+    errores?: Array<{ mensaje?: string; [key: string]: any }>;
 }
 
 export interface NominaConfirmRequest {

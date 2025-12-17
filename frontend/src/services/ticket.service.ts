@@ -143,6 +143,37 @@ export class TicketService {
             throw ErrorHandler.handle(error, 'TicketService.listar', false);
         }
     }
+
+    // Generación de QR (placeholder mientras se integra backend)
+    async generateQR(payload: { box_id: string; benefit_type: string }): Promise<any> {
+        // Simulación local para no bloquear la UI; reemplazar por endpoint real cuando exista
+        return {
+            id: Date.now(),
+            qrCode: payload.box_id,
+            boxId: payload.box_id,
+            workerName: '',
+            workerRut: '',
+            guardName: '',
+            generatedDate: new Date().toISOString(),
+            deliveredDate: null,
+            status: 'Pendiente',
+        };
+    }
+
+    async generateBatchQR(payload: { quantity: number }): Promise<any[]> {
+        const now = Date.now();
+        return Array.from({ length: payload.quantity }, (_, idx) => ({
+            id: now + idx,
+            qrCode: `QR-${now + idx}`,
+            boxId: `BOX-${now + idx}`,
+            workerName: '',
+            workerRut: '',
+            guardName: '',
+            generatedDate: new Date().toISOString(),
+            deliveredDate: null,
+            status: 'Pendiente',
+        }));
+    }
 }
 
 // Exportar instancia singleton

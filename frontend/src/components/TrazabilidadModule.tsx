@@ -10,6 +10,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { ticketService } from '../services/ticket.service';
 import { showSuccess, showError } from '../utils/toast';
 
+const mockQRTimeline = [
+  { id: 1, type: 'generated', title: 'QR Generado', timestamp: '2024-01-01 10:00', date: '2024-01-01', description: 'QR generado', user: 'System' },
+  { id: 2, type: 'assigned', title: 'Asignado a caja', timestamp: '2024-01-01 10:05', date: '2024-01-01', description: 'Asignado', user: 'Admin' },
+  { id: 3, type: 'validated', title: 'Validado por guardia', timestamp: '2024-01-01 10:15', date: '2024-01-01', description: 'Validado', user: 'Guardia' },
+  { id: 4, type: 'delivered', title: 'Entregado', timestamp: '2024-01-01 10:20', date: '2024-01-01', description: 'Entregado', user: 'Guardia' },
+];
+
 export function TrazabilidadModule() {
   const [qrCodes, setQrCodes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -539,41 +546,9 @@ export function TrazabilidadModule() {
                 </Button>
               </div>
             </TabsContent>
-            placeholder="BOX-PRM-"
-            className="h-11 border-2 border-[#E0E0E0] rounded-xl mt-2"
-                />
-          </div>
-          <div className="bg-[#FFF4E6] border-2 border-[#FF9F55] rounded-xl p-4">
-            <div className="flex gap-3">
-              <AlertCircle className="w-5 h-5 text-[#FF9F55] flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-[#333333] mb-1">Generación por Lote</p>
-                <p className="text-[#6B6B6B]" style={{ fontSize: '14px' }}>
-                  Se generarán códigos QR únicos para cada caja. El proceso puede tardar unos minutos.
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="flex justify-end gap-3 pt-4">
-            <Button
-              variant="outline"
-              onClick={() => setShowGenerateModal(false)}
-              className="h-11 px-6 rounded-xl border-2 border-[#E0E0E0]"
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={() => setShowGenerateModal(false)}
-              className="bg-[#E12019] text-white hover:bg-[#B51810] h-11 px-6 rounded-xl"
-            >
-              <QrCode className="w-4 h-4 mr-2" />
-              Generar Lote
-            </Button>
-          </div>
-        </TabsContent>
-      </Tabs>
-    </DialogContent>
-      </Dialog >
-    </div >
+          </Tabs>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

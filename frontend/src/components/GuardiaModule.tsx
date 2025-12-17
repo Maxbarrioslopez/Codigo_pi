@@ -573,7 +573,7 @@ function ScannerView({
               <button
                 onClick={onFetchEstado}
                 disabled={!ticketUUID || validating}
-                className="px-6 py-3 bg-[#6B6B6B] text-white rounded-xl hover:bg-[#4B4B4B] transition-colors disabled:opacity-50"
+                className="px-6 py-3 bg-[#6B6B6B] text-white rounded-xl hover:bg-[#4B4B4B] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ fontSize: '14px', fontWeight: 700 }}
               >
                 Estado
@@ -1155,7 +1155,7 @@ function StockView() {
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
                   placeholder="Ej: 20"
-                  className="w-full px-4 py-3 bg-white border-2 border-[#E0E0E0] rounded-xl text-[#333333] placeholder:text-[#6B6B6B] focus:border-[#017E49] focus:outline-none"
+                  className="w-full px-4 py-3 bg-white border-2 border-[#E0E0E0] rounded-xl text-[#333333] placeholder:text-[#999999] focus:border-[#017E49] focus:outline-none"
                   style={{ fontSize: '16px' }}
                 />
               </div>
@@ -1246,7 +1246,7 @@ function StockView() {
                   value={observation}
                   onChange={(e) => setObservation(e.target.value)}
                   placeholder="Ej: Cajas dañadas durante transporte"
-                  className="w-full h-24 px-4 py-3 bg-white border-2 border-[#E0E0E0] rounded-xl text-[#333333] placeholder:text-[#6B6B6B] focus:border-[#E12019] focus:outline-none resize-none"
+                  className="w-full h-24 px-4 py-3 bg-white border-2 border-[#E0E0E0] rounded-xl text-[#333333] placeholder:text-[#999999] focus:border-[#E12019] focus:outline-none resize-none"
                   style={{ fontSize: '16px' }}
                 />
               </div>

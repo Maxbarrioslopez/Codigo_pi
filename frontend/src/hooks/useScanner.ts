@@ -57,7 +57,9 @@ export function useScanner(options: UseScannerOptions): UseScannerReturn {
     function stop() {
         try {
             controlsRef.current?.stop();
-            readerRef.current?.reset();
+            if (readerRef.current && 'reset' in readerRef.current) {
+                (readerRef.current as any).reset();
+            }
         } catch { /* noop */ }
         setIsActive(false);
     }

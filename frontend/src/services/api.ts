@@ -34,7 +34,23 @@ export interface IncidenciaDTO {
 }
 export interface ParametroOperativoDTO { id: number; clave: string; valor: string; descripcion: string; updated_at: string; }
 export interface BeneficioResponse { beneficio: TrabajadorDTO; }
-export interface MetricasGuardiaDTO { entregados: number; pendientes: number; incidencias_pendientes: number; }
+export interface MetricasGuardiaDTO { 
+    entregados: number; 
+    pendientes: number; 
+    incidencias_pendientes: number;
+    tickets_pendientes?: number;
+    entregas_hoy?: number;
+    stock_disponible?: number;
+    tasa_eficiencia?: number;
+    tickets_generados?: number;
+    tickets_entregados?: number;
+    tickets_expirados?: number;
+    ciclo_actual?: {
+        fecha_inicio: string;
+        fecha_fin: string;
+        dias_restantes?: number;
+    };
+}
 // Stock
 export interface StockResumenDTO { disponible: number; entregadas_hoy: number; reservadas: number; total_mes: number; por_tipo: { estandar: number; premium: number }; }
 export interface StockMovimientoDTO { fecha: string; hora: string; tipo_caja: string; accion: 'Agregado' | 'Retirado'; cantidad: number; motivo: string; usuario: string; }

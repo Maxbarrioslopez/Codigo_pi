@@ -95,7 +95,7 @@ export function ScannerBase({
                     // Usar decodeFromVideoDevice que maneja cámara automáticamente
                     const controls = await reader.decodeFromVideoDevice(
                         undefined, // deviceId - usa cámara por defecto
-                        videoRef.current,
+                        videoRef.current || undefined,
                         (result, err) => {
                             if (result) {
                                 const text = result.getText();

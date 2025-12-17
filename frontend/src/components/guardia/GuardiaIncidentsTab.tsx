@@ -100,7 +100,7 @@ export function GuardiaIncidentsTab() {
                 <div className="bg-white border-2 border-[#E0E0E0] rounded-xl p-4">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-[#333333] mb-2">
+                            <label className="block text-base font-semibold text-[#333333] mb-2">
                                 Estado
                             </label>
                             <select
@@ -130,7 +130,7 @@ export function GuardiaIncidentsTab() {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-[#333333] mb-2">
+                            <label className="block text-base font-semibold text-[#333333] mb-2">
                                 RUT Trabajador
                             </label>
                             <input
@@ -177,7 +177,7 @@ export function GuardiaIncidentsTab() {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-[#333333] mb-2">
+                            <label className="block text-base font-semibold text-[#333333] mb-2">
                                 Descripción
                             </label>
                             <textarea
@@ -216,7 +216,7 @@ export function GuardiaIncidentsTab() {
                         Incidencias ({incidents.length})
                     </h3>
                     <button
-                        onClick={refresh}
+                        onClick={() => refresh()}
                         disabled={loading}
                         className="px-3 py-1 text-sm text-[#E12019] hover:bg-[#FFE5E5] rounded-lg transition-colors"
                     >
@@ -259,9 +259,9 @@ export function GuardiaIncidentsTab() {
                                         <span className="text-xs text-[#6B6B6B]">{inc.tipo}</span>
                                     </div>
                                     <p className="text-[#333333] text-sm mb-2">{inc.descripcion}</p>
-                                    {inc.trabajador && (
+                                    {inc.trabajador && typeof inc.trabajador === 'object' && (
                                         <p className="text-xs text-[#6B6B6B]">
-                                            Trabajador: {inc.trabajador.nombre} ({inc.trabajador.rut})
+                                            Trabajador: {(inc.trabajador as any).nombre} ({(inc.trabajador as any).rut})
                                         </p>
                                     )}
                                 </div>

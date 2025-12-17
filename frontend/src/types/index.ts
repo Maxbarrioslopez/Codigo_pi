@@ -9,6 +9,12 @@ export interface TrabajadorDTO {
     rut: string;
     nombre: string;
     beneficio_disponible: any;
+    // Campos opcionales usados por formularios y listados
+    contrato?: string;
+    sucursal?: string;
+    seccion?: string;
+    estado?: string;
+    beneficio?: string;
 }
 
 export interface BeneficioDTO {
@@ -40,6 +46,13 @@ export interface TicketDTO {
     ciclo: number | null;
     sucursal: number | null;
     eventos: TicketEventoDTO[];
+    // Campos adicionales que algunas vistas consumen
+    beneficio?: {
+        tipo?: string;
+        tipo_contrato?: string;
+        sucursal?: string;
+    };
+    mensaje?: string;
 }
 
 // ==================== DTOs de Tipos de Beneficio ====================
@@ -111,6 +124,19 @@ export interface MetricasGuardiaDTO {
     entregados: number;
     pendientes: number;
     incidencias_pendientes: number;
+    // Métricas extendidas opcionales
+    tickets_pendientes?: number;
+    entregas_hoy?: number;
+    stock_disponible?: number;
+    tasa_eficiencia?: number;
+    tickets_generados?: number;
+    tickets_entregados?: number;
+    tickets_expirados?: number;
+    ciclo_actual?: {
+        fecha_inicio: string;
+        fecha_fin: string;
+        dias_restantes?: number;
+    };
 }
 
 export interface RetirosDiaDTO {

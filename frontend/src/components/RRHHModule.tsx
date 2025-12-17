@@ -113,7 +113,7 @@ function RRHHDashboard({
                   value={rutFilter}
                   onChange={(e) => setRutFilter(e.target.value)}
                   placeholder="RUT trabajador (ej: 12345678-5)"
-                  className="px-3 py-2 bg-white border-2 border-[#E0E0E0] rounded-lg text-[#333333] placeholder:text-[#6B6B6B] focus:border-[#E12019] focus:outline-none"
+                  className="px-3 py-2 bg-white border-2 border-[#E0E0E0] rounded-lg text-[#333333] placeholder:text-[#999999] focus:border-[#E12019] focus:outline-none"
                   style={{ fontSize: '14px', minWidth: '220px' }}
                 />
               </div>

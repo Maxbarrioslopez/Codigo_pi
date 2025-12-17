@@ -272,7 +272,7 @@ export function TotemCheckIncidents({ onBack }: TotemCheckIncidentsProps) {
                                     <button
                                         onClick={() => setSelectedIndex(Math.min(incidencias.length - 1, selectedIndex + 1))}
                                         disabled={selectedIndex === incidencias.length - 1}
-                                        className="px-4 py-2 bg-[#E0E0E0] text-[#333333] rounded disabled:opacity-50"
+                                        className="px-4 py-2 bg-[#E0E0E0] text-[#333333] rounded disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         →
                                     </button>

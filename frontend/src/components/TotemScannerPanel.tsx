@@ -140,8 +140,8 @@ export default function TotemScannerPanel({ onRutDetected, onError }: TotemScann
     // Detener
     const stopCamera = useCallback(() => {
         try {
-            if (codeReaderRef.current) {
-                codeReaderRef.current.reset();
+            if (codeReaderRef.current && 'reset' in codeReaderRef.current) {
+                (codeReaderRef.current as any).reset();
             }
             if (videoRef.current?.srcObject) {
                 (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());

@@ -331,7 +331,7 @@ export function DesignSystem() {
               <input
                 type="text"
                 placeholder="Enter text..."
-                className="w-full px-4 py-3 bg-white border-2 border-[#E0E0E0] rounded-xl text-[#333333] placeholder:text-[#6B6B6B] focus:border-[#E12019] focus:outline-none transition-colors"
+                className="w-full px-4 py-3 bg-white border-2 border-[#E0E0E0] rounded-xl text-[#333333] placeholder:text-[#999999] focus:border-[#E12019] focus:outline-none focus:ring-2 focus:ring-[#E12019]/20 transition-colors"
                 style={{ fontSize: '16px' }}
               />
               <input

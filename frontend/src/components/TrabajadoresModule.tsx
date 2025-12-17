@@ -26,20 +26,21 @@ export function TrabajadoresModule() {
   const [registerForm, setRegisterForm] = useState({ rut: '', nombre: '', seccion: '', contrato: '', sucursal: '', beneficio: '' });
   const [editForm, setEditForm] = useState({ nombre: '', estado: '', beneficio: '' });
 
+  const loadWorkers = async () => {
+    try {
+      setLoading(true);
+      const workersList = await trabajadorService.getAll();
+      setWorkers(workersList || []);
+    } catch (error) {
+      console.error('Error loading workers:', error);
+      showError('Error', 'No se pudieron cargar los trabajadores');
+      setWorkers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadWorkers = async () => {
-      try {
-        setLoading(true);
-        const workersList = await trabajadorService.getAll();
-        setWorkers(workersList || []);
-      } catch (error) {
-        console.error('Error loading workers:', error);
-        showError('Error', 'No se pudieron cargar los trabajadores');
-        setWorkers([]);
-      } finally {
-        setLoading(false);
-      }
-    };
     loadWorkers();
   }, []);
 

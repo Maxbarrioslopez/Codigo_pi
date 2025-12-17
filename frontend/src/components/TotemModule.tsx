@@ -141,7 +141,7 @@ export function TotemModule() {
       setTicket(t);
       setCurrentScreen('success');
     } catch (e: any) {
-      mapApiErrorToStateAndToast(e, { setError: setErrorMsg, toState: setCurrentScreen });
+      mapApiErrorToStateAndToast(e, { setError: setErrorMsg, toState: (state: string) => setCurrentScreen(state as TotemScreen) });
     } finally { setLoading(false); }
   };
 
@@ -151,7 +151,7 @@ export function TotemModule() {
       await scheduleService.crearAgendamiento(rutEscaneado, fechaISO);
       setCurrentScreen('schedule-confirm');
     } catch (e: any) {
-      mapApiErrorToStateAndToast(e, { setError: setErrorMsg, toState: setCurrentScreen });
+      mapApiErrorToStateAndToast(e, { setError: setErrorMsg, toState: (state: string) => setCurrentScreen(state as TotemScreen) });
     } finally { setLoading(false); }
   };
 
@@ -178,7 +178,7 @@ export function TotemModule() {
       setCurrentScreen('benefit');
     } catch (e: any) {
       console.error('Error reportando incidencia:', e);
-      mapApiErrorToStateAndToast(e, { setError: setErrorMsg, toState: setCurrentScreen });
+      mapApiErrorToStateAndToast(e, { setError: setErrorMsg, toState: (state: string) => setCurrentScreen(state as TotemScreen) });
     } finally {
       setLoading(false);
     }
@@ -752,7 +752,7 @@ function TotemScheduleSelect({
                 ? 'bg-[#FF9F55] border-[#FF9F55] text-white'
                 : day.available
                   ? 'bg-white border-[#E0E0E0] text-[#333333] hover:border-[#FF9F55]'
-                  : 'bg-[#F8F8F8] border-[#E0E0E0] text-[#6B6B6B] cursor-not-allowed'
+                  : 'bg-[#C0C0C0] border-[#C0C0C0] text-[#6B6B6B] cursor-not-allowed'
                 }`}
               style={{ fontSize: '18px', fontWeight: 700, minHeight: '72px' }}
             >
@@ -1071,7 +1071,7 @@ function LocalTotemIncidentForm({
           value={description}
           onChange={(e) => onDescriptionChange(e.target.value)}
           placeholder="Describe el problema con más detalle..."
-          className="w-full h-32 px-4 py-3 bg-white border-2 border-[#E0E0E0] rounded-xl text-[#333333] placeholder:text-[#6B6B6B] focus:border-[#E12019] focus:outline-none resize-none"
+          className="w-full h-32 px-4 py-3 bg-white border-2 border-[#E0E0E0] rounded-xl text-[#333333] placeholder:text-[#999999] focus:border-[#E12019] focus:outline-none focus:ring-2 focus:ring-[#E12019]/20 resize-none"
           style={{ fontSize: '16px' }}
         />
       </div>

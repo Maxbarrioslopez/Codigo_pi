@@ -596,7 +596,7 @@ export function RRHHModuleNew() {
                                                 </DialogHeader>
                                                 <div className="space-y-4">
                                                     <div>
-                                                        <Label className="text-sm font-medium text-[#333333]">Fecha Inicio</Label>
+                                                        <Label className="text-base font-semibold text-[#333333]">Fecha Inicio</Label>
                                                         <Input
                                                             type="date"
                                                             value={cicloForm.fecha_inicio || ''}
@@ -605,7 +605,7 @@ export function RRHHModuleNew() {
                                                         />
                                                     </div>
                                                     <div>
-                                                        <Label className="text-sm font-medium text-[#333333]">Fecha Fin</Label>
+                                                        <Label className="text-base font-semibold text-[#333333]">Fecha Fin</Label>
                                                         <Input
                                                             type="date"
                                                             value={cicloForm.fecha_fin || ''}
@@ -688,7 +688,7 @@ export function RRHHModuleNew() {
                                             </DialogHeader>
                                             <div className="space-y-4">
                                                 <div>
-                                                    <Label className="text-sm font-medium text-[#333333]">RUT <span className="text-[#E12019]">*</span></Label>
+                                                    <Label className="text-base font-semibold text-[#333333]">RUT <span className="text-[#E12019]">*</span></Label>
                                                     <Input
                                                         placeholder="12.345.678-9"
                                                         value={trabajadorForm.rut || ''}
@@ -709,7 +709,7 @@ export function RRHHModuleNew() {
                                                     <p className="text-xs text-[#6B6B6B] mt-1">Formato: 12.345.678-9</p>
                                                 </div>
                                                 <div>
-                                                    <Label className="text-sm font-medium text-[#333333]">Nombre Completo <span className="text-[#E12019]">*</span></Label>
+                                                    <Label className="text-base font-semibold text-[#333333]">Nombre Completo <span className="text-[#E12019]">*</span></Label>
                                                     <Input
                                                         placeholder="Juan Pérez López"
                                                         value={trabajadorForm.nombre || ''}
@@ -718,7 +718,7 @@ export function RRHHModuleNew() {
                                                     />
                                                 </div>
                                                 <div>
-                                                    <Label className="text-sm font-medium text-[#333333]">Tipo de Contrato <span className="text-[#E12019]">*</span></Label>
+                                                    <Label className="text-base font-semibold text-[#333333]">Tipo de Contrato <span className="text-[#E12019]">*</span></Label>
                                                     <Select value={trabajadorForm.contrato || ''} onValueChange={(val) => setTrabajadorForm({ ...trabajadorForm, contrato: val })}>
                                                         <SelectTrigger className="text-sm h-10 border-2 border-[#E0E0E0] rounded-lg mt-1">
                                                             <SelectValue placeholder="Seleccionar tipo..." />
@@ -732,7 +732,7 @@ export function RRHHModuleNew() {
                                                     </Select>
                                                 </div>
                                                 <div>
-                                                    <Label className="text-sm font-medium text-[#333333]">Sucursal</Label>
+                                                    <Label className="text-base font-semibold text-[#333333]">Sucursal</Label>
                                                     <Select value={trabajadorForm.sucursal || ''} onValueChange={(val) => setTrabajadorForm({ ...trabajadorForm, sucursal: val })}>
                                                         <SelectTrigger className="text-sm h-10 border-2 border-[#E0E0E0] rounded-lg mt-1">
                                                             <SelectValue placeholder="Seleccionar sucursal..." />
@@ -784,7 +784,7 @@ export function RRHHModuleNew() {
                                             </DialogHeader>
                                             <div className="space-y-4">
                                                 <div>
-                                                    <Label className="text-sm font-medium text-[#333333]">Archivo CSV o Excel</Label>
+                                                    <Label className="text-base font-semibold text-[#333333]">Archivo CSV o Excel</Label>
                                                     <Input
                                                         type="file"
                                                         accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"

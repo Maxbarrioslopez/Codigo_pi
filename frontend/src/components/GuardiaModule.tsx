@@ -3,6 +3,7 @@ import { Scan, Package, Clock, AlertOctagon, History, User, Eye, EyeOff, AlertCi
 import { ticketService } from '@/services/ticket.service';
 import { TicketDTO, MetricasGuardiaDTO, StockResumenDTO, StockMovimientoDTO } from '@/types';
 import { incidentService } from '@/services/incident.service';
+import { formatRutOnType } from '@/utils/rut';
 import { stockService } from '@/services/stock.service';
 import { ticketsQueryService } from '@/services/tickets.query.service';
 import { useMetricasGuardia } from '../hooks/useMetricasGuardia';
@@ -805,6 +806,9 @@ function ScannerView({
 function IncidentReportView() {
   const [selectedType, setSelectedType] = useState('');
   const [description, setDescription] = useState('');
+  const [workerRut, setWorkerRut] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const incidentTypes = [
     'Ticket ilegible o dañado',
@@ -814,6 +818,29 @@ function IncidentReportView() {
     'Otro problema'
   ];
 
+  const handleSubmit = async () => {
+    if (!selectedType) return;
+    
+    setSubmitting(true);
+    setMessage(null);
+    try {
+      await incidentService.crearIncidencia({
+        tipo: selectedType.toLowerCase().replace(/\s+/g, '_'),
+        descripcion: description,
+        trabajador_rut: workerRut || undefined,
+        origen: 'guardia'
+      });
+      setMessage({ type: 'success', text: 'Incidencia reportada exitosamente' });
+      setSelectedType('');
+      setDescription('');
+      setWorkerRut('');
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err?.detail || err?.message || 'Error al reportar incidencia' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="max-w-3xl mx-auto">
       <h3 className="text-[#333333] mb-6" style={{ fontSize: '24px', fontWeight: 500 }}>
@@ -821,6 +848,12 @@ function IncidentReportView() {
       </h3>
 
       <div className="bg-white border-2 border-[#E0E0E0] rounded-xl p-8">
+        {message && (
+          <div className={`mb-6 p-4 rounded-lg ${message.type === 'success' ? 'bg-[#E8F5F1] border-2 border-[#017E49] text-[#017E49]' : 'bg-[#FFE5E5] border-2 border-[#E12019] text-[#E12019]'}`}>
+            {message.text}
+          </div>
+        )}
+
         {/* Type Selection */}
         <div className="mb-8">
           <label className="block text-[#333333] mb-4" style={{ fontSize: '18px', fontWeight: 500 }}>
@@ -869,6 +902,8 @@ function IncidentReportView() {
           </label>
           <input
             type="text"
+            value={workerRut}
+            onChange={(e) => setWorkerRut(formatRutOnType(e.target.value))}
             placeholder="Ej: 12.345.678-9"
             className="w-full px-4 py-3 bg-white border-2 border-[#E0E0E0] rounded-xl text-[#333333] placeholder:text-[#6B6B6B] focus:border-[#E12019] focus:outline-none"
             style={{ fontSize: '16px' }}
@@ -878,13 +913,20 @@ function IncidentReportView() {
         {/* Actions */}
         <div className="flex gap-4">
           <button
-            disabled={!selectedType}
+            onClick={handleSubmit}
+            disabled={!selectedType || submitting}
             className="flex-1 px-8 py-4 bg-[#E12019] text-white rounded-xl hover:bg-[#B51810] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ fontSize: '18px', fontWeight: 700, minHeight: '56px' }}
           >
-            Enviar Incidencia
+            {submitting ? 'Enviando...' : 'Enviar Incidencia'}
           </button>
           <button
+            onClick={() => {
+              setSelectedType('');
+              setDescription('');
+              setWorkerRut('');
+              setMessage(null);
+            }}
             className="px-8 py-4 bg-white text-[#333333] border-2 border-[#E12019] rounded-xl hover:bg-[#F8F8F8] transition-colors"
             style={{ fontSize: '18px', fontWeight: 700, minHeight: '56px' }}
           >

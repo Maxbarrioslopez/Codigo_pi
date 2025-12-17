@@ -661,7 +661,15 @@ export function RRHHModuleNew() {
                                 <Input
                                     placeholder="Buscar por nombre o RUT..."
                                     value={trabajadorFilter}
-                                    onChange={(e) => setTrabajadorFilter(e.target.value)}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        // Si parece un RUT (solo números y punto), formatear
+                                        if (/^[\d.]+$/.test(value) && value.length > 0) {
+                                            setTrabajadorFilter(formatRutOnType(value));
+                                        } else {
+                                            setTrabajadorFilter(value);
+                                        }
+                                    }}
                                     className="flex-1 text-sm"
                                 />
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AlertCircle, CheckCircle2, Clock, Search, Filter } from 'lucide-react';
+import { formatRutOnType } from '@/utils/rut';
 import { useGuardiaIncidents } from '@/hooks/useGuardiaIncidents';
 
 type IncidentFormData = {
@@ -136,7 +137,7 @@ export function GuardiaIncidentsTab() {
                             <input
                                 type="text"
                                 value={filter.trabajador_rut || ''}
-                                onChange={(e) => applyFilter({ ...filter, trabajador_rut: e.target.value || undefined })}
+                                onChange={(e) => applyFilter({ ...filter, trabajador_rut: formatRutOnType(e.target.value) || undefined })}
                                 placeholder="12345678-9"
                                 className="w-full px-3 py-2 border-2 border-[#E0E0E0] rounded-lg focus:border-[#E12019] focus:outline-none"
                             />
@@ -157,7 +158,7 @@ export function GuardiaIncidentsTab() {
                             <input
                                 type="text"
                                 value={formData.trabajador_rut}
-                                onChange={(e) => setFormData({ ...formData, trabajador_rut: e.target.value })}
+                                onChange={(e) => setFormData({ ...formData, trabajador_rut: formatRutOnType(e.target.value) })}
                                 placeholder="12345678-9"
                                 className="w-full px-3 py-2 border-2 border-[#E0E0E0] rounded-lg focus:border-[#E12019] focus:outline-none"
                             />

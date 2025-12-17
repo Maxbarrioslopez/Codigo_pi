@@ -507,21 +507,15 @@ export function CicloBimensualModule() {
         </div>
             {showCreateBeneficioTipoModal && (
               <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                <div className="bg-white rounded-xl p-6 w-full max-w-4xl mx-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-[#333333]" style={{ fontSize: '20px', fontWeight: 700 }}>
-                      Nuevo Beneficio
-                    </h3>
+                <div className="bg-white rounded-xl w-full max-w-4xl mx-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+                  <RRHHCrearTipoBeneficio />
+                  <div className="p-4 border-t border-[#E0E0E0] flex justify-end">
                     <button
                       onClick={() => setShowCreateBeneficioTipoModal(false)}
-                      className="px-3 py-1 border-2 border-[#E0E0E0] rounded-lg hover:bg-[#F8F8F8]"
-                      style={{ fontSize: '14px', fontWeight: 600 }}
+                      className="px-6 py-2 bg-[#E0E0E0] text-[#333333] rounded-lg hover:bg-[#D0D0D0] font-semibold"
                     >
                       Cerrar
                     </button>
-                  </div>
-                  <div className="text-[#333333]">
-                    <RRHHCrearTipoBeneficio />
                   </div>
                 </div>
               </div>
@@ -632,7 +626,7 @@ export function CicloBimensualModule() {
                     </Button>
                     <Button
                       onClick={() => handleAsignarBeneficiosMasivo(ciclo.id)}
-                      className="bg-blue-600 text-white hover:bg-blue-700 font-bold"
+                      className="bg-[#E12019] text-white hover:bg-[#B51810] font-bold disabled:bg-[#C0C0C0] disabled:text-[#6B6B6B] disabled:cursor-not-allowed"
                       disabled={!ciclo.activo}
                     >
                       <Users className="w-4 h-4 mr-2" />

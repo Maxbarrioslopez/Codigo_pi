@@ -1023,57 +1023,90 @@ export function RRHHModuleNew() {
                     {/* INCIDENTES TAB */}
                     <TabsContent value="incidentes" className="space-y-4">
                         <div className="bg-white rounded-lg border border-[#E0E0E0] p-3 md:p-6">
-                            <div className="mb-3">
-                                <h3 className="text-[#333333] text-sm md:text-base font-semibold">Incidentes</h3>
-                                <p className="text-[#6B6B6B] text-xs">Listado de reportes con opción de responder</p>
+                            <div className="mb-4 flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-[#333333] text-sm md:text-base font-semibold">Reportes de Incidentes</h3>
+                                    <p className="text-[#6B6B6B] text-xs">Reportados por Guardia ({incidencias.length})</p>
+                                </div>
+                                <button
+                                    onClick={reloadIncidencias}
+                                    className="px-3 py-2 bg-[#017E49] text-white text-xs rounded hover:bg-[#015F3A] transition-colors"
+                                >
+                                    Recargar
+                                </button>
                             </div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-xs md:text-sm">
-                                    <thead className="bg-[#F8F8F8] border-b border-[#E0E0E0]">
-                                        <tr>
-                                            <th className="text-left p-2 md:p-3">Tipo</th>
-                                            <th className="text-left p-2 md:p-3">RUT reclamante</th>
-                                            <th className="text-left p-2 md:p-3">Descripción</th>
-                                            <th className="text-left p-2 md:p-3">Respuesta</th>
-                                            <th className="text-center p-2 md:p-3">Estado</th>
-                                            <th className="text-center p-2 md:p-3">Acción</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {incidencias.slice(0, 10).map((inc) => {
-                                            const rutReclamante = (inc as any).trabajador_rut
-                                                || (inc as any).trabajador?.rut
-                                                || (typeof inc.trabajador === 'string' ? inc.trabajador : undefined)
-                                                || (typeof inc.trabajador === 'number' ? inc.trabajador : undefined)
-                                                || 'N/A';
-                                            const respuesta = inc.resolucion || (inc as any)?.metadata?.resolucion || 'Pendiente';
+                            {incidencias.length === 0 ? (
+                                <div className="text-center py-8 text-[#6B6B6B]">
+                                    <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                                    <p className="text-sm">No hay incidentes registrados</p>
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-xs md:text-sm">
+                                        <thead className="bg-[#F8F8F8] border-b-2 border-[#E0E0E0]">
+                                            <tr>
+                                                <th className="text-left p-2 md:p-3 text-[#333333] font-semibold">Código</th>
+                                                <th className="text-left p-2 md:p-3 text-[#333333] font-semibold">Tipo</th>
+                                                <th className="text-left p-2 md:p-3 text-[#333333] font-semibold">Trabajador</th>
+                                                <th className="text-left p-2 md:p-3 text-[#333333] font-semibold">Descripción</th>
+                                                <th className="text-center p-2 md:p-3 text-[#333333] font-semibold">Estado</th>
+                                                <th className="text-center p-2 md:p-3 text-[#333333] font-semibold">Acción</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {incidencias.map((inc) => {
+                                                // Buscar el nombre del trabajador si existe RUT
+                                                const rutIncidencia = (inc as any).trabajador_rut
+                                                    || (inc as any).trabajador?.rut
+                                                    || (typeof inc.trabajador === 'string' ? inc.trabajador : undefined);
+                                                
+                                                const trabajador = rutIncidencia 
+                                                    ? trabajadores.find(t => t.rut?.toLowerCase() === String(rutIncidencia).toLowerCase())
+                                                    : null;
+                                                
+                                                const nombreTrabajador = trabajador?.nombre || (inc as any).trabajador_nombre || rutIncidencia || 'Sin dato';
 
-                                            return (
-                                                <tr key={inc.id || inc.codigo} className="border-b border-[#E0E0E0]">
-                                                    <td className="p-2 md:p-3">{inc.tipo || 'N/A'}</td>
-                                                    <td className="p-2 md:p-3">{rutReclamante}</td>
-                                                    <td className="p-2 md:p-3 text-[#6B6B6B] truncate" title={inc.descripcion}>{inc.descripcion || 'Sin descripción'}</td>
-                                                    <td className="p-2 md:p-3 text-[#6B6B6B] truncate" title={respuesta}>{respuesta}</td>
-                                                    <td className="p-2 md:p-3 text-center">
-                                                        <Badge className="text-xs px-2 py-0.5" variant={inc.estado === 'resuelta' ? 'outline' : 'destructive'}>
-                                                            {inc.estado || 'pendiente'}
-                                                        </Badge>
-                                                    </td>
-                                                    <td className="p-2 md:p-3 text-center">
-                                                        <button
-                                                            className="px-3 py-1 rounded bg-[#017E49] text-white text-xs hover:bg-[#015F3A] transition-colors disabled:opacity-50"
-                                                            onClick={() => handleResponderIncidencia(inc)}
-                                                            disabled={resolviendoIncidencia === (inc.codigo || String(inc.id))}
-                                                        >
-                                                            {resolviendoIncidencia === (inc.codigo || String(inc.id)) ? 'Enviando...' : 'Responder'}
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
+                                                return (
+                                                    <tr key={inc.id || inc.codigo} className="border-b border-[#E0E0E0] hover:bg-[#F8F8F8] transition-colors">
+                                                        <td className="p-2 md:p-3 font-mono text-[#E12019]">{inc.codigo || String(inc.id)}</td>
+                                                        <td className="p-2 md:p-3 capitalize">
+                                                            <span className="px-2 py-1 bg-[#E8F5F1] text-[#017E49] rounded text-xs font-medium">
+                                                                {inc.tipo || 'N/A'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-2 md:p-3">
+                                                            <div className="text-[#333333] font-medium">{nombreTrabajador}</div>
+                                                            {rutIncidencia && (
+                                                                <div className="text-[#6B6B6B] text-xs">{rutIncidencia}</div>
+                                                            )}
+                                                        </td>
+                                                        <td className="p-2 md:p-3 text-[#6B6B6B] max-w-xs truncate" title={inc.descripcion}>
+                                                            {inc.descripcion || 'Sin descripción'}
+                                                        </td>
+                                                        <td className="p-2 md:p-3 text-center">
+                                                            <Badge 
+                                                                className="text-xs px-2 py-0.5 capitalize"
+                                                                variant={inc.estado === 'resuelta' ? 'outline' : 'destructive'}
+                                                            >
+                                                                {inc.estado || 'pendiente'}
+                                                            </Badge>
+                                                        </td>
+                                                        <td className="p-2 md:p-3 text-center">
+                                                            <button
+                                                                className="px-3 py-1.5 rounded bg-[#017E49] text-white text-xs hover:bg-[#015F3A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                                                                onClick={() => handleResponderIncidencia(inc)}
+                                                                disabled={resolviendoIncidencia === (inc.codigo || String(inc.id)) || inc.estado === 'resuelta'}
+                                                            >
+                                                                {resolviendoIncidencia === (inc.codigo || String(inc.id)) ? 'Enviando...' : 'Responder'}
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
                         </div>
                     </TabsContent>
 

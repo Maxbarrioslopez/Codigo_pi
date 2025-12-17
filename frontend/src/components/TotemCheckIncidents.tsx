@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ArrowLeft, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { incidentService } from '../services/incident.service';
 import { Input } from './ui/input';
-import { validateRut } from '@/utils/rut';
+import { validateRut, formatRutOnType } from '@/utils/rut';
 
 interface TotemCheckIncidentsProps {
     onBack: () => void;
@@ -115,7 +115,7 @@ export function TotemCheckIncidents({ onBack }: TotemCheckIncidentsProps) {
                         <Input
                             type="text"
                             value={rut}
-                            onChange={(e) => setRut(e.target.value)}
+                            onChange={(e) => setRut(formatRutOnType(e.target.value))}
                             placeholder="Ej: 12345678-9"
                             className="w-full"
                         />

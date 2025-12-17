@@ -485,32 +485,47 @@ export function RRHHModuleNew() {
             {/* Tabs responsivos */}
             <div className="p-3 md:p-6">
                 <Tabs value={currentTab} onValueChange={(v) => setCurrentTab(v as RRHHTab)} className="w-full">
-                    <TabsList className="grid w-full grid-cols-3 md:grid-cols-5 gap-2 mb-6 bg-white border border-[#E0E0E0] p-1 md:p-2">
-                        <TabsTrigger value="dashboard" className="text-xs md:text-sm">
+                    <TabsList className="grid w-full grid-cols-3 md:grid-cols-5 gap-2 mb-6 bg-white border border-[#E0E0E0] p-3 md:p-4 rounded-xl shadow-sm">
+                        <TabsTrigger
+                            value="dashboard"
+                            className="text-base md:text-lg font-semibold px-4 py-3 md:px-5 md:py-3 rounded-lg border border-[#E0E0E0] bg-white text-[#333333] hover:bg-[#F8F8F8] transition-colors data-[state=active]:!bg-[#E12019] data-[state=active]:!text-white data-[state=active]:!border-[#E12019] data-[state=active]:shadow-sm data-[state=active]:shadow-[#E12019]/25"
+                        >
                             <span className="inline-flex items-center gap-2">
                                 <BarChart3 className="w-3 h-3 md:w-4 md:h-4" />
                                 <span>Dashboard</span>
                             </span>
                         </TabsTrigger>
-                        <TabsTrigger value="nomina" className="text-xs md:text-sm">
+                        <TabsTrigger
+                            value="nomina"
+                            className="text-base md:text-lg font-semibold px-4 py-3 md:px-5 md:py-3 rounded-lg border border-[#E0E0E0] bg-white text-[#333333] hover:bg-[#F8F8F8] transition-colors data-[state=active]:!bg-[#E12019] data-[state=active]:!text-white data-[state=active]:!border-[#E12019] data-[state=active]:shadow-sm data-[state=active]:shadow-[#E12019]/25"
+                        >
                             <span className="inline-flex items-center gap-2">
                                 <Users className="w-3 h-3 md:w-4 md:h-4" />
                                 <span>Trabajadores y Nómina</span>
                             </span>
                         </TabsTrigger>
-                        <TabsTrigger value="ciclos" className="text-xs md:text-sm">
+                        <TabsTrigger
+                            value="ciclos"
+                            className="text-base md:text-lg font-semibold px-4 py-3 md:px-5 md:py-3 rounded-lg border border-[#E0E0E0] bg-white text-[#333333] hover:bg-[#F8F8F8] transition-colors data-[state=active]:!bg-[#E12019] data-[state=active]:!text-white data-[state=active]:!border-[#E12019] data-[state=active]:shadow-sm data-[state=active]:shadow-[#E12019]/25"
+                        >
                             <span className="inline-flex items-center gap-2">
                                 <Calendar className="w-3 h-3 md:w-4 md:h-4" />
                                 <span>Ciclos</span>
                             </span>
                         </TabsTrigger>
-                        <TabsTrigger value="incidentes" className="text-xs md:text-sm">
+                        <TabsTrigger
+                            value="incidentes"
+                            className="text-base md:text-lg font-semibold px-4 py-3 md:px-5 md:py-3 rounded-lg border border-[#E0E0E0] bg-white text-[#333333] hover:bg-[#F8F8F8] transition-colors data-[state=active]:!bg-[#E12019] data-[state=active]:!text-white data-[state=active]:!border-[#E12019] data-[state=active]:shadow-sm data-[state=active]:shadow-[#E12019]/25"
+                        >
                             <span className="inline-flex items-center gap-2">
                                 <QrCode className="w-3 h-3 md:w-4 md:h-4" />
                                 <span>Incidentes</span>
                             </span>
                         </TabsTrigger>
-                        <TabsTrigger value="reportes" className="text-xs md:text-sm">
+                        <TabsTrigger
+                            value="reportes"
+                            className="text-base md:text-lg font-semibold px-4 py-3 md:px-5 md:py-3 rounded-lg border border-[#E0E0E0] bg-white text-[#333333] hover:bg-[#F8F8F8] transition-colors data-[state=active]:!bg-[#E12019] data-[state=active]:!text-white data-[state=active]:!border-[#E12019] data-[state=active]:shadow-sm data-[state=active]:shadow-[#E12019]/25"
+                        >
                             <span className="inline-flex items-center gap-2">
                                 <Package className="w-3 h-3 md:w-4 md:h-4" />
                                 <span>Reportes</span>
